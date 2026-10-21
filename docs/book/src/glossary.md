@@ -27,7 +27,9 @@
 **Passphrase** — A password made of random words.
 **Plaintext** — Readable, unencrypted data.
 **Poly1305** — The authentication part of XChaCha20-Poly1305.
-**Property test** — A test that checks a rule holds for many generated inputs.
+**Property test** — A test that checks a rule holds for many generated inputs, then shrinks any failure to a minimal case.
+**Mutation check** — Deliberately breaking the code to confirm the tests notice.
+**Redundant protection** — Two independent safeguards against one attack; either alone suffices, which is deliberate.
 **Rejection sampling** — Discarding random draws that would introduce bias.
 **Re-authentication** — Asking for the master password again before a dangerous action.
 **Salt** — Random public data mixed into password hashing.

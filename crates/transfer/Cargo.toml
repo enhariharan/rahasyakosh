@@ -14,3 +14,7 @@ serde_json = "1.0.154"
 thiserror = "2.0.21"
 uuid = "1.28.0"
 zeroize = "1.9.1"
+
+# proptest (via rusty-fork) does not build for WASI; property tests run natively only.
+[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
+proptest = "1.12.0"

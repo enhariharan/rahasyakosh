@@ -17,7 +17,7 @@ cargo build -p rahasyakosh-core -p rahasyakosh-strength -p rahasyakosh-transfer 
 cargo deny check
 # optional: run core's tests (incl. the golden vault) under WebAssembly; needs wasmtime installed
 rustup target add wasm32-wasip1
-CARGO_TARGET_WASM32_WASIP1_RUNNER=wasmtime cargo test -p rahasyakosh-core --target wasm32-wasip1
+CARGO_TARGET_WASM32_WASIP1_RUNNER=wasmtime cargo test -p rahasyakosh-core -p rahasyakosh-transfer --target wasm32-wasip1
 ```
 CI runs the same checks. Minimum supported Rust version is set in `Cargo.toml` (`rust-version`).
 

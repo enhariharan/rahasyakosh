@@ -1,4 +1,4 @@
-# Testing with known answers
+# Testing with known answers and properties
 
 Ordinary tests check that code does what *we think* is right. In cryptography that is not enough:
 if we misunderstand an algorithm, our code and our test can be wrong in the same way and both pass.
@@ -78,3 +78,62 @@ If the current code can still open it, old vaults still open.
 Elsewhere in software, golden files are often *snapshots* of program output (for example, a
 rendered screen) that are updated when the output intentionally changes. Ours is stricter: it is
 never updated, because other people's data depends on it.
+
+## Property tests
+
+A known-answer test checks one input. A **property test** states a rule that must hold for *every* input,
+then lets the computer try hundreds of generated inputs, including odd ones a person would never think of:
+empty strings, quotes, newlines, emoji, enormous numbers. We use the `proptest` library. If a rule fails,
+it automatically **shrinks** the failing input to the smallest one that still fails, which makes the bug
+easy to see.
+
+They live in `crates/core/tests/properties.rs` and `crates/transfer/tests/properties.rs`. The rules include:
+
+| Rule | In plain English |
+|---|---|
+| seal then open is the identity | Encrypting then decrypting gives back exactly what you put in |
+| any single bit flip is rejected | Change one bit of a ciphertext, nonce, record or vault header, and opening fails |
+| wrong key, wrong context, resized data | All rejected |
+| a record cannot be moved or replayed | Changing its item id, revision or version makes it fail |
+| only the right password unlocks | And changing the password keeps items readable while revoking the old one |
+| generated passwords match their spec | Right length, every chosen character class present, none of the excluded ones |
+| TOTP codes have the right shape | Right number of digits, and unchanged within one time step |
+| parsers never panic | Feed the CSV importer and the TOTP parsers arbitrary junk; they may refuse it, but must not crash |
+| export then import preserves every value | Nothing is trimmed, altered or lost on the way |
+
+They run only on native targets, because `proptest` does not build for WebAssembly. The known-answer
+tests and golden vault cover WebAssembly.
+
+### A real bug they found
+
+The export-then-import property failed at once on a username that was just a tab character. The importer
+trimmed spaces from every CSV cell, so it quietly turned `"\t"` into `""`. The same would have happened
+to a password with a leading or trailing space. Changing a stored secret during import is exactly the sort
+of silent bug that is miserable to track down later. The fix is to tidy only titles, URLs, TOTP
+secrets and tags, and leave usernames, passwords and notes exactly as they are. A plain unit test
+(`secrets_are_not_trimmed`) now pins it. This is the usual pattern: let a property find the bug, then
+keep a small ordinary test so the failure is obvious next time.
+
+## Checking that the tests can fail
+
+A test that always passes is worse than none. After writing the security properties we deliberately **broke the
+code** in small ways ("mutations") and checked that the tests noticed:
+
+| Deliberate breakage | Caught? |
+|---|---|
+| `open` ignores the associated data | Yes, by seven tests |
+| Record associated data ignores the revision number | Yes |
+| Header associated data ignores the vault id | Yes |
+| Padding bucket changed from 64 to 63 | Yes |
+| Header associated data ignores the salt | **No** |
+| Record associated data ignores the item id | **No** |
+| Header or record associated data ignores the version number | **No** |
+
+The last three are not gaps in the tests. They are **redundant protections**. The salt already
+changes the key that Argon2 derives. The item id already changes the per-item key. The version
+numbers are checked by an explicit "is this a version I understand?" test before anything else happens.
+So removing the extra binding does not make any attack succeed, and no test of behaviour can tell the difference.
+That is deliberate defence in depth: if one layer has a flaw, the other still holds.
+
+One consequence for future maintainers: **when a second format version exists, add tests for
+version downgrade attacks.** Until then, version binding in the associated data cannot be exercised.

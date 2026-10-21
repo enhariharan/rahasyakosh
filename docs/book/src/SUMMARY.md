@@ -10,7 +10,7 @@
 - [One-time codes (TOTP)](totp.md)
 - [Importing and exporting](import-export.md)
 - [Writing code that handles secrets](safe-coding.md)
-- [Testing with known answers](testing-with-known-answers.md)
+- [Testing with known answers and properties](testing-with-known-answers.md)
 - [What we defend against](threat-model.md)
 - [A tour of the repository](repo-tour.md)
 - [Maintainer's handbook](maintainers-handbook.md)

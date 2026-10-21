@@ -188,12 +188,15 @@ pub fn import_csv(
 
     for (n, rec) in rdr.records().enumerate() {
         let rec = rec.map_err(|e| Error::Csv(format!("row {}: {e}", n + 2)))?;
-        let get = |c: Col| -> String {
+        // Titles, URLs, TOTP secrets and tags are tidied. Username, password and notes are kept exactly as
+        // they are in the file: altering a secret on import (even stray spaces) would be a silent bug.
+        let raw = |c: Col| -> String {
             at(c)
                 .and_then(|i| rec.get(i))
-                .map(|s| s.trim().to_string())
+                .map(String::from)
                 .unwrap_or_default()
         };
+        let get = |c: Col| -> String { raw(c).trim().to_string() };
         let (url, mut title) = (get(Col::Url), get(Col::Title));
         if title.is_empty() && url.is_empty() {
             report.skipped_empty += 1;
@@ -204,18 +207,15 @@ pub fn import_csv(
         }
         let mut item = Item::login(
             &title,
-            &get(Col::Username),
-            &get(Col::Password),
+            &raw(Col::Username),
+            &raw(Col::Password),
             now,
             new_id(),
         );
         if !url.is_empty() {
             item.urls.push(url);
         }
-        item.notes = at(Col::Notes)
-            .and_then(|i| rec.get(i))
-            .unwrap_or("")
-            .to_string();
+        item.notes = raw(Col::Notes);
         let totp = get(Col::Totp);
         if !totp.is_empty() {
             let ok = if totp.starts_with("otpauth://") {
@@ -390,6 +390,14 @@ mod tests {
         assert_eq!(i.notes, "line1\nline2");
         assert_eq!(i.field("totp").unwrap().value, "JBSWY3DPEHPK3PXP");
         assert_eq!(i.tags, ["fin", "home"]);
+    }
+
+    #[test]
+    fn secrets_are_not_trimmed() {
+        // Found by a property test: surrounding whitespace in a username or password is part of the value.
+        let r = run("name,username,password\nA,\" u \",\"\tp w \"\n", &[]);
+        assert_eq!(r.items[0].field("username").unwrap().value, " u ");
+        assert_eq!(r.items[0].field("password").unwrap().value, "\tp w ");
     }
 
     #[test]

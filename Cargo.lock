@@ -836,6 +836,7 @@ name = "rahasyakosh-transfer"
 version = "0.1.0"
 dependencies = [
  "csv",
+ "proptest",
  "rahasyakosh-core",
  "serde",
  "serde_json",

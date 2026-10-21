@@ -38,7 +38,7 @@ jobs:
       - uses: bytecodealliance/actions/wasmtime/setup@v1
         with:
           version: v50.0.0
-      - run: cargo test -p rahasyakosh-core --target wasm32-wasip1
+      - run: cargo test -p rahasyakosh-core -p rahasyakosh-transfer --target wasm32-wasip1
 
   deny:
     runs-on: ubuntu-latest
