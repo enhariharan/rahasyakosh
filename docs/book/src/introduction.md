@@ -19,6 +19,7 @@ If you are new to the subject, read the chapters in order. Each one builds on th
 
 | If you want to… | Read |
 |---|---|
+| Install `rk` and store your first passwords | [Quick start: using `rk`](quick-start.md) |
 | Understand the big picture | [What a password manager does](what-is-a-password-manager.md) |
 | Decode jargon in a code review | [Security words you will meet](vocabulary.md) and the [Glossary](glossary.md) |
 | Know why we picked Argon2, XChaCha20 and friends | [The cryptography toolbox](crypto-toolbox.md) |

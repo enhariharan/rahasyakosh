@@ -3,6 +3,7 @@
 **AAD** — Associated data: unencrypted context covered by the authentication tag.
 **AEAD** — Authenticated encryption with associated data; encrypts and detects tampering.
 **Argon2id** — A deliberately slow, memory-hungry password-hashing/KDF algorithm.
+**Backup (encrypted)** — `rk export -f vault`: a copy of the vault that is still encrypted, so it is safe to store elsewhere.
 **Base32** — Text encoding using A–Z and 2–7; used for TOTP secrets.
 **Bit** — A single 0/1. A 256-bit key has 2²⁵⁶ possible values.
 **Ciphertext** — Encrypted data.
