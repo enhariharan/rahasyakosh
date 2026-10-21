@@ -1,0 +1,11 @@
+[package]
+name = "rahasyakosh-clipboard"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Copy secrets to the desktop clipboard through the desktop's own tools, and clear them again"
+
+[dependencies]
+thiserror = "2.0.21"
+zeroize = "1.9.1"

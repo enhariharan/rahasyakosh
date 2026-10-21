@@ -58,6 +58,13 @@ struct Entry {
     rev: u64,
 }
 
+/// A failed unlock, with the store returned so the caller can try again.
+#[derive(Debug)]
+pub struct UnlockFailed<S> {
+    pub error: Error,
+    pub store: S,
+}
+
 /// An unlocked vault: keys, decrypted items and search index, all in memory, backed by a [`Store`].
 /// Dropping it wipes the keys, the items and the index.
 pub struct Vault<S: Store> {
@@ -90,6 +97,32 @@ impl<S: Store> Vault<S> {
 
     /// Unlock an existing vault: check the password, decrypt every item once and build the search index.
     pub fn unlock(store: S, password: &str, config: Config) -> Result<Self> {
+        Self::try_unlock(store, password, config).map_err(|f| f.error)
+    }
+
+    /// Like [`unlock`](Self::unlock), but a failure (typically a wrong password) hands the store back so the caller can try again.
+    pub fn try_unlock(
+        store: S,
+        password: &str,
+        config: Config,
+    ) -> std::result::Result<Self, UnlockFailed<S>> {
+        match Self::unlock_inner(&store, password) {
+            Ok((keys, entries, index)) => Ok(Self {
+                store,
+                keys,
+                entries,
+                index,
+                config,
+            }),
+            Err(error) => Err(UnlockFailed { error, store }),
+        }
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn unlock_inner(
+        store: &S,
+        password: &str,
+    ) -> Result<(UnlockedVault, BTreeMap<Uuid, Entry>, SearchIndex)> {
         let keys = store.header()?.unlock(password)?;
         let mut entries = BTreeMap::new();
         let mut index = SearchIndex::default();
@@ -104,13 +137,7 @@ impl<S: Store> Vault<S> {
                 },
             );
         }
-        Ok(Self {
-            store,
-            keys,
-            entries,
-            index,
-            config,
-        })
+        Ok((keys, entries, index))
     }
 
     /// Lock: wipe keys and items, and hand the store back.
@@ -120,6 +147,11 @@ impl<S: Store> Vault<S> {
 
     pub fn store(&self) -> &S {
         &self.store
+    }
+
+    /// Change behaviour such as the history limit and trash retention for the open vault.
+    pub fn set_config(&mut self, config: Config) {
+        self.config = config;
     }
 
     pub fn config(&self) -> Config {

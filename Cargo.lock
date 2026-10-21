@@ -848,6 +848,8 @@ dependencies = [
  "rahasyakosh-store",
  "rand_chacha",
  "rand_core",
+ "serde",
+ "serde_json",
  "thiserror",
  "uuid",
  "zeroize",
@@ -860,6 +862,7 @@ dependencies = [
  "anyhow",
  "clap",
  "rahasyakosh-app",
+ "rahasyakosh-clipboard",
  "rahasyakosh-core",
  "rahasyakosh-store",
  "rahasyakosh-strength",
@@ -869,6 +872,14 @@ dependencies = [
  "serde",
  "serde_json",
  "uuid",
+ "zeroize",
+]
+
+[[package]]
+name = "rahasyakosh-clipboard"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
  "zeroize",
 ]
 

@@ -10,6 +10,7 @@
 - [Where your data lives: the store](storage.md)
 - [Passwords and passphrases](passwords-and-passphrases.md)
 - [One-time codes (TOTP)](totp.md)
+- [Sessions: locking, hiding and clearing](sessions.md)
 - [Importing and exporting](import-export.md)
 - [The clipboard and the trash](clipboard.md)
 - [Writing code that handles secrets](safe-coding.md)

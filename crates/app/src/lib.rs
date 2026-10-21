@@ -8,6 +8,10 @@
 #![forbid(unsafe_code)]
 
 mod index;
+mod session;
 mod vault;
 
-pub use vault::{Config, Error, Result, Scope, Vault};
+pub use session::{
+    backoff_secs, should_clear, Locked, Session, Settings, Tick, UnlockError, Unlocked,
+};
+pub use vault::{Config, Error, Result, Scope, UnlockFailed, Vault};

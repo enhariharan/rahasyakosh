@@ -28,6 +28,7 @@ If you are new to the subject, read the chapters in order. Each one builds on th
 | Follow a password from keyboard to disk | [How a vault works](how-a-vault-works.md) |
 | Understand storage, the trash, history, search and upgrades | [Where your data lives: the store](storage.md) |
 | Copy passwords without printing them, or use the trash | [The clipboard and the trash](clipboard.md) |
+| Understand locking, the idle timeout and clipboard clearing | [Sessions](sessions.md) |
 | Move logins in or out safely | [Importing and exporting](import-export.md) |
 | Work on the password generator | [Passwords and passphrases](passwords-and-passphrases.md) |
 | Understand how we attack our own parsers | [Fuzzing](fuzzing.md) |

@@ -71,7 +71,7 @@ does its job and exits, and the key is wiped as the process ends (`UnlockedVault
 the safest design, which is why there is no `rk lock`: there is nothing to lock. The cost is typing the
 password each time.
 
-A convenient "unlock once, work for a while" mode needs a long-lived **session** that holds the key and
+A convenient "unlock once, work for a while" mode needs a long-lived **session** (now built for the desktop app: see [Sessions](sessions.md)) that holds the key and
 forgets it after a timeout, much as `ssh-agent` does for SSH keys. That is new security-sensitive code with its
 own risks (who may talk to it, how long it lives, how it wipes), and the desktop app needs the same thing. So we
 build it once, in the M3 session crate, rather than twice. See story US-VLT-04.

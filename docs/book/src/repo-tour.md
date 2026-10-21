@@ -11,6 +11,7 @@ rahasyakosh/
 ├── docs/                 design documents (01–06) and this book (docs/book)
 └── crates/
     ├── core/             rahasyakosh-core: all security-relevant logic
+    ├── clipboard/        rahasyakosh-clipboard: copy to the desktop clipboard and clear it (shared by rk and the app)
     ├── store/            rahasyakosh-store: saves encrypted records (SQLite, directory and memory backends)
     ├── app/              rahasyakosh-app: the unlocked vault (items, trash, history, search)
     ├── fuzzcheck/        rahasyakosh-fuzzcheck: robustness checks for every parser, used by tests and by `fuzz/`
@@ -35,10 +36,14 @@ rahasyakosh/
 Rules: **no file access, no network, no clock, no ambient randomness.** Everything is passed in.
 That is what makes it testable and portable to WebAssembly.
 
-## `crates/store` and `crates/app` — storage and vault operations
+## `crates/clipboard` — the clipboard
+
+Wraps the desktop's clipboard tools (`wl-copy`/`wl-paste`, `xclip`, `xsel`) and implements "clear it, but only if it is still our value". Used by `rk` and by the desktop app.
+
+## `crates/store` and `crates/app` — storage, vault operations and the session
 
 `store` saves and loads encrypted records and never has a key; `app` holds the keys and the decrypted items and offers one tested set of operations to every
-front-end. See [Where your data lives](storage.md).
+front-end, and the **session** (locking, auto-lock, reveal and clipboard bookkeeping). See [Where your data lives](storage.md) and [Sessions](sessions.md).
 
 ## `crates/fuzzcheck` and `fuzz/` — attacking our own parsers
 

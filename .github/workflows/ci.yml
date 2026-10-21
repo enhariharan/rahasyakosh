@@ -22,7 +22,7 @@ jobs:
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - run: cargo test --workspace --all-features
       - name: WASM build of core
-        run: cargo build -p rahasyakosh-core -p rahasyakosh-store -p rahasyakosh-app -p rahasyakosh-strength -p rahasyakosh-transfer --target wasm32-unknown-unknown --release
+        run: cargo build -p rahasyakosh-core -p rahasyakosh-store -p rahasyakosh-app -p rahasyakosh-clipboard -p rahasyakosh-strength -p rahasyakosh-transfer --target wasm32-unknown-unknown --release
 
   wasm-test:
     # Runs core's tests, including the golden vault in spec/vectors, inside a WebAssembly runtime.

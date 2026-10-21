@@ -92,6 +92,8 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Backend** — One way of keeping stored data (memory, a folder of files, SQLite). See Store.
 
+**Backoff** — Making each repeated failed attempt wait longer (1 s, 2 s, 4 s …). It slows guessing at the keyboard; it does not stop offline guessing against a copied file.
+
 **Backup (encrypted)** — `rk export -f vault`: a copy of the vault that is still locked, so it can be stored anywhere.
 
 **Base32 / Base64** — Ways of writing binary data using only letters and digits so it can sit in text files. TOTP secrets are base32; our JSON files use base64.
@@ -168,6 +170,8 @@ so an old password is not lost by accident, and you can go back to it.
 
 **HMAC** — A keyed fingerprint; the building block of TOTP.
 
+**Idle timeout (auto-lock)** — Locking the vault automatically after a period with no activity, so a vault left open on an unattended computer closes itself.
+
 **Index (search index)** — A temporary in-memory list built when you unlock, used to search quickly. It is never written to disk and is wiped when the program exits.
 
 **Item** — One thing you saved: a login, note, card or identity. See the core ideas above.
@@ -232,6 +236,8 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Rejection sampling** — Throwing away random numbers that would make a choice slightly uneven. Avoids "modulo bias".
 
+**Reveal** — Showing a hidden secret on screen for a few seconds, then hiding it again.
+
 **Revision (rev)** — A counter on each record that goes up with every change. A write that is not newer than what is stored is refused.
 
 **RFC** — A published technical standard ("Request for Comments"). The test vectors come from them.
@@ -248,7 +254,7 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Secure delete** — Overwriting deleted data with zeros so it cannot be recovered from the file's free space.
 
-**Session** — A period during which the vault stays unlocked. The CLI has none; the desktop app (M3) will.
+**Session** — A period during which the vault stays unlocked, and the code that decides when it ends. The CLI has none; the desktop app does. See [Sessions](sessions.md).
 
 **Shared secret** — The value that a website and your authenticator both know, from which the six-digit codes are computed. Treat it like a password.
 
