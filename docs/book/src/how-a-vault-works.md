@@ -33,7 +33,7 @@ affected. It also means a record is meaningless without its own id.
 
 ## What is stored on disk
 
-The CLI vault (`crates/cli/src/file.rs`) is a JSON file with two parts:
+A vault (a SQLite database file, see [Where your data lives](storage.md)) has two parts:
 
 1. **Header** (readable, not secret): format version, a vault id, the Argon2 settings, the salt,
    and the **wrapped vault key**. None of this helps an attacker without the password.
@@ -41,11 +41,12 @@ The CLI vault (`crates/cli/src/file.rs`) is a JSON file with two parts:
    **ciphertext**. The item's title, username, password, notes and everything else are *inside*
    the ciphertext.
 
+The same two parts, written out as one JSON file, form the portable *bundle* that `rk export -f vault` produces and `rk migrate` reads.
+
 Before encryption, each item is padded to a multiple of 64 bytes so that file sizes do not
 reveal, say, how long your password is.
 
-The file is written safely: to a temporary file, flushed to disk, then renamed over the old one
-(so a crash cannot leave half a vault) and with permissions `0600` (owner only) on Unix.
+The database is written safely: changes go through a log and a transaction (so a crash cannot leave half a vault) and the file is readable only by you (`0600`).
 
 ## Unlocking
 

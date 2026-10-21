@@ -32,7 +32,7 @@ asked. If you prefer to choose your own master password, run `rk init`; it shows
 
 **There is no recovery.** If you lose the master passphrase, nobody can open your vault, including the authors.
 
-The vault is one file, `~/.local/share/rahasyakosh/vault.rkv`, readable only by you. Use another file with `--vault FILE`, or set `RK_VAULT`.
+The vault is one file, `~/.local/share/rahasyakosh/vault.db`, readable only by you. Use another file with `--vault FILE`, or set `RK_VAULT`.
 Every command asks for the master passphrase and takes a fraction of a second to check it.
 
 ## Everyday use
@@ -83,6 +83,16 @@ rk restore github        # bring it back
 rk rm github --purge     # delete for good (also works on trashed items)
 ```
 
+Items stay in the trash for 30 days, then are deleted automatically the next time you use `rk`.
+
+### History and favourites
+
+```
+rk history github          # earlier versions: which parts changed (never the secret values)
+rk revert github 1         # make version 1 current again (the present content is kept too)
+rk edit github --favourite # pin it: favourites are listed first, marked with ★ ( --no-favourite removes)
+```
+
 ### Passwords and passphrases
 
 ```
@@ -106,7 +116,7 @@ rk import chrome-passwords.csv           # ask, then import; duplicates are skip
 ```
 
 Plaintext exports contain every password. Delete them as soon as you are done, and read [Importing and exporting](import-export.md).
-**Make an encrypted backup regularly and keep it somewhere other than this computer.** To restore, use the backup file with `--vault`.
+**Make an encrypted backup regularly and keep it somewhere other than this computer.** To restore a backup, load it into a new vault with `rk migrate backup.rkv --vault new-vault.db`.
 
 ## Command cheat sheet
 
@@ -120,6 +130,8 @@ Plaintext exports contain every password. Delete them as soon as you are done, a
 | `rk edit TEXT [options]` | Change an item |
 | `rk rm TEXT [--purge]` | Trash an item, or delete it for good |
 | `rk trash` / `rk restore TEXT` | List the trash / bring an item back |
+| `rk history TEXT` / `rk revert TEXT N` | Earlier versions / go back to version N |
+| `rk migrate FILE` | Load an old-format vault or a backup bundle into a new vault |
 | `rk gen [--passphrase]` | Generate a password or passphrase |
 | `rk passwd [--passphrase]` | Change the master password |
 | `rk import FILE [--map F=COL] [--dry-run] [-y]` | Import CSV (Chrome, Firefox or generic) |
@@ -135,8 +147,9 @@ Add `--help` to any command. Every command also takes `--vault FILE`.
 - **`rk get` without `--copy` prints the password**, which then sits in your terminal scrollback. Prefer `--copy`.
 - **Do not set `RK_PASSWORD` in your shell configuration.** It exists for scripts and tests, and would keep your master password in your environment.
 - **Back up** with `rk export -f vault`. Restoring a backup is only possible if you still know the master passphrase it was made with.
-- **Your vault will move to a new storage format** (milestone M2, in progress). A `rk migrate` command will convert it without changing any
-  passwords. The format of vaults you create now is protected by a committed test vector, so they stay readable. Keep your vault file and your backups.
+- **If you used an earlier version** your vault is an old-format file (`vault.rkv`). Convert it once:
+  `rk migrate ~/.local/share/rahasyakosh/vault.rkv --vault ~/.local/share/rahasyakosh/vault.db`. Your passwords and master password stay the same, and the old file
+  is left untouched; keep it until you have checked the new vault. `rk` tells you when it meets an old file.
 
 ## When something goes wrong
 
@@ -146,6 +159,8 @@ Add `--help` to any command. Every command also takes `--vault FILE`.
 | `master password is too weak` | Choose a longer one, use `--passphrase`, or accept the risk with `--allow-weak` |
 | `'x' is ambiguous: A, B` | More than one item matches; use a longer name |
 | `no item matches 'x'` | Nothing live matches. Check `rk trash`; `rk restore` brings an item back |
+| `... is in the old vault file format` | Run `rk migrate` as the message says |
+| `no vault at ...` | Create one with `rk init`, or check `--vault` / `RK_VAULT` |
 | `no clipboard tool found` | Install `wl-clipboard` (Wayland) or `xclip` (X11) |
 | `nothing to change` | You ran `rk edit` without saying what to change |
 | `... already exists` | `rk init` will not overwrite a vault. Use `--vault` for a different file |

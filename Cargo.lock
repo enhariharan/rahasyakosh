@@ -859,7 +859,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "rahasyakosh-app",
  "rahasyakosh-core",
+ "rahasyakosh-store",
  "rahasyakosh-strength",
  "rahasyakosh-transfer",
  "rand",

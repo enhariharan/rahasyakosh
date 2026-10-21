@@ -1,28 +1,32 @@
-//! `rk` — Rahasyakosh command-line password manager (M1b: single-file vault).
+//! `rk` — Rahasyakosh command-line password manager.
+//!
+//! Every command unlocks the vault, does its job and exits (the CLI keeps no session), so keys never outlive it.
+//! The vault is a SQLite database; `rk export -f vault` writes (and `rk migrate` reads) a portable JSON bundle.
 mod clipboard;
 mod file;
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use file::VaultFile;
+use rahasyakosh_app::{Config, Scope, Vault};
 use rahasyakosh_core::{
     crypto::KdfParams,
     generator::{self, PasswordSpec},
-    item::{Field, Item},
+    item::{Field, Item, ItemVersion},
     totp::Totp,
-    vault::UnlockedVault,
     wordlist,
 };
+use rahasyakosh_store::{SqliteStore, Store};
 use rahasyakosh_strength as strength;
 use rahasyakosh_transfer as transfer;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
 #[derive(Parser)]
 #[command(name = "rk", version, about = "Rahasyakosh password manager")]
 struct Cli {
-    /// Vault file (default: $RK_VAULT or ~/.local/share/rahasyakosh/vault.rkv)
+    /// Vault file (default: $RK_VAULT or ~/.local/share/rahasyakosh/vault.db)
     #[arg(long, global = true, env = "RK_VAULT")]
     vault: Option<PathBuf>,
     #[command(subcommand)]
@@ -82,6 +86,24 @@ enum Cmd {
         /// Remove a tag (repeatable)
         #[arg(long)]
         untag: Vec<String>,
+        /// Pin the item: favourites are listed first
+        #[arg(long, conflicts_with = "no_favourite")]
+        favourite: bool,
+        #[arg(long)]
+        no_favourite: bool,
+    },
+    /// Show the earlier versions of an item
+    History { query: String },
+    /// Make an earlier version current again (the present one is kept in the history)
+    Revert {
+        query: String,
+        /// Version number from `rk history`
+        version: usize,
+    },
+    /// Load a JSON vault file (an old-format vault, or a backup from `rk export -f vault`) into a NEW vault
+    Migrate {
+        /// The JSON vault file to read. The new vault is created at --vault.
+        file: PathBuf,
     },
     /// List items (optionally filtered)
     List { query: Option<String> },
@@ -226,7 +248,7 @@ fn now() -> i64 {
 
 fn default_path() -> Result<PathBuf> {
     let home = std::env::var_os("HOME").context("HOME not set; use --vault")?;
-    Ok(PathBuf::from(home).join(".local/share/rahasyakosh/vault.rkv"))
+    Ok(PathBuf::from(home).join(".local/share/rahasyakosh/vault.db"))
 }
 
 /// Master password from $RK_PASSWORD (for scripting) or an interactive prompt.
@@ -357,55 +379,88 @@ fn confirm(question: &str) -> Result<bool> {
     Ok(matches!(line.trim(), "y" | "Y" | "yes"))
 }
 
-/// Which items a lookup may return.
-#[derive(Clone, Copy, PartialEq)]
-enum Scope {
-    Live,
-    Trashed,
-    /// Live items first, then trashed ones.
-    Any,
-}
-
-fn find<'a>(items: &'a [Item], q: &str) -> Result<&'a Item> {
-    find_in(items, q, Scope::Live)
-}
-
-fn find_in<'a>(items: &'a [Item], q: &str, scope: Scope) -> Result<&'a Item> {
-    let wanted = |i: &&Item| match scope {
-        Scope::Live => i.deleted_at.is_none(),
-        Scope::Trashed => i.deleted_at.is_some(),
-        Scope::Any => true,
-    };
-    // Live items sort before trashed ones, so an exact title match prefers the live item.
-    let mut pool: Vec<&Item> = items.iter().filter(wanted).collect();
-    pool.sort_by_key(|i| i.deleted_at.is_some());
-    if let Some(i) = pool.iter().find(|i| i.title.eq_ignore_ascii_case(q)) {
-        return Ok(i);
-    }
-    let hits: Vec<_> = pool.into_iter().filter(|i| i.matches(q)).collect();
-    match hits.as_slice() {
-        [] => bail!("no item matches '{q}'"),
-        [one] => Ok(one),
-        many => bail!(
-            "'{q}' is ambiguous: {}",
-            many.iter()
-                .map(|i| if i.deleted_at.is_some() {
-                    format!("{} (in trash)", i.title)
-                } else {
-                    i.title.clone()
-                })
-                .collect::<Vec<_>>()
-                .join(", ")
-        ),
-    }
-}
-
 /// "today", "1 day ago", "5 days ago".
 fn days_ago(then: i64, now: i64) -> String {
     match ((now - then).max(0)) / 86_400 {
         0 => "today".into(),
         1 => "1 day ago".into(),
         n => format!("{n} days ago"),
+    }
+}
+
+/// Open the vault at `path` and unlock it. Refuses files that are not a vault, and points old-format files at `rk migrate`.
+fn open_vault(path: &Path) -> Result<Vault<SqliteStore>> {
+    use std::io::Read;
+    let mut file = std::fs::File::open(path)
+        .with_context(|| format!("no vault at {} (create one with `rk init`)", path.display()))?;
+    let mut head = [0u8; 16];
+    let n = file.read(&mut head)?;
+    let head = &head[..n];
+    if !head.is_empty() && head != b"SQLite format 3\0" {
+        if head.iter().find(|b| !b.is_ascii_whitespace()) == Some(&b'{') {
+            bail!(
+                "{} is in the old vault file format. Convert it with: rk migrate {} --vault <NEW FILE>",
+                path.display(),
+                path.display()
+            );
+        }
+        bail!("{} is not a Rahasyakosh vault", path.display());
+    }
+    drop(file);
+    let store = SqliteStore::open(path)?;
+    let pw = read_password("Master password: ")?;
+    let mut vault = Vault::unlock(store, &pw, Config::default())?;
+    let purged = vault.purge_expired(now())?;
+    if purged > 0 {
+        eprintln!(
+            "Deleted {purged} item(s) that had been in the trash for {} days or more.",
+            vault.config().trash_retention_days
+        );
+    }
+    Ok(vault)
+}
+
+/// "title, notes": which parts of the content differ between two versions. Never shows values.
+fn changed_parts(a: &ItemVersion, b: &ItemVersion) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    if a.title != b.title {
+        parts.push("title".into());
+    }
+    if a.urls != b.urls {
+        parts.push("url".into());
+    }
+    if a.tags != b.tags {
+        parts.push("tags".into());
+    }
+    if a.notes != b.notes {
+        parts.push("notes".into());
+    }
+    if a.favourite != b.favourite {
+        parts.push("favourite".into());
+    }
+    let mut names: Vec<&str> = a
+        .fields
+        .iter()
+        .chain(&b.fields)
+        .map(|f| f.name.as_str())
+        .collect();
+    names.sort_unstable();
+    names.dedup();
+    for name in names {
+        let find = |v: &ItemVersion| {
+            v.fields
+                .iter()
+                .find(|f| f.name == name)
+                .map(|f| f.value.clone())
+        };
+        if find(a) != find(b) {
+            parts.push(name.to_string());
+        }
+    }
+    if parts.is_empty() {
+        "(no visible change)".into()
+    } else {
+        parts.join(", ")
     }
 }
 
@@ -417,7 +472,8 @@ fn main() -> Result<()> {
     };
     let mut rng = rand::rng();
 
-    match cli.cmd {
+    // Commands that do not need an existing, unlocked vault.
+    match &cli.cmd {
         Cmd::Gen {
             length,
             no_symbols,
@@ -427,21 +483,26 @@ fn main() -> Result<()> {
             separator,
             capitalize,
         } => {
-            if passphrase {
+            if *passphrase {
                 let list = wordlist::eff_large();
-                let phrase =
-                    generator::generate_passphrase(&list, words, &separator, capitalize, &mut rng)?;
+                let phrase = generator::generate_passphrase(
+                    &list,
+                    *words,
+                    separator,
+                    *capitalize,
+                    &mut rng,
+                )?;
                 println!("{}", *phrase);
                 eprintln!(
                     "~{:.0} bits of entropy",
-                    generator::passphrase_entropy_bits(list.len(), words)
+                    generator::passphrase_entropy_bits(list.len(), *words)
                 );
                 return Ok(());
             }
             let spec = PasswordSpec {
-                length,
+                length: *length,
                 symbols: !no_symbols,
-                avoid_ambiguous,
+                avoid_ambiguous: *avoid_ambiguous,
                 ..Default::default()
             };
             let password = generator::generate_password(&spec, &mut rng)?;
@@ -450,47 +511,78 @@ fn main() -> Result<()> {
             eprintln!("Strength: {}/4 ({})", s.score, s.label());
             return Ok(());
         }
-        Cmd::ClipboardClear { after } => return clipboard::run_clearer(after),
+        Cmd::ClipboardClear { after } => return clipboard::run_clearer(*after),
         Cmd::Init(opts) => {
             if path.exists() {
                 bail!("{} already exists", path.display());
             }
-            let pw = new_master(&opts, &mut rng)?;
-            let vault = UnlockedVault::create(&pw, KdfParams::DESKTOP, &mut rng)?;
-            VaultFile {
-                header: vault.header().clone(),
-                records: vec![],
-            }
-            .save(&path)?;
+            let pw = new_master(opts, &mut rng)?;
+            Vault::create(
+                SqliteStore::open(&path)?,
+                &pw,
+                KdfParams::DESKTOP,
+                Config::default(),
+                &mut rng,
+            )?;
             eprintln!("Created {}", path.display());
             return Ok(());
+        }
+        Cmd::Migrate { file } => {
+            if path.exists() {
+                bail!(
+                    "{} already exists; migrate into a new file (--vault)",
+                    path.display()
+                );
+            }
+            let bundle =
+                VaultFile::load(file).with_context(|| format!("reading {}", file.display()))?;
+            let pw = read_password("Master password of the old vault: ")?;
+            // Copy first, then prove the copy opens with the password: a wrong password or damaged data must not
+            // leave a half-built vault behind.
+            let result = (|| -> Result<usize> {
+                let mut store = SqliteStore::open(&path)?;
+                store.create(&bundle.header)?;
+                store.put_many(&bundle.records)?;
+                Ok(Vault::unlock(store, &pw, Config::default())?.len())
+            })();
+            match result {
+                Ok(count) => {
+                    eprintln!("Migrated {count} item(s) into {}.", path.display());
+                    eprintln!(
+                        "Your master password is unchanged. Keep {} until you are sure everything is there.",
+                        file.display()
+                    );
+                    return Ok(());
+                }
+                Err(e) => {
+                    let _ = std::fs::remove_file(&path);
+                    for ext in ["-wal", "-shm"] {
+                        let mut side = path.clone().into_os_string();
+                        side.push(ext);
+                        let _ = std::fs::remove_file(side);
+                    }
+                    return Err(e.context("migration failed; nothing was created"));
+                }
+            }
         }
         _ => {}
     }
 
-    let mut vf = VaultFile::load(&path).with_context(|| format!("opening {}", path.display()))?;
-    let pw = read_password("Master password: ")?;
-    let mut vault = vf.header.unlock(&pw)?;
-    let mut items: Vec<Item> = vf
-        .records
-        .iter()
-        .map(|r| vault.open_record(r))
-        .collect::<Result<_, _>>()?;
+    let mut vault = open_vault(&path)?;
 
     match cli.cmd {
         Cmd::List { query } => {
-            let mut shown: Vec<_> = items
-                .iter()
-                .filter(|i| i.deleted_at.is_none() && query.as_deref().is_none_or(|q| i.matches(q)))
-                .collect();
-            shown.sort_by_key(|i| i.title.to_lowercase());
-            for i in shown {
+            for i in vault.search(query.as_deref().unwrap_or("")) {
                 let user = i.field("username").map(|f| f.value.as_str()).unwrap_or("");
-                println!("{}\t{}", i.title, user);
+                if i.favourite {
+                    println!("{}\t{}\t★", i.title, user);
+                } else {
+                    println!("{}\t{}", i.title, user);
+                }
             }
         }
         Cmd::Get { query, field, copy } => {
-            let item = find(&items, &query)?;
+            let item = vault.resolve(&query, Scope::Live)?;
             let f = if field == "notes" {
                 None
             } else {
@@ -504,7 +596,7 @@ fn main() -> Result<()> {
             }
         }
         Cmd::Totp { query, copy } => {
-            let item = find(&items, &query)?;
+            let item = vault.resolve(&query, Scope::Live)?;
             let f = item.field("totp").context("item has no TOTP field")?;
             let t = if f.value.starts_with("otpauth://") {
                 Totp::from_uri(&f.value)?
@@ -544,9 +636,7 @@ fn main() -> Result<()> {
                 validate_totp(&t)?;
                 item.fields.push(Field::secret("totp", &t));
             }
-            let rec = vault.seal_item(&item, 1, &mut rng)?;
-            vf.records.push(rec);
-            vf.save(&path)?;
+            vault.add(item, &mut rng)?;
             if generate {
                 println!("{}", *password);
             }
@@ -565,6 +655,8 @@ fn main() -> Result<()> {
             remove_totp,
             tag,
             untag,
+            favourite,
+            no_favourite,
         } => {
             let changes = title.is_some()
                 || username.is_some()
@@ -576,7 +668,9 @@ fn main() -> Result<()> {
                 || totp.is_some()
                 || remove_totp
                 || !tag.is_empty()
-                || !untag.is_empty();
+                || !untag.is_empty()
+                || favourite
+                || no_favourite;
             if !changes {
                 bail!("nothing to change; pass at least one option (see `rk edit --help`)");
             }
@@ -598,52 +692,85 @@ fn main() -> Result<()> {
                 None
             };
 
-            let id = find(&items, &query)?.id;
-            let idx = items.iter().position(|i| i.id == id).unwrap();
-            let item = &mut items[idx];
-            if let Some(t) = title {
-                item.title = t;
-            }
-            if let Some(u) = username {
-                item.set_field("username", &u, false);
-            }
-            if let Some(u) = url {
-                item.urls = if u.is_empty() { vec![] } else { vec![u] };
-            }
-            if let Some(n) = notes {
-                item.notes = n;
-            }
-            if let Some(p) = &new_password {
-                item.set_field("password", p, true);
-            }
-            if let Some(t) = totp {
-                item.set_field("totp", &t, true);
-            }
-            if remove_totp && !item.remove_field("totp") {
-                eprintln!("note: '{}' has no TOTP secret", item.title);
-            }
-            for t in tag {
-                if !item.tags.iter().any(|x| x.eq_ignore_ascii_case(&t)) {
-                    item.tags.push(t);
+            let id = vault.resolve(&query, Scope::Live)?.id;
+            let mut had_no_totp = false;
+            let changed = vault.edit(id, now(), &mut rng, |item| {
+                if let Some(t) = title {
+                    item.title = t;
                 }
+                if let Some(u) = username {
+                    item.set_field("username", &u, false);
+                }
+                if let Some(u) = url {
+                    item.urls = if u.is_empty() { vec![] } else { vec![u] };
+                }
+                if let Some(n) = notes {
+                    item.notes = n;
+                }
+                if let Some(p) = &new_password {
+                    item.set_field("password", p, true);
+                }
+                if let Some(t) = totp {
+                    item.set_field("totp", &t, true);
+                }
+                if remove_totp {
+                    had_no_totp = !item.remove_field("totp");
+                }
+                for t in tag {
+                    if !item.tags.iter().any(|x| x.eq_ignore_ascii_case(&t)) {
+                        item.tags.push(t);
+                    }
+                }
+                item.tags
+                    .retain(|x| !untag.iter().any(|u| u.eq_ignore_ascii_case(x)));
+                if favourite {
+                    item.favourite = true;
+                }
+                if no_favourite {
+                    item.favourite = false;
+                }
+            })?;
+            let title = vault.get(id).map(|i| i.title.clone()).unwrap_or_default();
+            if had_no_totp {
+                eprintln!("note: '{title}' has no TOTP secret");
             }
-            item.tags
-                .retain(|x| !untag.iter().any(|u| u.eq_ignore_ascii_case(x)));
-            item.updated_at = now();
-
-            let old = vf.records.iter_mut().find(|r| r.item_id == id).unwrap();
-            *old = vault.seal_item(item, old.rev + 1, &mut rng)?;
-            let title = item.title.clone();
-            vf.save(&path)?;
             if generate {
                 if let Some(p) = &new_password {
                     println!("{}", **p);
                 }
             }
-            eprintln!("Updated '{title}'");
+            if changed {
+                eprintln!("Updated '{title}'");
+            } else {
+                eprintln!("No changes: '{title}' already has these values");
+            }
+        }
+        Cmd::History { query } => {
+            let item = vault.resolve(&query, Scope::Any)?;
+            let t = now();
+            let mut newer = item.snapshot(t);
+            for (n, v) in item.history.iter().enumerate() {
+                println!(
+                    "{n}\treplaced {}\t{}",
+                    days_ago(v.replaced_at, t),
+                    changed_parts(v, &newer)
+                );
+                newer = v.clone();
+            }
+            eprintln!(
+                "{} earlier version(s) of '{}'. `rk revert <item> <number>` makes one current again.",
+                item.history.len(),
+                item.title
+            );
+        }
+        Cmd::Revert { query, version } => {
+            let id = vault.resolve(&query, Scope::Live)?.id;
+            vault.revert(id, version, now(), &mut rng)?;
+            let title = vault.get(id).map(|i| i.title.clone()).unwrap_or_default();
+            eprintln!("Reverted '{title}' to version {version} (the previous content is kept in its history)");
         }
         Cmd::Trash => {
-            let mut trashed: Vec<_> = items.iter().filter(|i| i.deleted_at.is_some()).collect();
+            let mut trashed = vault.items(Scope::Trashed);
             trashed.sort_by_key(|i| std::cmp::Reverse(i.deleted_at));
             let t = now();
             for i in &trashed {
@@ -656,53 +783,41 @@ fn main() -> Result<()> {
                 );
             }
             eprintln!(
-                "{} item(s) in trash. `rk restore <item>` brings one back; `rk rm --purge <item>` deletes it forever.",
-                trashed.len()
+                "{} item(s) in trash; they are deleted automatically after {} days. `rk restore <item>` brings one back; `rk rm --purge <item>` deletes it now.",
+                trashed.len(),
+                vault.config().trash_retention_days
             );
         }
         Cmd::Restore { query } => {
-            let id = find_in(&items, &query, Scope::Trashed)
+            let id = vault
+                .resolve(&query, Scope::Trashed)
                 .context("nothing in the trash matches (see `rk trash`)")?
                 .id;
-            let idx = items.iter().position(|i| i.id == id).unwrap();
-            let item = &mut items[idx];
-            item.deleted_at = None;
-            item.updated_at = now();
-            let old = vf.records.iter_mut().find(|r| r.item_id == id).unwrap();
-            *old = vault.seal_item(item, old.rev + 1, &mut rng)?;
-            let title = item.title.clone();
-            vf.save(&path)?;
+            vault.restore(id, now(), &mut rng)?;
+            let title = vault.get(id).map(|i| i.title.clone()).unwrap_or_default();
             eprintln!("Restored '{title}'");
         }
         Cmd::Rm { query, purge } => {
             let scope = if purge { Scope::Any } else { Scope::Live };
-            let id = match find_in(&items, &query, scope) {
+            let id = match vault.resolve(&query, scope) {
                 Ok(i) => i.id,
                 Err(e) => {
-                    if !purge && find_in(&items, &query, Scope::Trashed).is_ok() {
+                    if !purge && vault.resolve(&query, Scope::Trashed).is_ok() {
                         bail!("'{query}' is already in the trash (`rk restore` it, or `rk rm --purge` to delete it forever)");
                     }
-                    return Err(e);
+                    return Err(e.into());
                 }
             };
-            let idx = items.iter().position(|i| i.id == id).unwrap();
             if purge {
-                vf.records.retain(|r| r.item_id != id);
+                vault.purge(id)?;
             } else {
-                let item = &mut items[idx];
-                item.deleted_at = Some(now());
-                item.updated_at = now();
-                let old = vf.records.iter_mut().find(|r| r.item_id == id).unwrap();
-                *old = vault.seal_item(item, old.rev + 1, &mut rng)?;
+                vault.trash(id, now(), &mut rng)?;
             }
-            vf.save(&path)?;
             eprintln!("{}", if purge { "Deleted" } else { "Moved to trash" });
         }
         Cmd::Passwd(opts) => {
             let new = new_master(&opts, &mut rng)?;
             vault.change_password(&new, KdfParams::DESKTOP, &mut rng)?;
-            vf.header = vault.header().clone();
-            vf.save(&path)?;
             eprintln!("Master password changed");
         }
         Cmd::Import {
@@ -722,7 +837,8 @@ fn main() -> Result<()> {
             let data = zeroize::Zeroizing::new(
                 std::fs::read(&file).with_context(|| format!("reading {}", file.display()))?,
             );
-            let report = transfer::import_csv(&data, &overrides, &items, now(), Uuid::now_v7)?;
+            let existing: Vec<Item> = vault.items(Scope::Any).into_iter().cloned().collect();
+            let report = transfer::import_csv(&data, &overrides, &existing, now(), Uuid::now_v7)?;
             eprintln!(
                 "Detected format: {}. {} to import, {} duplicate(s) skipped, {} empty row(s) skipped.",
                 report.detected,
@@ -748,11 +864,9 @@ fn main() -> Result<()> {
             if !yes && !confirm(&format!("Import {} item(s)?", report.items.len()))? {
                 bail!("cancelled; nothing was imported");
             }
-            for item in &report.items {
-                vf.records.push(vault.seal_item(item, 1, &mut rng)?);
-            }
-            vf.save(&path)?;
-            eprintln!("Imported {} item(s)", report.items.len());
+            let count = report.items.len();
+            vault.add_many(report.items, &mut rng)?;
+            eprintln!("Imported {count} item(s)");
             eprintln!(
                 "The CSV still holds your passwords in plain text. Delete it securely: {}",
                 file.display()
@@ -771,14 +885,19 @@ fn main() -> Result<()> {
                 if out.exists() && !force {
                     bail!("{} exists (use --force to overwrite)", out.display());
                 }
-                vf.save(&out)?;
+                VaultFile {
+                    header: vault.store().header()?,
+                    records: vault.store().all()?,
+                }
+                .save(&out)?;
                 eprintln!("Wrote encrypted copy to {}", out.display());
                 return Ok(());
             }
             eprintln!(
                 "WARNING: this export is PLAINTEXT. Anyone who can read it can read every password in it."
             );
-            reauthenticate(&vf.header)?;
+            reauthenticate(&vault.store().header()?)?;
+            let items: Vec<Item> = vault.items(Scope::Any).into_iter().cloned().collect();
             let text = match format {
                 ExportFormat::Csv => transfer::export_csv(&items)?,
                 _ => transfer::export_json(&items)?,
@@ -794,7 +913,9 @@ fn main() -> Result<()> {
                 None => print!("{}", *text),
             }
         }
-        Cmd::Init(_) | Cmd::Gen { .. } | Cmd::ClipboardClear { .. } => unreachable!(),
+        Cmd::Init(_) | Cmd::Gen { .. } | Cmd::ClipboardClear { .. } | Cmd::Migrate { .. } => {
+            unreachable!()
+        }
     }
     Ok(())
 }

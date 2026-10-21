@@ -11,6 +11,8 @@ rahasyakosh/
 ├── docs/                 design documents (01–06) and this book (docs/book)
 └── crates/
     ├── core/             rahasyakosh-core: all security-relevant logic
+    ├── store/            rahasyakosh-store: saves encrypted records (SQLite, directory and memory backends)
+    ├── app/              rahasyakosh-app: the unlocked vault (items, trash, history, search)
     ├── strength/         rahasyakosh-strength: advisory password strength meter (zxcvbn)
     ├── transfer/         rahasyakosh-transfer: CSV import and CSV/JSON export (pure conversion)
     └── cli/              rk: the command-line front-end
@@ -32,6 +34,11 @@ rahasyakosh/
 Rules: **no file access, no network, no clock, no ambient randomness.** Everything is passed in.
 That is what makes it testable and portable to WebAssembly.
 
+## `crates/store` and `crates/app` — storage and vault operations
+
+`store` saves and loads encrypted records and never has a key; `app` holds the keys and the decrypted items and offers one tested set of operations to every
+front-end. See [Where your data lives](storage.md).
+
 ## `crates/strength` — the strength meter
 
 One file, `lib.rs`, wrapping the `zxcvbn` library. It is a separate crate because it needs the clock and,
@@ -45,9 +52,9 @@ Converts between CSV/JSON text and items. No file or terminal access. See
 
 ## `crates/cli` — the `rk` program
 
-`clipboard.rs` copies secrets with the desktop's clipboard tools and clears them again. `main.rs` defines the commands (`init`, `add`, `get`, `list`, `edit`, `totp`, `rm`, `trash`, `restore`, `gen`, `passwd`, `import`, `export`) using
-`clap`. `file.rs` reads and writes the vault file. It is deliberately simple; a proper storage
-layer (SQLite and directory backends) arrives in milestone M2.
+`clipboard.rs` copies secrets with the desktop's clipboard tools and clears them again. `main.rs` defines the commands (`init`, `add`, `get`, `list`, `edit`, `history`, `revert`, `totp`, `rm`, `trash`, `restore`, `gen`, `passwd`, `import`, `export`, `migrate`) using
+`clap`. `file.rs` reads and writes the portable JSON *bundle* used by `rk export -f vault` and `rk migrate`.
+Everything else goes through `rahasyakosh-app`.
 
 ## CI: the safety net
 
@@ -58,7 +65,7 @@ On every push, GitHub Actions (`.github/workflows/ci.yml`) runs:
 | `cargo fmt --check` | inconsistent formatting |
 | `cargo clippy -D warnings` | common mistakes and suspicious code |
 | `cargo test` | broken behaviour |
-| wasm32 build of core, strength and transfer | accidental use of OS-only features |
+| wasm32 build of core, store, app, strength and transfer | accidental use of OS-only features |
 | `cargo deny` | bad licences, banned crates, yanked versions |
 | `cargo audit` | dependencies with known vulnerabilities |
 

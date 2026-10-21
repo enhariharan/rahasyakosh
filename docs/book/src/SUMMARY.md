@@ -7,6 +7,7 @@
 - [Security words you will meet](vocabulary.md)
 - [The cryptography toolbox](crypto-toolbox.md)
 - [How a vault works](how-a-vault-works.md)
+- [Where your data lives: the store](storage.md)
 - [Passwords and passphrases](passwords-and-passphrases.md)
 - [One-time codes (TOTP)](totp.md)
 - [Importing and exporting](import-export.md)

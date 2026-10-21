@@ -11,8 +11,7 @@ quick look-ups.
 A **vault** is the place where all your saved logins live. Think of a safe-deposit box: the box holds everything, it is locked, and
 only one key opens it (here, your **master password**). If someone steals the box, they hold a locked metal case, not your passwords.
 
-In Rahasyakosh a vault is **one file on your disk**. Today that is `~/.local/share/rahasyakosh/vault.rkv`; after milestone M2 it becomes
-a database file. Inside the file there are two kinds of thing:
+In Rahasyakosh a vault is **one file on your disk**: by default the SQLite database `~/.local/share/rahasyakosh/vault.db`. Inside the file there are two kinds of thing:
 
 ```
  ┌──────────────────────── the vault (one file) ─────────────────────────┐
@@ -62,7 +61,7 @@ The vault file is always scrambled on disk. **Unlocked** means a program has use
 in memory, so it can read your items. **Locked** means that key has been wiped. The `rk` command never stays unlocked: each command unlocks, does
 its job, and exits (see [How a vault works](how-a-vault-works.md)).
 
-### Store, backend and migration (milestone M2)
+### Store, backend and migration
 
 The **store** is the part of the program that *saves and loads* records: it knows how to keep them, not how to read them (it never has a key).
 Different **backends** are different ways of keeping them: in memory (for tests), as one file per item in a folder (for sync tools), or in a
@@ -89,6 +88,8 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Authenticator app** — A phone app (or `rk totp`) that shows the six-digit two-factor codes. See TOTP.
 
+**Auto-purge** — Deleting items that have been in the trash for 30 days, done whenever the vault is unlocked.
+
 **Backend** — One way of keeping stored data (memory, a folder of files, SQLite). See Store.
 
 **Backup (encrypted)** — `rk export -f vault`: a copy of the vault that is still locked, so it can be stored anywhere.
@@ -100,6 +101,8 @@ so an old password is not lost by accident, and you can go back to it.
 **Brute force** — Trying every possible password or key until one works. Strong random passwords and a slow key function make it impractical.
 
 **Bucket (padding)** — Item sizes are rounded up to a multiple of 64 bytes, so the file size does not reveal how long a password is.
+
+**Bundle (vault bundle)** — A vault written out as a single JSON file (header plus scrambled records). It is what `rk export -f vault` produces and `rk migrate` reads. Still encrypted, so safe to store.
 
 **cargo-audit / cargo-deny** — Tools that check our dependencies: `cargo-audit` for known security vulnerabilities, `cargo-deny` for licences, banned crates and yanked versions. Both run in CI.
 
@@ -145,6 +148,8 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Fixture** — A saved sample used by a test. Ours (the golden vault, the schema database) are never changed.
 
+**Fsync / full sync** — Asking the operating system to confirm that data has really reached the disk, not just a memory buffer. Slower, but a committed change survives a power cut.
+
 **Golden file** — A saved known-good file that the code must always be able to open. See [Testing with known answers and properties](testing-with-known-answers.md).
 
 **Hash** — A one-way fingerprint of data. You cannot get the data back from it.
@@ -158,6 +163,8 @@ so an old password is not lost by accident, and you can go back to it.
 **HLC (hybrid logical clock)** — A kind of timestamp that keeps order across devices even if their clocks differ. Planned for sync (M4).
 
 **HMAC** — A keyed fingerprint; the building block of TOTP.
+
+**Index (search index)** — A temporary in-memory list built when you unlock, used to search quickly. It is never written to disk and is wiped when the program exits.
 
 **Item** — One thing you saved: a login, note, card or identity. See the core ideas above.
 
@@ -250,6 +257,8 @@ so an old password is not lost by accident, and you can go back to it.
 **Tombstone** — A tiny marker left when an item is purged, so a deletion can later be shared with other devices.
 
 **TOTP** — Time-based one-time password: the six-digit code that changes every 30 seconds. See [One-time codes](totp.md).
+
+**Transaction** — A group of database changes that happen together or not at all. "Check the revision, then write" is one transaction, so two programs cannot slip in between.
 
 **Trash** — Items marked deleted but still stored, so they can be restored.
 

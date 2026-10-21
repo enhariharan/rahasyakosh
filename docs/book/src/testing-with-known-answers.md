@@ -43,7 +43,7 @@ Our golden file is a complete small vault:
 
 | File | What it is |
 |---|---|
-| `spec/vectors/golden-v1.rkv` | A real encrypted vault in the CLI's file layout |
+| `spec/vectors/golden-v1.rkv` | A real encrypted vault, in the portable *bundle* layout (a JSON file; `rk migrate` loads it) |
 | `spec/vectors/golden-v1.expected.json` | What should be inside once decrypted |
 | `spec/vectors/README.md` | Its master password, settings and rules |
 

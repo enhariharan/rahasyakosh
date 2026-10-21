@@ -6,7 +6,7 @@ Open-source (MIT), local-first, end-to-end-encrypted password manager in Rust.
 
 **How to use it:** [quick start](docs/book/src/quick-start.md).
 
-**Status:** M0–M1b done, M2 (storage) in progress. **Not yet audited — do not store real secrets.**
+**Status:** M0–M2 done (storage: SQLite, trash, history, search). **Not yet audited — do not store real secrets.**
 
 ```
 cargo test --workspace

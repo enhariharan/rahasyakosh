@@ -1,6 +1,6 @@
 # 07 — M2 Store Design
 
-Status: **approved** (decisions in section 10 accepted as recommended; work packages 1-5 done). Implements M2 of the roadmap (ADR-4 in `03-architecture.md` already fixes the broad shape).
+Status: **implemented** (decisions in section 10 accepted as recommended; all seven work packages done). Implements M2 of the roadmap (ADR-4 in `03-architecture.md` already fixes the broad shape).
 Stories: US-ITM-02, US-ITM-03, US-ITM-04, US-ITM-05, US-ITM-08.
 
 ## 1. Goals and non-goals
@@ -132,9 +132,9 @@ index structure to keep consistent or to leak. Updated incrementally on every op
 ## 7. CLI changes
 
 - Default vault becomes `~/.local/share/rahasyakosh/vault.db` (SQLite). `--vault` / `RK_VAULT` unchanged.
-- New: `rk migrate`, `rk history <item>`, `rk revert <item> <version>`. (`rk trash`, `rk restore` and `rk rm --purge` already exist and keep their behaviour.)
+- New: `rk migrate`, `rk history <item>`, `rk revert <item> <version>`, `rk edit --favourite`. (`rk trash`, `rk restore` and `rk rm --purge` already exist and keep their behaviour.)
 - `rk export -f vault` keeps writing the **portable JSON bundle** (header + records), so backups stay human-inspectable and the format
-  in `spec/vectors/` stays the interchange format. Add `rk import-vault <file>` to load such a bundle.
+  in `spec/vectors/` stays the interchange format. `rk migrate <file>` loads such a bundle (or an old-format vault) into a new vault; it replaced the separate `import-vault` idea because it is the same operation.
 - Still stateless: no sessions, so no `lock` (decided earlier).
 
 ## 8. Leaving room for sync (M4)

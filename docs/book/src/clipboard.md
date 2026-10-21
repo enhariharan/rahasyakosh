@@ -73,6 +73,7 @@ A few behaviours worth knowing:
 - **Restore and purge look at the right set.** `restore` only considers trashed items. `rm --purge` considers both,
   preferring a live item over a trashed one with the same name.
 - **A second `rk rm` explains itself** ("already in the trash") instead of claiming nothing matches.
-- **Nothing is deleted automatically yet.** The plan (US-ITM-03) is to purge items that have been in the trash for
-  30 days. That needs the vault to be unlocked, because the deletion time is encrypted too, so it arrives with the M2 store.
+- **The trash empties itself after 30 days.** Whenever you unlock the vault, items that have been in the trash for 30 days or more are deleted for good
+  (US-ITM-03). It happens at unlock because the time of deletion is encrypted too, so only the unlocked program can read it. See
+  [Where your data lives](storage.md).
 - **Purging is permanent.** The record is removed from the vault file; copies in backups you made earlier still contain it.

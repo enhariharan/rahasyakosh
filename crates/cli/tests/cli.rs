@@ -1,4 +1,5 @@
 //! End-to-end tests that drive the real `rk` binary against a throwaway vault.
+use rahasyakosh_store::{SqliteStore, Store};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
@@ -10,7 +11,7 @@ struct Vault(PathBuf);
 
 impl Vault {
     fn new(name: &str) -> Self {
-        let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("{name}.rkv"));
+        let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("{name}.db"));
         let _ = std::fs::remove_file(&path);
         let v = Vault(path);
         assert!(v.rk(&["init"], "").status.success());
@@ -37,15 +38,10 @@ impl Vault {
         String::from_utf8_lossy(&out.stderr).into_owned()
     }
 
+    /// Revision numbers of the stored records, read straight from the database.
     fn revs(&self) -> Vec<u64> {
-        let v: serde_json::Value =
-            serde_json::from_slice(&std::fs::read(&self.0).unwrap()).unwrap();
-        v["records"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|r| r["rev"].as_u64().unwrap())
-            .collect()
+        let store = SqliteStore::open(&self.0).unwrap();
+        store.list().unwrap().iter().map(|m| m.rev).collect()
     }
 }
 
@@ -223,16 +219,30 @@ fn wrong_master_password_cannot_edit() {
     assert_eq!(v.revs(), [1]);
 }
 
-/// The committed golden vault (see spec/vectors/README.md) must open with the real CLI.
+/// The committed golden vault (see spec/vectors/README.md) is a JSON bundle. It must load into the real CLI.
 #[test]
-fn cli_opens_the_golden_vault() {
+fn cli_migrates_and_opens_the_golden_vault() {
     let golden = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../spec/vectors/golden-v1.rkv");
-    let out = Command::new(env!("CARGO_BIN_EXE_rk"))
-        .args(["list"])
-        .env("RK_VAULT", golden)
-        .env("RK_PASSWORD", "रहस्यकोश-golden-1")
-        .output()
-        .unwrap();
+    let target = Path::new(env!("CARGO_TARGET_TMPDIR")).join("golden-migrated.db");
+    let _ = std::fs::remove_file(&target);
+    let pw = "रहस्यकोश-golden-1";
+    let run = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_rk"))
+            .args(args)
+            .env("RK_VAULT", &target)
+            .env("RK_PASSWORD", pw)
+            .output()
+            .unwrap()
+    };
+    let out = run(&["migrate", golden.to_str().unwrap()]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(String::from_utf8_lossy(&out.stderr).contains("Migrated 5 item(s)"));
+
+    let out = run(&["list"]);
     assert!(
         out.status.success(),
         "{}",
@@ -242,6 +252,7 @@ fn cli_opens_the_golden_vault() {
     assert!(text.contains("GitHub\talice@example.com"));
     assert!(text.contains("बैंक (Bank)\tme"));
     assert!(!text.contains("Old site"), "trashed items are not listed");
+    let _ = std::fs::remove_file(&target);
 }
 
 #[test]
@@ -486,4 +497,224 @@ fn clear_after_requires_copy() {
     let v = Vault::new("clip_requires");
     v.ok(&["add", "Site", "--password-stdin"], "pw\n");
     v.err(&["get", "site", "--clear-after", "5"]);
+}
+
+// ---- new in M2: favourites, history, migration, auto-purge, friendly errors ------------------------------
+
+#[test]
+fn favourites_are_listed_first_and_marked() {
+    let v = Vault::new("favourites");
+    for t in ["Alpha", "Bravo", "Charlie"] {
+        v.ok(&["add", t, "--password-stdin"], "pw\n");
+    }
+    assert_eq!(v.ok(&["list"], ""), "Alpha\t\nBravo\t\nCharlie\t\n");
+    v.ok(&["edit", "charlie", "--favourite"], "");
+    assert_eq!(v.ok(&["list"], ""), "Charlie\t\t★\nAlpha\t\nBravo\t\n");
+    v.ok(&["edit", "charlie", "--no-favourite"], "");
+    assert_eq!(v.ok(&["list"], ""), "Alpha\t\nBravo\t\nCharlie\t\n");
+    v.err(&["edit", "charlie", "--favourite", "--no-favourite"]);
+}
+
+#[test]
+fn history_lists_versions_without_showing_secrets_and_revert_restores() {
+    let v = Vault::new("history");
+    v.ok(
+        &["add", "Site", "-u", "alice", "--password-stdin"],
+        "first-secret\n",
+    );
+    v.ok(&["edit", "site", "--password-stdin"], "second-secret\n");
+    v.ok(
+        &["edit", "site", "--username", "bob", "--notes", "hello"],
+        "",
+    );
+
+    let out = v.rk(&["history", "site"], "");
+    assert!(out.status.success());
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        !text.contains("secret"),
+        "history must not print passwords: {text}"
+    );
+    let lines: Vec<&str> = text.lines().collect();
+    assert_eq!(lines.len(), 2, "{text}");
+    assert!(
+        lines[0].starts_with("0\treplaced today\t")
+            && lines[0].contains("username")
+            && lines[0].contains("notes"),
+        "{text}"
+    );
+    assert!(
+        lines[1].starts_with("1\treplaced today\t") && lines[1].contains("password"),
+        "{text}"
+    );
+
+    // Go back to the very first password; the present content is kept too.
+    v.ok(&["revert", "site", "1"], "");
+    assert_eq!(v.ok(&["get", "site"], "").trim(), "first-secret");
+    assert_eq!(v.ok(&["get", "site", "-f", "username"], "").trim(), "alice");
+    assert_eq!(v.ok(&["history", "site"], "").lines().count(), 3);
+    v.err(&["revert", "site", "9"]);
+}
+
+#[test]
+fn editing_to_the_same_values_reports_no_change_and_writes_nothing() {
+    let v = Vault::new("nochange");
+    v.ok(&["add", "Site", "-u", "alice", "--password-stdin"], "pw\n");
+    let out = v.rk(&["edit", "site", "--username", "alice"], "");
+    assert!(out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("No changes"));
+    assert_eq!(v.revs(), [1]);
+    assert_eq!(v.ok(&["history", "site"], ""), "");
+}
+
+#[test]
+fn migrate_loads_an_old_vault_file_and_refuses_bad_input() {
+    let v = Vault::new("migrate-src");
+    v.ok(&["add", "Site", "-u", "alice", "--password-stdin"], "pw\n");
+    // `export -f vault` writes the portable JSON bundle.
+    let bundle = Path::new(env!("CARGO_TARGET_TMPDIR")).join("migrate-src.bundle.rkv");
+    let _ = std::fs::remove_file(&bundle);
+    v.ok(
+        &["export", "-f", "vault", "-o", bundle.to_str().unwrap()],
+        "",
+    );
+
+    let target = Path::new(env!("CARGO_TARGET_TMPDIR")).join("migrate-dst.db");
+    let _ = std::fs::remove_file(&target);
+    let run = |args: &[&str], pw: &str, vault: &Path| {
+        Command::new(env!("CARGO_BIN_EXE_rk"))
+            .args(args)
+            .env("RK_VAULT", vault)
+            .env("RK_PASSWORD", pw)
+            .output()
+            .unwrap()
+    };
+
+    // Wrong password: nothing is left behind.
+    let out = run(
+        &["migrate", bundle.to_str().unwrap()],
+        "not the password",
+        &target,
+    );
+    assert!(!out.status.success());
+    assert!(
+        !target.exists(),
+        "a failed migration must not leave a vault file"
+    );
+
+    let out = run(&["migrate", bundle.to_str().unwrap()], PW, &target);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let out = run(&["get", "site"], PW, &target);
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "pw");
+
+    // It will not overwrite an existing vault.
+    assert!(!run(&["migrate", bundle.to_str().unwrap()], PW, &target)
+        .status
+        .success());
+    let _ = std::fs::remove_file(&target);
+    let _ = std::fs::remove_file(&bundle);
+}
+
+#[test]
+fn old_format_missing_and_foreign_files_get_helpful_errors() {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR"));
+    let run = |p: &Path| {
+        Command::new(env!("CARGO_BIN_EXE_rk"))
+            .args(["list"])
+            .env("RK_VAULT", p)
+            .env("RK_PASSWORD", PW)
+            .output()
+            .unwrap()
+    };
+    let err = |o: Output| String::from_utf8_lossy(&o.stderr).into_owned();
+
+    let old = dir.join("errors-old.rkv");
+    std::fs::write(&old, "{\n  \"header\": {}, \"records\": []\n}").unwrap();
+    let e = err(run(&old));
+    assert!(
+        e.contains("old vault file format") && e.contains("rk migrate"),
+        "{e}"
+    );
+
+    let foreign = dir.join("errors-foreign.bin");
+    std::fs::write(&foreign, b"\x7fELF this is not a vault").unwrap();
+    assert!(err(run(&foreign)).contains("not a Rahasyakosh vault"));
+
+    let missing = dir.join("errors-missing.db");
+    let _ = std::fs::remove_file(&missing);
+    let e = err(run(&missing));
+    assert!(e.contains("no vault at") && e.contains("rk init"), "{e}");
+    assert!(
+        !missing.exists(),
+        "a failed open must not create a vault file"
+    );
+    let _ = std::fs::remove_file(&old);
+    let _ = std::fs::remove_file(&foreign);
+}
+
+#[test]
+fn items_in_the_trash_for_30_days_are_deleted_on_the_next_unlock() {
+    use rahasyakosh_app::{Config, Vault as AppVault};
+    use rahasyakosh_core::crypto::KdfParams;
+    use rahasyakosh_core::item::Item;
+    use rand::SeedableRng;
+
+    // Build a vault whose trashed items have different ages, with explicit timestamps.
+    let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join("expiry.db");
+    let _ = std::fs::remove_file(&path);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+    let day = 86_400;
+    let kdf = KdfParams {
+        m_kib: KdfParams::MIN_M_KIB,
+        t: KdfParams::MIN_T,
+        p: 1,
+    };
+    let mut rng = rand::rngs::StdRng::seed_from_u64(1);
+    let mut av = AppVault::create(
+        SqliteStore::open(&path).unwrap(),
+        PW,
+        kdf,
+        Config::default(),
+        &mut rng,
+    )
+    .unwrap();
+    let ids: Vec<_> = (1..=3u128)
+        .map(|n| {
+            let id = rahasyakosh_store::Uuid::from_u128(n);
+            av.add(
+                Item::login(&format!("Item{n}"), "u", "p", now, id),
+                &mut rng,
+            )
+            .unwrap();
+            id
+        })
+        .collect();
+    av.trash(ids[0], now - 31 * day, &mut rng).unwrap(); // expired
+    av.trash(ids[1], now - 29 * day, &mut rng).unwrap(); // not yet
+    drop(av);
+
+    let out = Command::new(env!("CARGO_BIN_EXE_rk"))
+        .args(["trash"])
+        .env("RK_VAULT", &path)
+        .env("RK_PASSWORD", PW)
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("Deleted 1 item(s)") && stderr.contains("30 days"),
+        "{stderr}"
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "Item2\tu\tdeleted 29 days ago\n"
+    );
+    let _ = std::fs::remove_file(&path);
 }

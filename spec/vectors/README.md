@@ -7,7 +7,7 @@ on every platform (native and WebAssembly), and third-party implementations can 
 
 | File | Contents |
 |---|---|
-| `golden-v1.rkv` | A vault in the CLI file layout: `{ "header": …, "records": […] }` (JSON) |
+| `golden-v1.rkv` | A vault as the portable JSON *bundle*: `{ "header": …, "records": […] }` (what `rk export -f vault` writes and `rk migrate` loads) |
 | `golden-v1.expected.json` | The five items inside it, decrypted |
 
 - **Master password:** `रहस्यकोश-golden-1` (UTF-8; includes non-ASCII on purpose)

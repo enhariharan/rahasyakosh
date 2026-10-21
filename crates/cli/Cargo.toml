@@ -8,7 +8,9 @@ rust-version.workspace = true
 [dependencies]
 anyhow = "1.0.104"
 clap = { version = "4.6.7", features = ["derive", "env"] }
+rahasyakosh-app = { version = "0.1.0", path = "../app" }
 rahasyakosh-core = { version = "0.1.0", path = "../core" }
+rahasyakosh-store = { version = "0.1.0", path = "../store", features = ["sqlite"] }
 rahasyakosh-strength = { version = "0.1.0", path = "../strength" }
 rahasyakosh-transfer = { version = "0.1.0", path = "../transfer" }
 rand = "0.10.3"
