@@ -156,7 +156,7 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Fsync / full sync** — Asking the operating system to confirm that data has really reached the disk, not just a memory buffer. Slower, but a committed change survives a power cut.
 
-**Fuzzing / fuzzer** — Feeding a program huge numbers of automatically made-up inputs to find crashes. A coverage-guided fuzzer keeps the inputs that reach new code and mutates them. See [Fuzzing](fuzzing.md).
+**Fuzzing / fuzzer** — Testing by throwing junk at a program. A *fuzzer* is a tool that feeds the program millions of automatically made-up inputs per minute — empty files, truncated files, random bytes, valid files with one byte changed — and watches for crashes, hangs or broken promises. Normal tests check the cases a person thought of; a fuzzer finds the ones nobody did, which matters most for code that reads files from outside (a vault file, a CSV, a one-time-code link), because an attacker controls those. A *coverage-guided* fuzzer is smarter than random: it notices which inputs reach new parts of the code, keeps those, and mutates them further. Example: if opening a damaged vault file crashed the program, the fuzzer would hand us the exact bytes that did it. See [Fuzzing](fuzzing.md).
 
 **Gallery** — A development aid that opens one screen of the desktop app on sample data in an in-memory vault, to look at the design without touching a real vault.
 
