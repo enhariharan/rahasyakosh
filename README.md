@@ -1,7 +1,10 @@
 # Rahasyakosh (रहस्यकोश)
 
 Open-source (MIT), local-first, end-to-end-encrypted password manager in Rust.
-Design docs: [`docs/`](docs/README.md). **How to use it:** [quick start](docs/book/src/quick-start.md).
+
+**Design docs:** [`docs/`](docs/README.md).
+
+**How to use it:** [quick start](docs/book/src/quick-start.md).
 
 **Status:** M1 (core) + M1b (CLI) done. **Not yet audited — do not store real secrets.**
 

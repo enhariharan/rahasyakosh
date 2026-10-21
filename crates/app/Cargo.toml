@@ -1,0 +1,22 @@
+[package]
+name = "rahasyakosh-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Unlocked-vault operations for Rahasyakosh front-ends: items, trash, history, search"
+
+[dependencies]
+rahasyakosh-core = { version = "0.1.0", path = "../core" }
+rahasyakosh-store = { version = "0.1.0", path = "../store" }
+thiserror = "2.0.21"
+uuid = "1.28.0"
+zeroize = "1.9.1"
+
+[dev-dependencies]
+rand_chacha = "0.10.0"
+
+# These need native files, SQLite's C library, or proptest, none of which build for WASI.
+[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
+rahasyakosh-store = { version = "0.1.0", path = "../store", features = ["sqlite"] }
+proptest = "1.12.0"

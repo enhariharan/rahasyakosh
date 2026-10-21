@@ -14,7 +14,7 @@ cargo fmt --all
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features
 cargo build -p rahasyakosh-core -p rahasyakosh-store -p rahasyakosh-strength -p rahasyakosh-transfer --target wasm32-unknown-unknown
-cargo deny check
+cargo deny --all-features check
 # optional: run core's tests (incl. the golden vault) under WebAssembly; needs wasmtime installed
 rustup target add wasm32-wasip1
 CARGO_TARGET_WASM32_WASIP1_RUNNER=wasmtime cargo test -p rahasyakosh-core -p rahasyakosh-store -p rahasyakosh-transfer --target wasm32-wasip1
