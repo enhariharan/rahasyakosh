@@ -118,6 +118,32 @@ impl Item {
             .find(|f| f.name.eq_ignore_ascii_case(name))
     }
 
+    /// Set a field's value, keeping its position if it exists, otherwise appending it.
+    pub fn set_field(&mut self, name: &str, value: &str, concealed: bool) {
+        match self
+            .fields
+            .iter_mut()
+            .find(|f| f.name.eq_ignore_ascii_case(name))
+        {
+            Some(f) => {
+                f.value = value.into();
+                f.concealed = concealed;
+            }
+            None => self.fields.push(Field {
+                name: name.into(),
+                value: value.into(),
+                concealed,
+            }),
+        }
+    }
+
+    /// Remove a field by name (case-insensitive). Returns whether one was removed.
+    pub fn remove_field(&mut self, name: &str) -> bool {
+        let before = self.fields.len();
+        self.fields.retain(|f| !f.name.eq_ignore_ascii_case(name));
+        self.fields.len() != before
+    }
+
     /// Case-insensitive match on title, URLs, tags and non-concealed fields.
     pub fn matches(&self, query: &str) -> bool {
         let q = query.to_lowercase();
@@ -128,5 +154,33 @@ impl Item {
                 .fields
                 .iter()
                 .any(|f| !f.concealed && f.value.to_lowercase().contains(&q))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn login() -> Item {
+        Item::login("Site", "alice", "pw", 1, Uuid::from_u128(1))
+    }
+
+    #[test]
+    fn set_field_replaces_in_place_and_appends() {
+        let mut i = login();
+        i.set_field("PASSWORD", "new", true);
+        assert_eq!(i.fields.len(), 2);
+        assert_eq!(i.fields[1].value, "new");
+        i.set_field("totp", "JBSWY3DPEHPK3PXP", true);
+        assert_eq!(i.fields.len(), 3);
+        assert!(i.field("totp").unwrap().concealed);
+    }
+
+    #[test]
+    fn remove_field_reports_whether_it_removed() {
+        let mut i = login();
+        assert!(i.remove_field("Username"));
+        assert!(!i.remove_field("username"));
+        assert!(i.field("username").is_none());
     }
 }

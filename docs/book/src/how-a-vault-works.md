@@ -53,7 +53,27 @@ The file is written safely: to a temporary file, flushed to disk, then renamed o
 2. Run Argon2id on the password with the stored salt. Derive the KEK.
 3. Try to decrypt the wrapped vault key. If the password is wrong, authentication fails and we
    return one generic error — no hints.
-4. Hold the vault key in memory (`UnlockedVault`) until you lock; it is wiped when dropped.
+4. Hold the vault key in memory (`UnlockedVault`) until it is dropped, at which point it is wiped (see
+   [Locked and unlocked](#locked-and-unlocked)).
+
+## Locked and unlocked
+
+Your vault file is always encrypted on disk. **Unlocked** means a program has used your master password to
+work out the vault key and holds it in memory, so it can decrypt items without asking again. **Locked**
+means that key has been erased from memory; only the encrypted file remains, and getting back in needs the
+master password. Locking matters because a key in memory can be used by anything able to read that memory
+(malware, or someone at your open laptop). The shorter the key exists, the smaller that window. Apps lock
+after idle time, on sleep, or when you press a button.
+
+**The command-line tool never stays unlocked.** Every `rk` command asks for the master password, unlocks,
+does its job and exits, and the key is wiped as the process ends (`UnlockedVault` zeroizes on drop). That is
+the safest design, which is why there is no `rk lock`: there is nothing to lock. The cost is typing the
+password each time.
+
+A convenient "unlock once, work for a while" mode needs a long-lived **session** that holds the key and
+forgets it after a timeout, much as `ssh-agent` does for SSH keys. That is new security-sensitive code with its
+own risks (who may talk to it, how long it lives, how it wipes), and the desktop app needs the same thing. So we
+build it once, in the M3 session crate, rather than twice. See story US-VLT-04.
 
 ## Authenticated context: why the AAD matters
 

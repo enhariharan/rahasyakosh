@@ -20,6 +20,7 @@
 **Key** — A secret value used to encrypt or decrypt.
 **MAC** — Message authentication code.
 **Known-answer test (KAT)** — A test that checks output against a value published or computed by an independent source.
+**Locked / unlocked** — Whether the vault key is erased from memory (locked) or held there for use (unlocked).
 **Master password** — The one password the user remembers.
 **Modulo bias** — Unevenness introduced by using `%` on random numbers.
 **Nonce** — A number that must be used only once per key.
@@ -31,6 +32,7 @@
 **Re-authentication** — Asking for the master password again before a dangerous action.
 **Salt** — Random public data mixed into password hashing.
 **Strength score** — A 0–4 rating of how guessable a password is (from zxcvbn).
+**Session** — A long-lived unlocked state that remembers the key for a while. Planned for M3; the CLI has none.
 **Test vector** — A published input/output pair used to verify an implementation.
 **Threat model** — Statement of who we defend against and who we don't.
 **TOTP** — Time-based one-time password (RFC 6238).

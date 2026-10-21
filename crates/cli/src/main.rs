@@ -49,6 +49,39 @@ enum Cmd {
         #[arg(long)]
         totp: Option<String>,
     },
+    /// Change fields of an item; only the options you pass are changed
+    Edit {
+        query: String,
+        #[arg(long)]
+        title: Option<String>,
+        #[arg(short, long)]
+        username: Option<String>,
+        /// Replace the item's URLs with this one (empty string clears them)
+        #[arg(long)]
+        url: Option<String>,
+        #[arg(long)]
+        notes: Option<String>,
+        /// Prompt for a new password
+        #[arg(long, group = "new_password")]
+        password: bool,
+        /// Read the new password from stdin
+        #[arg(long, group = "new_password")]
+        password_stdin: bool,
+        /// Replace the password with a generated one (printed once)
+        #[arg(short, long, group = "new_password")]
+        generate: bool,
+        /// Set the TOTP secret (base32 or otpauth:// URI)
+        #[arg(long, conflicts_with = "remove_totp")]
+        totp: Option<String>,
+        #[arg(long)]
+        remove_totp: bool,
+        /// Add a tag (repeatable)
+        #[arg(long)]
+        tag: Vec<String>,
+        /// Remove a tag (repeatable)
+        #[arg(long)]
+        untag: Vec<String>,
+    },
     /// List items (optionally filtered)
     List { query: Option<String> },
     /// Print a field of the best-matching item (default: password)
@@ -253,6 +286,25 @@ fn write_private(path: &std::path::Path, bytes: &[u8], force: bool) -> Result<()
     Ok(())
 }
 
+/// One line from stdin with the trailing newline removed.
+fn read_stdin_line() -> Result<zeroize::Zeroizing<String>> {
+    let mut s = String::new();
+    std::io::stdin().read_line(&mut s)?;
+    Ok(zeroize::Zeroizing::new(
+        s.trim_end_matches(['\n', '\r']).to_string(),
+    ))
+}
+
+/// Check a TOTP secret (base32 or otpauth:// URI) is usable before storing it.
+fn validate_totp(t: &str) -> Result<()> {
+    if t.starts_with("otpauth://") {
+        Totp::from_uri(t)?;
+    } else {
+        Totp::from_base32(t)?;
+    }
+    Ok(())
+}
+
 fn confirm(question: &str) -> Result<bool> {
     eprint!("{question} [y/N] ");
     let mut line = String::new();
@@ -393,20 +445,14 @@ fn main() -> Result<()> {
             let password = if generate {
                 generator::generate_password(&PasswordSpec::default(), &mut rng)?
             } else if password_stdin {
-                let mut s = String::new();
-                std::io::stdin().read_line(&mut s)?;
-                zeroize::Zeroizing::new(s.trim_end_matches(['\n', '\r']).to_string())
+                read_stdin_line()?
             } else {
                 zeroize::Zeroizing::new(rpassword::prompt_password("Item password: ")?)
             };
             let mut item = Item::login(&title, &username, &password, now(), Uuid::now_v7());
             item.urls.extend(url);
             if let Some(t) = totp {
-                if t.starts_with("otpauth://") {
-                    Totp::from_uri(&t)?;
-                } else {
-                    Totp::from_base32(&t)?;
-                }
+                validate_totp(&t)?;
                 item.fields.push(Field::secret("totp", &t));
             }
             let rec = vault.seal_item(&item, 1, &mut rng)?;
@@ -416,6 +462,96 @@ fn main() -> Result<()> {
                 println!("{}", *password);
             }
             eprintln!("Added '{title}'");
+        }
+        Cmd::Edit {
+            query,
+            title,
+            username,
+            url,
+            notes,
+            password,
+            password_stdin,
+            generate,
+            totp,
+            remove_totp,
+            tag,
+            untag,
+        } => {
+            let changes = title.is_some()
+                || username.is_some()
+                || url.is_some()
+                || notes.is_some()
+                || password
+                || password_stdin
+                || generate
+                || totp.is_some()
+                || remove_totp
+                || !tag.is_empty()
+                || !untag.is_empty();
+            if !changes {
+                bail!("nothing to change; pass at least one option (see `rk edit --help`)");
+            }
+            if let Some(t) = &totp {
+                validate_totp(t)?;
+            }
+            let new_password = if generate {
+                Some(generator::generate_password(
+                    &PasswordSpec::default(),
+                    &mut rng,
+                )?)
+            } else if password_stdin {
+                Some(read_stdin_line()?)
+            } else if password {
+                Some(zeroize::Zeroizing::new(rpassword::prompt_password(
+                    "New item password: ",
+                )?))
+            } else {
+                None
+            };
+
+            let id = find(&items, &query)?.id;
+            let idx = items.iter().position(|i| i.id == id).unwrap();
+            let item = &mut items[idx];
+            if let Some(t) = title {
+                item.title = t;
+            }
+            if let Some(u) = username {
+                item.set_field("username", &u, false);
+            }
+            if let Some(u) = url {
+                item.urls = if u.is_empty() { vec![] } else { vec![u] };
+            }
+            if let Some(n) = notes {
+                item.notes = n;
+            }
+            if let Some(p) = &new_password {
+                item.set_field("password", p, true);
+            }
+            if let Some(t) = totp {
+                item.set_field("totp", &t, true);
+            }
+            if remove_totp && !item.remove_field("totp") {
+                eprintln!("note: '{}' has no TOTP secret", item.title);
+            }
+            for t in tag {
+                if !item.tags.iter().any(|x| x.eq_ignore_ascii_case(&t)) {
+                    item.tags.push(t);
+                }
+            }
+            item.tags
+                .retain(|x| !untag.iter().any(|u| u.eq_ignore_ascii_case(x)));
+            item.updated_at = now();
+
+            let old = vf.records.iter_mut().find(|r| r.item_id == id).unwrap();
+            *old = vault.seal_item(item, old.rev + 1, &mut rng)?;
+            let title = item.title.clone();
+            vf.save(&path)?;
+            if generate {
+                if let Some(p) = &new_password {
+                    println!("{}", **p);
+                }
+            }
+            eprintln!("Updated '{title}'");
         }
         Cmd::Rm { query, purge } => {
             let id = find(&items, &query)?.id;

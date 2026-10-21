@@ -9,7 +9,7 @@ IDs are stable; reference them in commits and tests (e.g. `US-VLT-02`).
 | US-VLT-01 | As a user I create a new vault protected by a master password. | Argon2id-derived key; vault file created; password strength shown; refuses empty/very weak (<zxcvbn 2) unless overridden. |
 | US-VLT-02 | I unlock an existing vault with my master password. | Wrong password gives generic error, no timing oracle on which part failed; KDF params read from header. |
 | US-VLT-03 | I change my master password. | Only the wrapped vault key is re-encrypted; items untouched; old password stops working. |
-| US-VLT-04 | I lock the vault manually or automatically. | Keys zeroized; idle timeout configurable; lock on app background / system sleep (platform permitting). |
+| US-VLT-04 | I lock the vault manually or automatically. | Keys zeroized; idle timeout configurable; lock on app background / system sleep (platform permitting). Key wiping on drop is in core; sessions, idle timeout and manual lock belong to the M3 `app` session crate (the stateless CLI has nothing to lock). |
 | US-VLT-05 | I get a Secret Key / recovery kit (optional) for extra entropy and recovery. (P1) | 128-bit secret key combined with password (2SKD); printable Emergency Kit. |
 | US-VLT-06 | I can have multiple vaults. (P1) | Independent keys per vault; switcher in UI. |
 
@@ -69,7 +69,7 @@ IDs are stable; reference them in commits and tests (e.g. `US-VLT-02`).
 ## E8 — Platforms & Shells
 | ID | Story | Priority |
 |----|-------|----------|
-| US-CLI-01 | CLI: `init, add, get, list, edit, rm, gen, totp, lock, export` with stdin/pipe support. | P0 |
+| US-CLI-01 | CLI: `init, add, get, list, edit, rm, gen, totp, passwd, import, export` with stdin/pipe support. The CLI is **stateless** (each command unlocks, acts and exits, so keys never outlive it); a `lock` command and unlock sessions arrive with the M3 session crate (US-VLT-04). | P0 |
 | US-DSK-01 | Desktop app (Linux/macOS/Windows) with tray, global quick-search shortcut. | P0 |
 | US-DSK-02 | OS keychain/biometric unlock (libsecret, Keychain/Touch ID, Windows Hello). | P1 |
 | US-WEB-01 | Web app (WASM) with IndexedDB storage, installable PWA. | P1 |

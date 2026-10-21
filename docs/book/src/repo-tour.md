@@ -45,7 +45,7 @@ Converts between CSV/JSON text and items. No file or terminal access. See
 
 ## `crates/cli` — the `rk` program
 
-`main.rs` defines the commands (`init`, `add`, `get`, `list`, `totp`, `rm`, `gen`, `passwd`, `import`, `export`) using
+`main.rs` defines the commands (`init`, `add`, `get`, `list`, `edit`, `totp`, `rm`, `gen`, `passwd`, `import`, `export`) using
 `clap`. `file.rs` reads and writes the vault file. It is deliberately simple; a proper storage
 layer (SQLite and directory backends) arrives in milestone M2.
 
