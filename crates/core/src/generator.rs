@@ -114,6 +114,11 @@ pub fn generate_passphrase(
     Ok(Zeroizing::new(picked.join(separator)))
 }
 
+/// Entropy in bits of a passphrase of `words` words drawn uniformly from a list of `list_len` words.
+pub fn passphrase_entropy_bits(list_len: usize, words: usize) -> f64 {
+    words as f64 * (list_len as f64).log2()
+}
+
 /// Rough entropy estimate in bits for a random password of this spec (upper bound for UI hints).
 pub fn entropy_bits(spec: &PasswordSpec) -> f64 {
     let mut pool = 0usize;
@@ -206,6 +211,22 @@ mod tests {
             &mut r
         )
         .is_err());
+    }
+
+    #[test]
+    fn eff_passphrase_entropy() {
+        let bits = passphrase_entropy_bits(crate::wordlist::EFF_LARGE_LEN, 6);
+        assert!((bits - 77.55).abs() < 0.01, "{bits}");
+    }
+
+    #[test]
+    fn passphrase_from_eff_list() {
+        let mut r = ChaCha20Rng::seed_from_u64(6);
+        let list = crate::wordlist::eff_large();
+        let p = generate_passphrase(&list, 6, " ", false, &mut r).unwrap();
+        let picked: Vec<&str> = p.split(' ').collect();
+        assert_eq!(picked.len(), 6);
+        assert!(picked.iter().all(|w| list.contains(w)));
     }
 
     #[test]

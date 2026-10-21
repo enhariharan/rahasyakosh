@@ -10,6 +10,7 @@ use rahasyakosh_core::{
     item::{Field, Item},
     totp::Totp,
     vault::UnlockedVault,
+    wordlist,
 };
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -62,7 +63,7 @@ enum Cmd {
         #[arg(long)]
         purge: bool,
     },
-    /// Generate a password
+    /// Generate a password, or a passphrase with --passphrase
     Gen {
         #[arg(short, long, default_value_t = 20)]
         length: usize,
@@ -70,6 +71,18 @@ enum Cmd {
         no_symbols: bool,
         #[arg(long)]
         avoid_ambiguous: bool,
+        /// Generate a passphrase from the EFF large wordlist instead of a password
+        #[arg(short, long)]
+        passphrase: bool,
+        /// Number of words in the passphrase
+        #[arg(short, long, default_value_t = 6, requires = "passphrase")]
+        words: usize,
+        /// Separator between words
+        #[arg(short, long, default_value = "-", requires = "passphrase")]
+        separator: String,
+        /// Capitalise each word
+        #[arg(short, long, requires = "passphrase")]
+        capitalize: bool,
     },
     /// Change the master password
     Passwd,
@@ -141,7 +154,22 @@ fn main() -> Result<()> {
             length,
             no_symbols,
             avoid_ambiguous,
+            passphrase,
+            words,
+            separator,
+            capitalize,
         } => {
+            if passphrase {
+                let list = wordlist::eff_large();
+                let phrase =
+                    generator::generate_passphrase(&list, words, &separator, capitalize, &mut rng)?;
+                println!("{}", *phrase);
+                eprintln!(
+                    "~{:.0} bits of entropy",
+                    generator::passphrase_entropy_bits(list.len(), words)
+                );
+                return Ok(());
+            }
             let spec = PasswordSpec {
                 length,
                 symbols: !no_symbols,

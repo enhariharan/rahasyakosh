@@ -61,8 +61,19 @@ rk gen --passphrase         # a passphrase from the EFF list
 rk gen --passphrase --words 7 --separator . --capitalize
 ```
 
-> **Status:** bundling the EFF list and the `--passphrase` option is the work for US-GEN-02. See
-> `docs/06-roadmap.md` for current progress.
+Each run also prints the estimated entropy (for example `~78 bits of entropy`) on standard error,
+so it does not pollute the passphrase when you pipe the output.
+
+### How it is wired up
+
+- `crates/core/src/wordlists/eff_large.txt` is the list itself, compiled into the program with
+  `include_str!`, so nothing is downloaded at run time and it works in WebAssembly too.
+- `wordlist::eff_large()` returns the words. Tests pin the file's SHA-256 checksum and check that it has
+  7,776 unique lowercase words, none the beginning of another. If you ever need to change the file, you
+  must update the checksum on purpose.
+- `generator::passphrase_entropy_bits` does the arithmetic from the table above.
+- The list is licensed CC BY 3.0 US, which requires crediting EFF. That credit is in
+  `crates/core/src/wordlists/README.md`; keep it.
 
 ### Rules for working on this code
 

@@ -10,5 +10,6 @@ pub mod generator;
 pub mod item;
 pub mod totp;
 pub mod vault;
+pub mod wordlist;
 
 pub use error::{Error, Result};

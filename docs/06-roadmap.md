@@ -28,7 +28,8 @@ security-relevant changes reviewed by a second maintainer.
 - [x] M0: workspace, MIT licence, CI (fmt, clippy, tests, wasm32 build, cargo-deny, cargo-audit), `deny.toml`, SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md
 - [x] M1 core: KDF, key hierarchy, records, items, generator, TOTP (13 tests; wasm32 builds)
 - [x] M1b CLI `rk`: init, add, get, list, totp, rm, gen, passwd
-- [ ] Next: EFF wordlist + passphrase CLI, strength meter, CSV import/export, then M2 store
+- [x] US-GEN-02: EFF large wordlist bundled in core; `rk gen --passphrase`
+- [ ] Next: strength meter, CSV import/export, then M2 store
 
 ## Original order
 1. Workspace + `rahasyakosh-core` (M1) with tests.
