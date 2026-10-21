@@ -20,6 +20,8 @@ usually already present) or `sudo apt install xclip` on X11.
 
 To update later, `git pull` and run the same `cargo install` command again.
 
+> Prefer a window to a terminal? There is a desktop app that uses the same vault: see [The desktop app](desktop-app.md).
+
 ## Create your vault
 
 ```

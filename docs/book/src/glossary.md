@@ -142,6 +142,8 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Deterministic** — Always giving the same result from the same input. The golden vault is generated deterministically so it can be reproduced exactly.
 
+**Dioxus** — The Rust framework we draw the desktop app with. It shows the interface in a web view and lets us write the interface in Rust.
+
 **Downgrade attack** — Tricking software into using weaker settings than it should.
 
 **EFF wordlist** — A list of 7,776 easy words published by the Electronic Frontier Foundation, used to make random passphrases.
@@ -155,6 +157,8 @@ so an old password is not lost by accident, and you can go back to it.
 **Fsync / full sync** — Asking the operating system to confirm that data has really reached the disk, not just a memory buffer. Slower, but a committed change survives a power cut.
 
 **Fuzzing / fuzzer** — Feeding a program huge numbers of automatically made-up inputs to find crashes. A coverage-guided fuzzer keeps the inputs that reach new code and mutates them. See [Fuzzing](fuzzing.md).
+
+**Gallery** — A development aid that opens one screen of the desktop app on sample data in an in-memory vault, to look at the design without touching a real vault.
 
 **Golden file** — A saved known-good file that the code must always be able to open. See [Testing with known answers and properties](testing-with-known-answers.md).
 
@@ -291,6 +295,8 @@ so an old password is not lost by accident, and you can go back to it.
 **Wayland / X11** — The two ways Linux draws a desktop. The clipboard tools differ between them.
 
 **WebAssembly (WASM / WASI)** — A format that lets the same code run in a browser or another sandbox. We build for it so the web app can share the code. `wasmtime` runs it in tests.
+
+**WebKitGTK** — The web-page engine used by GNOME. The desktop app uses it as its drawing surface; it is a system library, not part of our code.
 
 **Wrapped key** — A key that is stored encrypted under another key.
 

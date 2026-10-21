@@ -1,0 +1,46 @@
+# Supply-chain policy for the desktop app only. The rest of the project uses the stricter /deny.toml.
+# The GUI toolkit (Dioxus + WebKitGTK bindings) has a much larger dependency tree; every exception below is deliberate,
+# narrow, and explained. Nothing here weakens the vault's own cryptography, which lives in the main workspace.
+
+[graph]
+all-features = true
+targets = ["x86_64-unknown-linux-gnu"]
+
+[advisories]
+yanked = "deny"
+ignore = [
+    { id = "RUSTSEC-2024-0436", reason = "`paste` is unmaintained, no vulnerability; used by GUI toolkit macros" },
+    { id = "RUSTSEC-2024-0370", reason = "`proc-macro-error` is unmaintained, no vulnerability; build-time only" },
+    { id = "RUSTSEC-2025-0057", reason = "`fxhash` is unmaintained, no vulnerability; used inside the GUI toolkit" },
+    { id = "RUSTSEC-2024-0429", reason = "glib `VariantStrIter` unsoundness; we never iterate GVariant strings, toolkit internal" },
+    { id = "RUSTSEC-2026-0097", reason = "`rand` unsound only with a custom logger that calls rand::rng(); this app installs no logger. Affects a copy inside the toolkit" },
+]
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "MPL-2.0", # file-level copyleft; used unmodified by the GUI toolkit
+    "Unicode-3.0",
+    "Zlib",
+]
+
+[bans]
+multiple-versions = "allow" # a GUI tree always has duplicates; the main workspace keeps them at "warn"
+wildcards = "deny"
+allow-wildcard-paths = true # our own path dependencies
+deny = [
+    # `dioxus-desktop` pulls OpenSSL in through `tungstenite`/`native-tls`, for its local websocket to the web view.
+    # It never touches vault data. Allowed only through that one path; any other use is still banned.
+    { crate = "openssl", wrappers = ["native-tls"] },
+    { crate = "openssl-sys", wrappers = ["openssl", "native-tls"] },
+    { crate = "ring" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

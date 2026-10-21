@@ -9,7 +9,9 @@ rahasyakosh/
 ├── CODE_OF_CONDUCT.md    how we treat each other
 ├── .github/workflows/    CI: runs all checks on every push and PR
 ├── docs/                 design documents (01–06) and this book (docs/book)
-└── crates/
+├── apps/
+    │   └── desktop/      the Dioxus desktop app (its own workspace; needs WebKitGTK to build)
+    └── crates/
     ├── core/             rahasyakosh-core: all security-relevant logic
     ├── clipboard/        rahasyakosh-clipboard: copy to the desktop clipboard and clear it (shared by rk and the app)
     ├── store/            rahasyakosh-store: saves encrypted records (SQLite, directory and memory backends)
@@ -35,6 +37,11 @@ rahasyakosh/
 
 Rules: **no file access, no network, no clock, no ambient randomness.** Everything is passed in.
 That is what makes it testable and portable to WebAssembly.
+
+## `apps/desktop` — the desktop app
+
+A separate Cargo workspace (it needs WebKitGTK and other system libraries that the rest of the project does not). `src/model.rs` holds everything the screens do, tested without a window;
+`src/lib.rs` draws it with Dioxus. See [The desktop app](desktop-app.md).
 
 ## `crates/clipboard` — the clipboard
 

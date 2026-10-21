@@ -1,0 +1,35 @@
+[package]
+name = "rahasyakosh-desktop"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+rust-version = "1.88"
+publish = false
+description = "Rahasyakosh desktop app (Dioxus)"
+
+[dependencies]
+dioxus = { version = "0.7.10", default-features = false, features = ["desktop", "macro", "html", "hooks", "signals", "launch", "document"] }
+rahasyakosh-app = { path = "../../crates/app" }
+rahasyakosh-clipboard = { path = "../../crates/clipboard" }
+rahasyakosh-core = { path = "../../crates/core" }
+rahasyakosh-store = { path = "../../crates/store", features = ["sqlite"] }
+rahasyakosh-strength = { path = "../../crates/strength" }
+rand = "0.10.3"
+tokio = { version = "1", features = ["time"] }
+uuid = { version = "1.28.0", features = ["v7"] }
+zeroize = { version = "1.9.1", features = ["derive"] }
+
+[profile.release]
+lto = "thin"
+strip = true
+
+[lib]
+name = "rahasyakosh_desktop"
+path = "src/lib.rs"
+
+[dev-dependencies]
+rand_chacha = "0.10.0"
+
+# A separate workspace: the desktop app needs system GUI libraries (WebKitGTK on Linux) that the rest of the
+# project, including its CI, does not.
+[workspace]

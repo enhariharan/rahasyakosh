@@ -21,6 +21,12 @@ CARGO_TARGET_WASM32_WASIP1_RUNNER=wasmtime cargo test -p rahasyakosh-core -p rah
 ```
 CI runs the same checks. Minimum supported Rust version is set in `Cargo.toml` (`rust-version`).
 
+## The desktop app
+`apps/desktop` is its own Cargo workspace because it needs system GUI libraries
+(`sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev libayatana-appindicator3-dev libsoup-3.0-dev`). From that directory:
+`cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`, `cargo deny check`, `cargo audit`. Put behaviour in `src/model.rs` (tested
+without a window) and keep `src/lib.rs` to drawing. `GALLERY=detail cargo run --example gallery` shows a screen on sample data. See `docs/book/src/desktop-app.md`.
+
 ## Fuzzing
 Every parser of untrusted input has a check in `crates/fuzzcheck` and a fuzz target in `fuzz/`. `cargo test` replays the committed corpus and past
 crashes on stable Rust. To hunt for new bugs you need nightly: `cd fuzz && cargo +nightly fuzz run -s none <target>`. If you add a parser, add a check,

@@ -21,6 +21,7 @@ If you are new to the subject, read the chapters in order. Each one builds on th
 
 | If you want to… | Read |
 |---|---|
+| Use the desktop app | [The desktop app](desktop-app.md) |
 | Install `rk` and store your first passwords | [Quick start: using `rk`](quick-start.md) |
 | Understand the big picture | [What a password manager does](what-is-a-password-manager.md) |
 | Decode jargon in a code review | [Security words you will meet](vocabulary.md) and the [Glossary](glossary.md) |
