@@ -16,7 +16,7 @@ cargo test --workspace
 cargo fmt --all
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features
-cargo build -p rahasyakosh-core -p rahasyakosh-store -p rahasyakosh-strength -p rahasyakosh-transfer --target wasm32-unknown-unknown
+cargo build -p rahasyakosh-core -p rahasyakosh-store -p rahasyakosh-app -p rahasyakosh-strength -p rahasyakosh-transfer --target wasm32-unknown-unknown
 cargo deny --all-features check
 cargo audit
 ```

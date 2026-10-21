@@ -9,6 +9,7 @@ description = "Unlocked-vault operations for Rahasyakosh front-ends: items, tras
 [dependencies]
 rahasyakosh-core = { version = "0.1.0", path = "../core" }
 rahasyakosh-store = { version = "0.1.0", path = "../store" }
+rand_core = "0.10.1"
 thiserror = "2.0.21"
 uuid = "1.28.0"
 zeroize = "1.9.1"

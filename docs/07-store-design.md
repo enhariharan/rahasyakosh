@@ -1,6 +1,6 @@
 # 07 — M2 Store Design
 
-Status: **approved** (decisions in section 10 accepted as recommended; work packages 1-4 done). Implements M2 of the roadmap (ADR-4 in `03-architecture.md` already fixes the broad shape).
+Status: **approved** (decisions in section 10 accepted as recommended; work packages 1-5 done). Implements M2 of the roadmap (ADR-4 in `03-architecture.md` already fixes the broad shape).
 Stories: US-ITM-02, US-ITM-03, US-ITM-04, US-ITM-05, US-ITM-08.
 
 ## 1. Goals and non-goals

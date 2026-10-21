@@ -22,7 +22,7 @@ jobs:
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - run: cargo test --workspace --all-features
       - name: WASM build of core
-        run: cargo build -p rahasyakosh-core -p rahasyakosh-store -p rahasyakosh-strength -p rahasyakosh-transfer --target wasm32-unknown-unknown --release
+        run: cargo build -p rahasyakosh-core -p rahasyakosh-store -p rahasyakosh-app -p rahasyakosh-strength -p rahasyakosh-transfer --target wasm32-unknown-unknown --release
 
   wasm-test:
     # Runs core's tests, including the golden vault in spec/vectors, inside a WebAssembly runtime.
@@ -38,7 +38,7 @@ jobs:
       - uses: bytecodealliance/actions/wasmtime/setup@v1
         with:
           version: v50.0.0
-      - run: cargo test -p rahasyakosh-core -p rahasyakosh-store -p rahasyakosh-transfer --target wasm32-wasip1
+      - run: cargo test -p rahasyakosh-core -p rahasyakosh-store -p rahasyakosh-app -p rahasyakosh-transfer --target wasm32-wasip1
 
   deny:
     runs-on: ubuntu-latest

@@ -847,6 +847,7 @@ dependencies = [
  "rahasyakosh-core",
  "rahasyakosh-store",
  "rand_chacha",
+ "rand_core",
  "thiserror",
  "uuid",
  "zeroize",

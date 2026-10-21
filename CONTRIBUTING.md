@@ -13,11 +13,11 @@ Thanks for helping. Rahasyakosh is a password manager, so correctness and securi
 cargo fmt --all
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features
-cargo build -p rahasyakosh-core -p rahasyakosh-store -p rahasyakosh-strength -p rahasyakosh-transfer --target wasm32-unknown-unknown
+cargo build -p rahasyakosh-core -p rahasyakosh-store -p rahasyakosh-app -p rahasyakosh-strength -p rahasyakosh-transfer --target wasm32-unknown-unknown
 cargo deny --all-features check
 # optional: run core's tests (incl. the golden vault) under WebAssembly; needs wasmtime installed
 rustup target add wasm32-wasip1
-CARGO_TARGET_WASM32_WASIP1_RUNNER=wasmtime cargo test -p rahasyakosh-core -p rahasyakosh-store -p rahasyakosh-transfer --target wasm32-wasip1
+CARGO_TARGET_WASM32_WASIP1_RUNNER=wasmtime cargo test -p rahasyakosh-core -p rahasyakosh-store -p rahasyakosh-app -p rahasyakosh-transfer --target wasm32-wasip1
 ```
 CI runs the same checks. Minimum supported Rust version is set in `Cargo.toml` (`rust-version`).
 
