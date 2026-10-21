@@ -769,6 +769,7 @@ dependencies = [
  "anyhow",
  "clap",
  "rahasyakosh-core",
+ "rahasyakosh-strength",
  "rand",
  "rpassword",
  "serde",
@@ -797,6 +798,14 @@ dependencies = [
  "thiserror",
  "uuid",
  "zeroize",
+]
+
+[[package]]
+name = "rahasyakosh-strength"
+version = "0.1.0"
+dependencies = [
+ "rahasyakosh-core",
+ "rand_chacha",
  "zxcvbn",
 ]
 

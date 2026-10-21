@@ -8,11 +8,11 @@ use rahasyakosh_core::{
     crypto::KdfParams,
     generator::{self, PasswordSpec},
     item::{Field, Item},
-    strength,
     totp::Totp,
     vault::UnlockedVault,
     wordlist,
 };
+use rahasyakosh_strength as strength;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;

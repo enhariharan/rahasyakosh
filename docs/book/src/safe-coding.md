@@ -26,7 +26,8 @@ choosing it. `unsafe` code (for example, locking memory pages) belongs only in t
 layers, isolated and reviewed.
 
 ## 6. No hidden inputs: inject randomness and time
-The core never calls the system random generator or the clock. The caller passes in an `rng` and a
+The core never calls the system random generator or the clock. (This is why the strength meter, whose
+library does read the clock, is a separate crate.) The caller passes in an `rng` and a
 timestamp. Benefits: tests can use a fixed seed and reproduce results exactly, and the same code
 compiles to WebAssembly where "the system" differs.
 

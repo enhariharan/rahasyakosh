@@ -22,7 +22,7 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
       - name: WASM build of core
-        run: cargo build -p rahasyakosh-core --target wasm32-unknown-unknown --release
+        run: cargo build -p rahasyakosh-core -p rahasyakosh-strength --target wasm32-unknown-unknown --release
 
   deny:
     runs-on: ubuntu-latest

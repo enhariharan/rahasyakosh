@@ -1,0 +1,14 @@
+[package]
+name = "rahasyakosh-strength"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Password strength estimation for Rahasyakosh (advisory; kept out of core on purpose)"
+
+[dependencies]
+zxcvbn = { version = "3.1.1", default-features = false }
+
+[dev-dependencies]
+rahasyakosh-core = { version = "0.1.0", path = "../core" }
+rand_chacha = "0.10.0"

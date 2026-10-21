@@ -11,6 +11,7 @@ rahasyakosh/
 ├── docs/                 design documents (01–06) and this book (docs/book)
 └── crates/
     ├── core/             rahasyakosh-core: all security-relevant logic
+    ├── strength/         rahasyakosh-strength: advisory password strength meter (zxcvbn)
     └── cli/              rk: the command-line front-end
 ```
 
@@ -22,12 +23,19 @@ rahasyakosh/
 | `vault.rs` | Header, key wrapping, unlocking, changing password, encrypting/decrypting records |
 | `item.rs` | The decrypted item model: title, fields, kind (login, note, …) |
 | `generator.rs` | Random passwords, passphrases, entropy estimate |
+| `wordlist.rs` | The bundled EFF passphrase word list |
 | `totp.rs` | Time-based one-time codes |
 | `error.rs` | The `Error` type; messages here must never leak secrets |
 | `lib.rs` | Module list and `#![forbid(unsafe_code)]` |
 
 Rules: **no file access, no network, no clock, no ambient randomness.** Everything is passed in.
 That is what makes it testable and portable to WebAssembly.
+
+## `crates/strength` — the strength meter
+
+One file, `lib.rs`, wrapping the `zxcvbn` library. It is a separate crate because it needs the clock and,
+on the web, JavaScript, neither of which `core` may use. See
+[Passwords and passphrases](passwords-and-passphrases.md#the-strength-meter).
 
 ## `crates/cli` — the `rk` program
 
@@ -44,7 +52,7 @@ On every push, GitHub Actions (`.github/workflows/ci.yml`) runs:
 | `cargo fmt --check` | inconsistent formatting |
 | `cargo clippy -D warnings` | common mistakes and suspicious code |
 | `cargo test` | broken behaviour |
-| wasm32 build of core | accidental use of OS-only features |
+| wasm32 build of core and strength | accidental use of OS-only features |
 | `cargo deny` | bad licences, banned crates, yanked versions |
 | `cargo audit` | dependencies with known vulnerabilities |
 

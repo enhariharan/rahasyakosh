@@ -29,7 +29,7 @@ security-relevant changes reviewed by a second maintainer.
 - [x] M1 core: KDF, key hierarchy, records, items, generator, TOTP (13 tests; wasm32 builds)
 - [x] M1b CLI `rk`: init, add, get, list, totp, rm, gen, passwd
 - [x] US-GEN-02: EFF large wordlist bundled in core; `rk gen --passphrase`
-- [x] US-GEN-03: strength meter (zxcvbn) in core; enforced for master passwords (US-VLT-01); `rk init|passwd --passphrase`
+- [x] US-GEN-03: strength meter (zxcvbn, separate `rahasyakosh-strength` crate); enforced for master passwords (US-VLT-01); `rk init|passwd --passphrase`
 - [ ] Next: CSV import/export (US-IMP-01, US-IMP-03), then M2 store
 
 ## Original order

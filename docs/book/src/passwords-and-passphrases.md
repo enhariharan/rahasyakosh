@@ -100,7 +100,7 @@ Remember: if you lose the master password, nobody, including us, can recover you
 
 ## The strength meter
 
-`crates/core/src/strength.rs` answers "how guessable is this password?". The naive way is
+`crates/strength/src/lib.rs` (the `rahasyakosh-strength` crate) answers "how guessable is this password?". The naive way is
 "alphabet size ^ length", which is wrong for human-made passwords: `Password123!` uses four
 character classes and 12 characters, yet every cracking tool tries it within seconds.
 
@@ -130,8 +130,9 @@ Where it is used:
 - It is an **estimate**. A high score does not mean a password is safe if it has been leaked, or reused.
   Breach checking is a separate, later feature (US-GEN-05).
 - It assumes the attacker knows common human habits but not you personally.
-- The library reads the system clock internally (to recognise recent years) and, on WebAssembly,
-  uses browser JavaScript APIs. This is an accepted exception to the "core never touches the clock"
-  rule in [Writing code that handles secrets](safe-coding.md), and it is why the strength meter is
-  the only part of `core` that needs a JavaScript environment on the web. The password and
-  the library's result never leave the process.
+- The `zxcvbn` library reads the system clock internally (to recognise recent years) and, on WebAssembly,
+  uses browser JavaScript APIs. `rahasyakosh-core` must never do either, so the meter lives in its **own
+  crate**. Core stays free of those dependencies, and a problem in the estimator can never reach the code
+  that handles keys. The meter is advisory: it never sees a key, and the password never leaves the process.
+- Because it is separate, core cannot refuse a weak master password by itself. Each front-end (today
+  the CLI) applies the rule using `Strength::MIN_MASTER_SCORE`.

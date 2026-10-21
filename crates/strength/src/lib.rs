@@ -1,5 +1,8 @@
 //! Password strength estimation (US-GEN-03), a thin wrapper over `zxcvbn`.
 //!
+//! This lives outside `rahasyakosh-core` on purpose: `zxcvbn` reads the system clock and, on WebAssembly,
+//! needs browser JavaScript APIs, which core must never do. The meter is advisory and handles no keys.
+//!
 //! The estimate is pattern-aware (dictionary words, keyboard walks, dates, repeats), unlike the naive
 //! "pool size ^ length" figure from [`crate::generator::entropy_bits`]. It is a guide, not a guarantee.
 use zxcvbn::zxcvbn;
@@ -59,7 +62,7 @@ pub fn estimate(password: &str, user_inputs: &[&str]) -> Strength {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{generator, wordlist};
+    use rahasyakosh_core::{generator, wordlist};
     use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
 
     #[test]
