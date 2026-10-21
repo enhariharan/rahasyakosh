@@ -1,0 +1,74 @@
+# How a vault works
+
+This chapter follows your data from the master password to the file on disk. The authoritative
+specification is `docs/04-security-and-crypto.md`; the code is in `crates/core/src/vault.rs`.
+
+## The key hierarchy
+
+Instead of encrypting everything directly with a key derived from your password, we use layers:
+
+```
+master password
+      │  Argon2id (+ random salt)
+      ▼
+master key ──HKDF "rk/kek/v1"──► KEK  (key-encrypting key)
+                                  │ unlocks
+                                  ▼
+                       wrapped vault key (stored in header)
+                                  │ decrypts to
+                                  ▼
+                         VK  (random 32-byte vault key)
+                                  │ HKDF "rk/item/v1" + item id
+                                  ▼
+                         one key per item
+```
+
+**Why the extra layer?** The vault key (VK) is random and never changes. The password-derived key
+(KEK) only *wraps* it, like a safe containing the real key. When you change your master password,
+we re-wrap the small vault key under a new KEK. We do **not** need to re-encrypt every item. That
+is `UnlockedVault::change_password`.
+
+**Why a key per item?** If something ever went wrong with one item's key, only that item is
+affected. It also means a record is meaningless without its own id.
+
+## What is stored on disk
+
+The CLI vault (`crates/cli/src/file.rs`) is a JSON file with two parts:
+
+1. **Header** (readable, not secret): format version, a vault id, the Argon2 settings, the salt,
+   and the **wrapped vault key**. None of this helps an attacker without the password.
+2. **Records**: one per item. Each has an item id, a revision number, a nonce, and the
+   **ciphertext**. The item's title, username, password, notes and everything else are *inside*
+   the ciphertext.
+
+Before encryption, each item is padded to a multiple of 64 bytes so that file sizes do not
+reveal, say, how long your password is.
+
+The file is written safely: to a temporary file, flushed to disk, then renamed over the old one
+(so a crash cannot leave half a vault) and with permissions `0600` (owner only) on Unix.
+
+## Unlocking
+
+1. Read the header; check the Argon2 settings are within allowed bounds.
+2. Run Argon2id on the password with the stored salt. Derive the KEK.
+3. Try to decrypt the wrapped vault key. If the password is wrong, authentication fails and we
+   return one generic error — no hints.
+4. Hold the vault key in memory (`UnlockedVault`) until you lock; it is wiped when dropped.
+
+## Authenticated context: why the AAD matters
+
+Every encryption includes **associated data** that is checked but not hidden:
+
+- The header's AAD covers the format version, vault id, Argon2 settings and salt. If anyone edits
+  those fields (for example to weaken the settings), unwrapping the key fails.
+- A record's AAD covers the vault id, item id, revision and record version. If an attacker swaps
+  two records, or replays an old version of one, decryption fails.
+
+This is a powerful trick: **the context is part of the lock.**
+
+## Two things this design does not do
+
+- It cannot protect you from malware running as you while the vault is unlocked. See
+  [What we defend against](threat-model.md).
+- It cannot rescue a weak master password. Argon2 makes guessing expensive, not impossible.
+  A planned optional **Secret Key** (extra random entropy stored on your devices) will help.

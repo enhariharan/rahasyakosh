@@ -1,0 +1,12 @@
+[book]
+title = "The Rahasyakosh Book"
+authors = ["Rahasyakosh contributors"]
+description = "A plain-English guide to how Rahasyakosh works, for newcomers and future maintainers."
+language = "en"
+src = "src"
+
+[build]
+build-dir = "../../target/book"
+
+[output.html]
+git-repository-url = "https://github.com/enhariharan/rahasyakosh"

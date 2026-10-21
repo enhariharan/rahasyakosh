@@ -11,5 +11,6 @@ Targets: Linux, macOS, Windows, Android, iOS (later), Browser (WASM + extension)
 | 04 | [Security & Crypto Design](04-security-and-crypto.md) | Threat model, key hierarchy, vault format |
 | 05 | [UX Design](05-ux-design.md) | Information architecture, flows, screens, accessibility |
 | 06 | [Roadmap & Implementation Plan](06-roadmap.md) | Milestones, testing, CI, release |
+| — | [The Rahasyakosh Book](book/src/introduction.md) | Plain-English guide to security and cryptography for newcomers and maintainers (mdBook: `mdbook serve docs/book --open`) |
 
 Status: **draft v0.1** — decisions marked *ADR* in 03 are open to revision until M2.
