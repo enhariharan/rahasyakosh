@@ -2,6 +2,8 @@
 
 This chapter is for using the command-line tool `rk` to store passwords. The rest of the book explains why it works the way it does.
 
+> Unsure what a word means (vault, passphrase, trash)? See the [Glossary](glossary.md).
+
 > **Not audited yet.** Nobody independent has reviewed this software. Read [Before you store real passwords](#before-you-store-real-passwords) first.
 
 ## Install

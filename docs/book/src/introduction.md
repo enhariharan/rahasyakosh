@@ -13,6 +13,8 @@ This book explains how it works **in plain English**. It is written for two kind
 You do not need any security background. Every technical term is explained the first time it
 appears, and again in the [Glossary](glossary.md). You do need to be comfortable reading basic Rust.
 
+> **New to the jargon?** The [Glossary](glossary.md) explains every term, starting with what a *vault* is. Keep it open as you read.
+
 ## How to read this book
 
 If you are new to the subject, read the chapters in order. Each one builds on the one before.

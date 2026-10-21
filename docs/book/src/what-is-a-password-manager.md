@@ -6,6 +6,8 @@ A typical person has well over a hundred online accounts. Good security advice s
 needs a **long, random, different** password. Nobody can memorise that. So people reuse passwords,
 and when one website leaks, attackers try the same email-and-password pair everywhere else.
 
+> *Vault*, *encrypted* and the other terms used below are explained in the [Glossary](glossary.md).
+
 ## The idea
 
 A password manager stores all your passwords in one place and locks that place with **one** strong
