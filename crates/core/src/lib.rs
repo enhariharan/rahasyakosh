@@ -8,6 +8,7 @@ pub mod crypto;
 pub mod error;
 pub mod generator;
 pub mod item;
+pub mod strength;
 pub mod totp;
 pub mod vault;
 pub mod wordlist;

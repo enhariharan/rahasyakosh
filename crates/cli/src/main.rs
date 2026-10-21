@@ -8,6 +8,7 @@ use rahasyakosh_core::{
     crypto::KdfParams,
     generator::{self, PasswordSpec},
     item::{Field, Item},
+    strength,
     totp::Totp,
     vault::UnlockedVault,
     wordlist,
@@ -29,7 +30,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Cmd {
     /// Create a new vault
-    Init,
+    Init(MasterOpts),
     /// Add a login (password generated if --password is omitted and --generate is set)
     Add {
         title: String,
@@ -85,7 +86,21 @@ enum Cmd {
         capitalize: bool,
     },
     /// Change the master password
-    Passwd,
+    Passwd(MasterOpts),
+}
+
+/// How the new master password is chosen.
+#[derive(clap::Args)]
+struct MasterOpts {
+    /// Generate a random master passphrase (EFF large wordlist) instead of typing a password
+    #[arg(short, long)]
+    passphrase: bool,
+    /// Number of words in the generated passphrase
+    #[arg(short, long, default_value_t = 6, requires = "passphrase")]
+    words: usize,
+    /// Accept a master password the strength meter rates below "fair"
+    #[arg(long, conflicts_with = "passphrase")]
+    allow_weak: bool,
 }
 
 fn now() -> i64 {
@@ -108,7 +123,50 @@ fn read_password(prompt: &str) -> Result<zeroize::Zeroizing<String>> {
     Ok(zeroize::Zeroizing::new(rpassword::prompt_password(prompt)?))
 }
 
-fn new_password() -> Result<zeroize::Zeroizing<String>> {
+/// New master password: typed twice, or generated (shown once, then re-typed to confirm it was saved).
+fn new_master(
+    opts: &MasterOpts,
+    rng: &mut impl rand::CryptoRng,
+) -> Result<zeroize::Zeroizing<String>> {
+    if !opts.passphrase {
+        return new_password(opts.allow_weak);
+    }
+    if std::env::var("RK_PASSWORD").is_ok() {
+        bail!("--passphrase cannot be combined with RK_PASSWORD");
+    }
+    let list = wordlist::eff_large();
+    let phrase = generator::generate_passphrase(&list, opts.words, "-", false, rng)?;
+    eprintln!(
+        "Your new master passphrase (write it down; it is shown only once):\n\n    {}\n",
+        *phrase
+    );
+    eprintln!(
+        "~{:.0} bits of entropy",
+        generator::passphrase_entropy_bits(list.len(), opts.words)
+    );
+    let again = rpassword::prompt_password("Type it again to confirm you saved it: ")?;
+    if *again != *phrase {
+        bail!("passphrase did not match; nothing was changed");
+    }
+    Ok(phrase)
+}
+
+fn print_strength(s: &strength::Strength) {
+    eprintln!(
+        "Strength: {}/4 ({}); offline cracking time: {}",
+        s.score,
+        s.label(),
+        s.crack_time
+    );
+    if let Some(w) = &s.warning {
+        eprintln!("  {w}");
+    }
+    for hint in &s.suggestions {
+        eprintln!("  - {hint}");
+    }
+}
+
+fn new_password(allow_weak: bool) -> Result<zeroize::Zeroizing<String>> {
     let p = read_password("New master password: ")?;
     if std::env::var("RK_PASSWORD").is_err() {
         let again = rpassword::prompt_password("Repeat: ")?;
@@ -116,8 +174,10 @@ fn new_password() -> Result<zeroize::Zeroizing<String>> {
             bail!("passwords do not match");
         }
     }
-    if p.chars().count() < 8 {
-        bail!("master password must be at least 8 characters");
+    let strength = strength::estimate(&p, &[]);
+    print_strength(&strength);
+    if strength.score < strength::Strength::MIN_MASTER_SCORE && !allow_weak {
+        bail!("master password is too weak; choose a longer one, use --passphrase, or pass --allow-weak");
     }
     Ok(p)
 }
@@ -176,14 +236,17 @@ fn main() -> Result<()> {
                 avoid_ambiguous,
                 ..Default::default()
             };
-            println!("{}", *generator::generate_password(&spec, &mut rng)?);
+            let password = generator::generate_password(&spec, &mut rng)?;
+            println!("{}", *password);
+            let s = strength::estimate(&password, &[]);
+            eprintln!("Strength: {}/4 ({})", s.score, s.label());
             return Ok(());
         }
-        Cmd::Init => {
+        Cmd::Init(opts) => {
             if path.exists() {
                 bail!("{} already exists", path.display());
             }
-            let pw = new_password()?;
+            let pw = new_master(&opts, &mut rng)?;
             let vault = UnlockedVault::create(&pw, KdfParams::DESKTOP, &mut rng)?;
             VaultFile {
                 header: vault.header().clone(),
@@ -291,14 +354,14 @@ fn main() -> Result<()> {
             vf.save(&path)?;
             eprintln!("{}", if purge { "Deleted" } else { "Moved to trash" });
         }
-        Cmd::Passwd => {
-            let new = new_password()?;
+        Cmd::Passwd(opts) => {
+            let new = new_master(&opts, &mut rng)?;
             vault.change_password(&new, KdfParams::DESKTOP, &mut rng)?;
             vf.header = vault.header().clone();
             vf.save(&path)?;
             eprintln!("Master password changed");
         }
-        Cmd::Init | Cmd::Gen { .. } => unreachable!(),
+        Cmd::Init(_) | Cmd::Gen { .. } => unreachable!(),
     }
     Ok(())
 }

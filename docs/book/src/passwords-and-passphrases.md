@@ -64,6 +64,21 @@ rk gen --passphrase --words 7 --separator . --capitalize
 Each run also prints the estimated entropy (for example `~78 bits of entropy`) on standard error,
 so it does not pollute the passphrase when you pipe the output.
 
+### Choosing a master passphrase
+
+The master password is the one secret everything else depends on, so a random passphrase is the best
+choice for it:
+
+```
+rk init --passphrase            # six random words (~77 bits)
+rk passwd --passphrase -w 7     # change the master passphrase to seven words
+```
+
+The program shows the phrase **once**, then asks you to type it again. This proves you have written it
+down before the vault is created or changed; if the second entry does not match, nothing is changed.
+Remember: if you lose the master password, nobody, including us, can recover your vault.
+`--passphrase` cannot be combined with the `RK_PASSWORD` environment variable.
+
 ### How it is wired up
 
 - `crates/core/src/wordlists/eff_large.txt` is the list itself, compiled into the program with
@@ -82,3 +97,41 @@ so it does not pollute the passphrase when you pipe the output.
 - Generated secrets are returned as `Zeroizing<String>` so they are wiped when dropped.
 - Any change to the word list changes the strength calculation. Keep the list exact and unmodified,
   and keep a test that it has 7,776 unique entries.
+
+## The strength meter
+
+`crates/core/src/strength.rs` answers "how guessable is this password?". The naive way is
+"alphabet size ^ length", which is wrong for human-made passwords: `Password123!` uses four
+character classes and 12 characters, yet every cracking tool tries it within seconds.
+
+We use the `zxcvbn` library (originally from Dropbox), which looks for the patterns attackers
+actually try: common passwords, dictionary words, names, keyboard walks like `qwerty`, repeats,
+sequences, dates and "l33t" substitutions. It then estimates how many guesses an attacker would need.
+
+`strength::estimate(password, user_inputs)` returns:
+
+| Field | Meaning |
+|---|---|
+| `score` | 0 (very weak) to 4 (very strong) |
+| `crack_time` | Time to crack offline against a slow hash, e.g. "centuries" |
+| `warning`, `suggestions` | Plain-language hints, e.g. "This is a top-10 common password." |
+
+`user_inputs` lets the caller pass words an attacker could guess (username, site name); passwords
+containing them score lower.
+
+Where it is used:
+
+- `rk init` and `rk passwd` print the score, and **refuse a master password scoring below 2** (US-VLT-01).
+  `--allow-weak` overrides this deliberately. It cannot be combined with `--passphrase`.
+- `rk gen` prints the score of what it generated on standard error.
+
+### Limits you should know about
+
+- It is an **estimate**. A high score does not mean a password is safe if it has been leaked, or reused.
+  Breach checking is a separate, later feature (US-GEN-05).
+- It assumes the attacker knows common human habits but not you personally.
+- The library reads the system clock internally (to recognise recent years) and, on WebAssembly,
+  uses browser JavaScript APIs. This is an accepted exception to the "core never touches the clock"
+  rule in [Writing code that handles secrets](safe-coding.md), and it is why the strength meter is
+  the only part of `core` that needs a JavaScript environment on the web. The password and
+  the library's result never leave the process.

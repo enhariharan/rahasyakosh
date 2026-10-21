@@ -26,6 +26,7 @@
 **Property test** — A test that checks a rule holds for many generated inputs.
 **Rejection sampling** — Discarding random draws that would introduce bias.
 **Salt** — Random public data mixed into password hashing.
+**Strength score** — A 0–4 rating of how guessable a password is (from zxcvbn).
 **Test vector** — A published input/output pair used to verify an implementation.
 **Threat model** — Statement of who we defend against and who we don't.
 **TOTP** — Time-based one-time password (RFC 6238).
