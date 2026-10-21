@@ -14,6 +14,21 @@ pub trait Fixture {
     fn reopen(&self, store: Self::S) -> Self::S;
 }
 
+/// Made-up item id number `n`, shared with fixtures that must contain the same data.
+pub fn sample_id(n: u128) -> Uuid {
+    id(n)
+}
+
+/// Made-up header for vault number `vault` (`salt_byte` varies its contents).
+pub fn sample_header(vault: u128, salt_byte: u8) -> VaultHeader {
+    header(vault, salt_byte)
+}
+
+/// Made-up record: item `n`, revision `rev`, ciphertext of `len` bytes.
+pub fn sample_record(n: u128, rev: u64, len: usize) -> Record {
+    record(n, rev, len)
+}
+
 fn id(n: u128) -> Uuid {
     Uuid::from_u128(0x0190_0000_0000_7000_8000_0000_0000_0000 + n)
 }

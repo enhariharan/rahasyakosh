@@ -11,8 +11,8 @@ Thanks for helping. Rahasyakosh is a password manager, so correctness and securi
 ## Development
 ```
 cargo fmt --all
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace --all-features
 cargo build -p rahasyakosh-core -p rahasyakosh-store -p rahasyakosh-strength -p rahasyakosh-transfer --target wasm32-unknown-unknown
 cargo deny check
 # optional: run core's tests (incl. the golden vault) under WebAssembly; needs wasmtime installed

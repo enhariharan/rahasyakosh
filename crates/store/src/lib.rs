@@ -7,10 +7,14 @@
 pub mod conformance;
 mod directory;
 mod memory;
+#[cfg(feature = "sqlite")]
+mod sqlite;
 
 pub use directory::DirectoryStore;
 pub use memory::MemoryStore;
 pub use rahasyakosh_core::vault::{Record, VaultHeader};
+#[cfg(feature = "sqlite")]
+pub use sqlite::{Migration, SqliteStore, MIGRATIONS, SCHEMA_VERSION};
 pub use uuid::Uuid;
 
 #[derive(Debug, thiserror::Error)]
