@@ -291,7 +291,7 @@ fn Setup() -> Element {
         main { class: "centre",
             h1 { "Welcome to Rahasyakosh" }
             p { "Your passwords are kept in one encrypted file on this computer. A single master passphrase opens it." }
-            p { class: "warn", strong { "There is no way to recover a lost master passphrase. " } "Write it on paper and keep it safe." }
+            p { class: "warn", "This master passphrase below will be shown only once. Note it down. Keep it somewhere safe." }
             if !own() {
                 section { aria_label: "Generated passphrase",
                     p { class: "label", "Your new master passphrase" }
