@@ -24,6 +24,22 @@ jobs:
       - name: WASM build of core
         run: cargo build -p rahasyakosh-core -p rahasyakosh-strength -p rahasyakosh-transfer --target wasm32-unknown-unknown --release
 
+  wasm-test:
+    # Runs core's tests, including the golden vault in spec/vectors, inside a WebAssembly runtime.
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TARGET_WASM32_WASIP1_RUNNER: wasmtime
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+      - uses: Swatinem/rust-cache@v2
+      - uses: bytecodealliance/actions/wasmtime/setup@v1
+        with:
+          version: v50.0.0
+      - run: cargo test -p rahasyakosh-core --target wasm32-wasip1
+
   deny:
     runs-on: ubuntu-latest
     steps:

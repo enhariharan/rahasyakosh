@@ -11,6 +11,7 @@
 **Downgrade attack** — Tricking software into using weaker settings.
 **EFF wordlist** — The Electronic Frontier Foundation's 7,776-word list for dice-based passphrases.
 **Entropy** — A measure of unpredictability, in bits.
+**Golden file** — A saved known-good output kept in the repo; tests check the code still reproduces or opens it. Ours is never edited.
 **HKDF** — A function that derives several independent keys from one secret.
 **HMAC** — A keyed hash used to authenticate messages.
 **CSV injection** — A spreadsheet treating a cell starting with `=`, `+`, `-` or `@` as a formula.
@@ -18,6 +19,7 @@
 **KEK** — Key-encrypting key; protects (wraps) another key.
 **Key** — A secret value used to encrypt or decrypt.
 **MAC** — Message authentication code.
+**Known-answer test (KAT)** — A test that checks output against a value published or computed by an independent source.
 **Master password** — The one password the user remembers.
 **Modulo bias** — Unevenness introduced by using `%` on random numbers.
 **Nonce** — A number that must be used only once per key.

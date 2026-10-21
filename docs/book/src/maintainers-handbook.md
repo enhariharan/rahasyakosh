@@ -20,6 +20,7 @@ cargo build -p rahasyakosh-core -p rahasyakosh-strength -p rahasyakosh-transfer 
 cargo deny check
 cargo audit
 ```
+CI also runs core's tests inside a WebAssembly runtime (wasmtime). To do the same locally, see `CONTRIBUTING.md`.
 CI runs the same things; running them locally saves a round trip.
 
 ## Making a change

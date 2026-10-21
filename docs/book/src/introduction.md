@@ -25,6 +25,7 @@ If you are new to the subject, read the chapters in order. Each one builds on th
 | Follow a password from keyboard to disk | [How a vault works](how-a-vault-works.md) |
 | Move logins in or out safely | [Importing and exporting](import-export.md) |
 | Work on the password generator | [Passwords and passphrases](passwords-and-passphrases.md) |
+| Understand how we know the crypto is right | [Testing with known answers](testing-with-known-answers.md) |
 | Find your way around the code | [A tour of the repository](repo-tour.md) |
 | Make your first change safely | [Maintainer's handbook](maintainers-handbook.md) |
 

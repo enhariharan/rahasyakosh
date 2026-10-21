@@ -22,5 +22,8 @@ uuid = { version = "1.28.0", features = ["serde"] }
 zeroize = { version = "1.9.1", features = ["derive"] }
 
 [dev-dependencies]
-proptest = "1.12.0"
 rand_chacha = "0.10.0"
+
+# proptest (via rusty-fork) does not build for WASI; property tests run natively only.
+[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
+proptest = "1.12.0"

@@ -41,5 +41,5 @@ advisories, banned crates) and `cargo audit` (known vulnerabilities) in CI.
 
 ## 9. Test with known answers
 Cryptography is unforgiving. We test against **published test vectors** (e.g. RFC 6238 for TOTP)
-so we know we match the standard, plus **property tests**: "encrypt then decrypt returns the input",
+so we know we match the standard (see [Testing with known answers](testing-with-known-answers.md)), plus **property tests**: "encrypt then decrypt returns the input",
 "changing any bit makes decryption fail".
