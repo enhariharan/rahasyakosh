@@ -3,7 +3,12 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-pub const ITEM_SCHEMA: u16 = 1;
+/// Payload schema written today. Readers accept every earlier schema: new fields are optional with defaults.
+/// Schema 2 added [`Item::history`].
+pub const ITEM_SCHEMA: u16 = 2;
+
+/// How many earlier versions an item keeps unless told otherwise (US-ITM-02).
+pub const DEFAULT_HISTORY_LIMIT: usize = 10;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -53,6 +58,30 @@ impl Field {
     }
 }
 
+/// An earlier state of an item's content. History lives inside the item, so one item stays one encrypted record
+/// and old passwords are protected exactly like the current one.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Zeroize, ZeroizeOnDrop)]
+pub struct ItemVersion {
+    /// When this content stopped being current (the time of the edit that replaced it).
+    #[zeroize(skip)]
+    pub replaced_at: i64,
+    pub title: String,
+    pub fields: Vec<Field>,
+    pub urls: Vec<String>,
+    pub tags: Vec<String>,
+    pub notes: String,
+    #[zeroize(skip)]
+    pub favourite: bool,
+}
+
+impl std::fmt::Debug for ItemVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ItemVersion")
+            .field("replaced_at", &self.replaced_at)
+            .finish_non_exhaustive()
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Zeroize, ZeroizeOnDrop)]
 pub struct Item {
     pub schema: u16,
@@ -74,6 +103,9 @@ pub struct Item {
     /// Set when moved to trash.
     #[zeroize(skip)]
     pub deleted_at: Option<i64>,
+    /// Earlier versions of the content, newest first. Absent in schema-1 payloads.
+    #[serde(default)]
+    pub history: Vec<ItemVersion>,
 }
 
 impl std::fmt::Debug for Item {
@@ -102,6 +134,7 @@ impl Item {
             created_at: now,
             updated_at: now,
             deleted_at: None,
+            history: vec![],
         }
     }
 
@@ -116,6 +149,64 @@ impl Item {
         self.fields
             .iter()
             .find(|f| f.name.eq_ignore_ascii_case(name))
+    }
+
+    /// The current content as a history entry, stamped with the time it is being replaced.
+    pub fn snapshot(&self, replaced_at: i64) -> ItemVersion {
+        ItemVersion {
+            replaced_at,
+            title: self.title.clone(),
+            fields: self.fields.clone(),
+            urls: self.urls.clone(),
+            tags: self.tags.clone(),
+            notes: self.notes.clone(),
+            favourite: self.favourite,
+        }
+    }
+
+    /// Does the current content equal that of `v`? (Ignores timestamps, trash state and history itself.)
+    pub fn same_content_as(&self, v: &ItemVersion) -> bool {
+        self.title == v.title
+            && self.fields == v.fields
+            && self.urls == v.urls
+            && self.tags == v.tags
+            && self.notes == v.notes
+            && self.favourite == v.favourite
+    }
+
+    /// Remember the current content before it is changed. Keeps at most `limit` versions, newest first.
+    /// Does nothing if the content is identical to the newest entry already.
+    pub fn push_history(&mut self, replaced_at: i64, limit: usize) {
+        if limit == 0 {
+            self.history.clear();
+            return;
+        }
+        if self
+            .history
+            .first()
+            .is_some_and(|v| self.same_content_as(v))
+        {
+            return;
+        }
+        self.history.insert(0, self.snapshot(replaced_at));
+        self.history.truncate(limit);
+    }
+
+    /// Make the content of `history[index]` current again. The present content is saved to history first, so
+    /// nothing is lost and the past is never rewritten.
+    pub fn revert_to(&mut self, index: usize, now: i64, limit: usize) -> Result<(), crate::Error> {
+        let old = self.history.get(index).cloned().ok_or_else(|| {
+            crate::Error::InvalidArgument(format!("no version {index} in this item's history"))
+        })?;
+        self.push_history(now, limit);
+        self.title = old.title.clone();
+        self.fields = old.fields.clone();
+        self.urls = old.urls.clone();
+        self.tags = old.tags.clone();
+        self.notes = old.notes.clone();
+        self.favourite = old.favourite;
+        self.updated_at = now;
+        Ok(())
     }
 
     /// Set a field's value, keeping its position if it exists, otherwise appending it.
@@ -182,5 +273,86 @@ mod tests {
         assert!(i.remove_field("Username"));
         assert!(!i.remove_field("username"));
         assert!(i.field("username").is_none());
+    }
+
+    fn edited(i: &Item, new_password: &str, at: i64) -> Item {
+        let mut e = i.clone();
+        e.push_history(at, 3);
+        e.set_field("password", new_password, true);
+        e.updated_at = at;
+        e
+    }
+
+    #[test]
+    fn history_is_newest_first_and_capped() {
+        let mut i = login();
+        for (n, pw) in ["two", "three", "four", "five"].into_iter().enumerate() {
+            i = edited(&i, pw, 10 + n as i64);
+        }
+        assert_eq!(i.field("password").unwrap().value, "five");
+        assert_eq!(i.history.len(), 3, "capped at the limit");
+        let kept: Vec<_> = i
+            .history
+            .iter()
+            .map(|v| v.fields[1].value.as_str())
+            .collect();
+        assert_eq!(
+            kept,
+            ["four", "three", "two"],
+            "newest first; the oldest ('pw') was dropped"
+        );
+        assert_eq!(i.history[0].replaced_at, 13);
+    }
+
+    #[test]
+    fn unchanged_content_does_not_add_history() {
+        let mut i = login();
+        i.push_history(5, 10);
+        assert_eq!(i.history.len(), 1);
+        i.push_history(6, 10); // content still equals the newest entry
+        assert_eq!(i.history.len(), 1);
+        i.set_field("password", "changed", true);
+        i.push_history(7, 10);
+        assert_eq!(i.history.len(), 2);
+    }
+
+    #[test]
+    fn limit_zero_keeps_no_history() {
+        let mut i = edited(&login(), "x", 5);
+        i.push_history(6, 0);
+        assert!(i.history.is_empty());
+    }
+
+    #[test]
+    fn revert_restores_content_and_keeps_the_past() {
+        let v1 = login();
+        let mut v3 = edited(&edited(&v1, "two", 10), "three", 20);
+        assert_eq!(v3.history.len(), 2);
+        // history[1] is the original content ("pw"); revert to it.
+        v3.revert_to(1, 30, 10).unwrap();
+        assert_eq!(v3.field("password").unwrap().value, "pw");
+        assert_eq!(v3.updated_at, 30);
+        // The "three" content we just left is now the newest history entry, and nothing was lost.
+        assert_eq!(v3.history[0].fields[1].value, "three");
+        assert_eq!(v3.history.len(), 3);
+        assert!(v3.revert_to(9, 31, 10).is_err());
+    }
+
+    #[test]
+    fn schema_one_payloads_without_history_still_load() {
+        let json = r#"{"schema":1,"id":"01900000-0000-7000-8000-000000000001","kind":"login","title":"Old",
+            "fields":[],"urls":[],"tags":[],"notes":"","favourite":false,"created_at":1,"updated_at":1,"deleted_at":null}"#;
+        let i: Item = serde_json::from_str(json).unwrap();
+        assert_eq!(i.schema, 1);
+        assert!(i.history.is_empty());
+    }
+
+    #[test]
+    fn history_round_trips_through_json_and_hides_content_in_debug() {
+        let i = edited(&login(), "secret-new", 9);
+        let back: Item = serde_json::from_str(&serde_json::to_string(&i).unwrap()).unwrap();
+        assert_eq!(back, i);
+        let shown = format!("{:?}", i.history[0]);
+        assert!(!shown.contains("pw") && !shown.contains("Site"), "{shown}");
     }
 }

@@ -7,7 +7,7 @@
 use proptest::prelude::*;
 use rahasyakosh_core::crypto::{self, KdfParams, Sealed, NONCE_LEN};
 use rahasyakosh_core::generator::{self, PasswordSpec};
-use rahasyakosh_core::item::{Field, Item, ItemKind};
+use rahasyakosh_core::item::{Field, Item, ItemKind, ItemVersion};
 use rahasyakosh_core::totp::{Algorithm, Totp};
 use rahasyakosh_core::vault::{Record, UnlockedVault, VaultHeader};
 use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
@@ -60,9 +60,23 @@ fn item_strategy() -> impl Strategy<Value = Item> {
         any::<i64>(),
         any::<i64>(),
         prop::option::of(any::<i64>()),
+        prop::collection::vec((any::<i64>(), text(), text(), any::<bool>()), 0..3),
     )
         .prop_map(
-            |(id, kind, title, fields, urls, tags, notes, fav, created, updated, deleted)| {
+            |(
+                id,
+                kind,
+                title,
+                fields,
+                urls,
+                tags,
+                notes,
+                fav,
+                created,
+                updated,
+                deleted,
+                history,
+            )| {
                 let kind = [
                     ItemKind::Login,
                     ItemKind::Note,
@@ -84,6 +98,18 @@ fn item_strategy() -> impl Strategy<Value = Item> {
                 i.favourite = fav;
                 i.updated_at = updated;
                 i.deleted_at = deleted;
+                i.history = history
+                    .into_iter()
+                    .map(|(replaced_at, title, notes, favourite)| ItemVersion {
+                        replaced_at,
+                        title,
+                        fields: vec![Field::secret("password", &notes)],
+                        urls: vec![],
+                        tags: vec![],
+                        notes,
+                        favourite,
+                    })
+                    .collect();
                 i
             },
         )
