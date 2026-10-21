@@ -13,6 +13,7 @@ use rahasyakosh_core::{
     wordlist,
 };
 use rahasyakosh_strength as strength;
+use rahasyakosh_transfer as transfer;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
@@ -87,6 +88,41 @@ enum Cmd {
     },
     /// Change the master password
     Passwd(MasterOpts),
+    /// Import logins from a CSV file (generic, Chrome or Firefox export)
+    Import {
+        file: PathBuf,
+        /// Map one of our fields to a column header, e.g. --map password=pwd (fields: title, url,
+        /// username, password, notes, totp, tags)
+        #[arg(long, value_name = "FIELD=COLUMN")]
+        map: Vec<String>,
+        /// Show what would be imported, then stop
+        #[arg(long)]
+        dry_run: bool,
+        /// Do not ask for confirmation
+        #[arg(short, long)]
+        yes: bool,
+    },
+    /// Export the vault. csv and json are PLAINTEXT and ask for the master password again.
+    Export {
+        #[arg(short, long, value_enum, default_value_t = ExportFormat::Csv)]
+        format: ExportFormat,
+        /// Write to this file (default: standard output; not allowed for --format vault)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+        /// Overwrite the output file if it exists
+        #[arg(long)]
+        force: bool,
+    },
+}
+
+#[derive(Clone, Copy, clap::ValueEnum)]
+enum ExportFormat {
+    /// Plaintext CSV (lossy: logins only)
+    Csv,
+    /// Plaintext JSON (complete)
+    Json,
+    /// Encrypted copy of the vault file (safe to store; needs your master password to open)
+    Vault,
 }
 
 /// How the new master password is chosen.
@@ -180,6 +216,48 @@ fn new_password(allow_weak: bool) -> Result<zeroize::Zeroizing<String>> {
         bail!("master password is too weak; choose a longer one, use --passphrase, or pass --allow-weak");
     }
     Ok(p)
+}
+
+/// Ask for the master password again and check it against the vault header.
+fn reauthenticate(header: &rahasyakosh_core::vault::VaultHeader) -> Result<()> {
+    let again = zeroize::Zeroizing::new(
+        rpassword::prompt_password("Re-enter master password to continue: ")
+            .context("re-entering the password needs an interactive terminal")?,
+    );
+    header
+        .unlock(&again)
+        .map(drop)
+        .context("wrong master password")
+}
+
+/// Write `bytes` to `path` (owner-only on Unix), refusing to replace an existing file without `force`.
+fn write_private(path: &std::path::Path, bytes: &[u8], force: bool) -> Result<()> {
+    use std::io::Write;
+    let mut opts = std::fs::OpenOptions::new();
+    opts.write(true);
+    if force {
+        opts.create(true).truncate(true);
+    } else {
+        opts.create_new(true);
+    }
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
+    let mut f = opts.open(path).with_context(|| {
+        format!(
+            "cannot write {} (use --force to overwrite an existing file)",
+            path.display()
+        )
+    })?;
+    f.write_all(bytes)?;
+    f.sync_all()?;
+    Ok(())
+}
+
+fn confirm(question: &str) -> Result<bool> {
+    eprint!("{question} [y/N] ");
+    let mut line = String::new();
+    std::io::stdin().read_line(&mut line)?;
+    Ok(matches!(line.trim(), "y" | "Y" | "yes"))
 }
 
 fn find<'a>(items: &'a [Item], q: &str) -> Result<&'a Item> {
@@ -360,6 +438,95 @@ fn main() -> Result<()> {
             vf.header = vault.header().clone();
             vf.save(&path)?;
             eprintln!("Master password changed");
+        }
+        Cmd::Import {
+            file,
+            map,
+            dry_run,
+            yes,
+        } => {
+            let overrides = map
+                .iter()
+                .map(|m| {
+                    m.split_once('=')
+                        .map(|(f, c)| (f.trim().to_string(), c.trim().to_string()))
+                        .with_context(|| format!("--map expects FIELD=COLUMN, got '{m}'"))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            let data = zeroize::Zeroizing::new(
+                std::fs::read(&file).with_context(|| format!("reading {}", file.display()))?,
+            );
+            let report = transfer::import_csv(&data, &overrides, &items, now(), Uuid::now_v7)?;
+            eprintln!(
+                "Detected format: {}. {} to import, {} duplicate(s) skipped, {} empty row(s) skipped.",
+                report.detected,
+                report.items.len(),
+                report.skipped_duplicates,
+                report.skipped_empty
+            );
+            for w in &report.warnings {
+                eprintln!("warning: {w}");
+            }
+            for i in &report.items {
+                let user = i.field("username").map(|f| f.value.as_str()).unwrap_or("");
+                println!(
+                    "{}\t{}\t{}",
+                    i.title,
+                    user,
+                    i.urls.first().map_or("", |u| u)
+                );
+            }
+            if report.items.is_empty() || dry_run {
+                return Ok(());
+            }
+            if !yes && !confirm(&format!("Import {} item(s)?", report.items.len()))? {
+                bail!("cancelled; nothing was imported");
+            }
+            for item in &report.items {
+                vf.records.push(vault.seal_item(item, 1, &mut rng)?);
+            }
+            vf.save(&path)?;
+            eprintln!("Imported {} item(s)", report.items.len());
+            eprintln!(
+                "The CSV still holds your passwords in plain text. Delete it securely: {}",
+                file.display()
+            );
+        }
+        Cmd::Export {
+            format,
+            output,
+            force,
+        } => {
+            if let ExportFormat::Vault = format {
+                let out = output.context("--format vault needs --output FILE")?;
+                if out == path {
+                    bail!("output must differ from the vault file");
+                }
+                if out.exists() && !force {
+                    bail!("{} exists (use --force to overwrite)", out.display());
+                }
+                vf.save(&out)?;
+                eprintln!("Wrote encrypted copy to {}", out.display());
+                return Ok(());
+            }
+            eprintln!(
+                "WARNING: this export is PLAINTEXT. Anyone who can read it can read every password in it."
+            );
+            reauthenticate(&vf.header)?;
+            let text = match format {
+                ExportFormat::Csv => transfer::export_csv(&items)?,
+                _ => transfer::export_json(&items)?,
+            };
+            match output {
+                Some(out) => {
+                    write_private(&out, text.as_bytes(), force)?;
+                    eprintln!(
+                        "Wrote {}. Delete it securely when you are done.",
+                        out.display()
+                    );
+                }
+                None => print!("{}", *text),
+            }
         }
         Cmd::Init(_) | Cmd::Gen { .. } => unreachable!(),
     }

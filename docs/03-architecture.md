@@ -31,6 +31,7 @@ rahasyakosh/
 ├─ Cargo.toml                (workspace)
 ├─ crates/
 │  ├─ core/        rahasyakosh-core
+│  ├─ transfer/    rahasyakosh-transfer   (CSV/JSON import & export; pure conversion)
 │  ├─ strength/    rahasyakosh-strength   (advisory strength meter; zxcvbn needs clock/JS, so not in core)
 │  ├─ store/       rahasyakosh-store      (M2)
 │  ├─ sync/        rahasyakosh-sync       (M4)

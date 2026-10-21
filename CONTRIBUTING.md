@@ -13,7 +13,7 @@ Thanks for helping. Rahasyakosh is a password manager, so correctness and securi
 cargo fmt --all
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-cargo build -p rahasyakosh-core -p rahasyakosh-strength --target wasm32-unknown-unknown
+cargo build -p rahasyakosh-core -p rahasyakosh-strength -p rahasyakosh-transfer --target wasm32-unknown-unknown
 cargo deny check
 ```
 CI runs the same checks. Minimum supported Rust version is set in `Cargo.toml` (`rust-version`).

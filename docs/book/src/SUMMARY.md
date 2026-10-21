@@ -8,6 +8,7 @@
 - [How a vault works](how-a-vault-works.md)
 - [Passwords and passphrases](passwords-and-passphrases.md)
 - [One-time codes (TOTP)](totp.md)
+- [Importing and exporting](import-export.md)
 - [Writing code that handles secrets](safe-coding.md)
 - [What we defend against](threat-model.md)
 - [A tour of the repository](repo-tour.md)

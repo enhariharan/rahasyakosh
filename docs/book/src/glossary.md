@@ -13,6 +13,7 @@
 **Entropy** — A measure of unpredictability, in bits.
 **HKDF** — A function that derives several independent keys from one secret.
 **HMAC** — A keyed hash used to authenticate messages.
+**CSV injection** — A spreadsheet treating a cell starting with `=`, `+`, `-` or `@` as a formula.
 **KDF** — Key derivation function.
 **KEK** — Key-encrypting key; protects (wraps) another key.
 **Key** — A secret value used to encrypt or decrypt.
@@ -25,6 +26,7 @@
 **Poly1305** — The authentication part of XChaCha20-Poly1305.
 **Property test** — A test that checks a rule holds for many generated inputs.
 **Rejection sampling** — Discarding random draws that would introduce bias.
+**Re-authentication** — Asking for the master password again before a dangerous action.
 **Salt** — Random public data mixed into password hashing.
 **Strength score** — A 0–4 rating of how guessable a password is (from zxcvbn).
 **Test vector** — A published input/output pair used to verify an implementation.

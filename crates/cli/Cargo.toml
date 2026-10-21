@@ -10,6 +10,7 @@ anyhow = "1.0.104"
 clap = { version = "4.6.7", features = ["derive", "env"] }
 rahasyakosh-core = { version = "0.1.0", path = "../core" }
 rahasyakosh-strength = { version = "0.1.0", path = "../strength" }
+rahasyakosh-transfer = { version = "0.1.0", path = "../transfer" }
 rand = "0.10.3"
 rpassword = "7.5.4"
 serde = { version = "1.0.229", features = ["derive"] }

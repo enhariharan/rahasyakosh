@@ -12,6 +12,7 @@ rahasyakosh/
 └── crates/
     ├── core/             rahasyakosh-core: all security-relevant logic
     ├── strength/         rahasyakosh-strength: advisory password strength meter (zxcvbn)
+    ├── transfer/         rahasyakosh-transfer: CSV import and CSV/JSON export (pure conversion)
     └── cli/              rk: the command-line front-end
 ```
 
@@ -37,9 +38,14 @@ One file, `lib.rs`, wrapping the `zxcvbn` library. It is a separate crate becaus
 on the web, JavaScript, neither of which `core` may use. See
 [Passwords and passphrases](passwords-and-passphrases.md#the-strength-meter).
 
+## `crates/transfer` — import and export
+
+Converts between CSV/JSON text and items. No file or terminal access. See
+[Importing and exporting](import-export.md).
+
 ## `crates/cli` — the `rk` program
 
-`main.rs` defines the commands (`init`, `add`, `get`, `list`, `totp`, `rm`, `gen`, `passwd`) using
+`main.rs` defines the commands (`init`, `add`, `get`, `list`, `totp`, `rm`, `gen`, `passwd`, `import`, `export`) using
 `clap`. `file.rs` reads and writes the vault file. It is deliberately simple; a proper storage
 layer (SQLite and directory backends) arrives in milestone M2.
 
@@ -52,7 +58,7 @@ On every push, GitHub Actions (`.github/workflows/ci.yml`) runs:
 | `cargo fmt --check` | inconsistent formatting |
 | `cargo clippy -D warnings` | common mistakes and suspicious code |
 | `cargo test` | broken behaviour |
-| wasm32 build of core and strength | accidental use of OS-only features |
+| wasm32 build of core, strength and transfer | accidental use of OS-only features |
 | `cargo deny` | bad licences, banned crates, yanked versions |
 | `cargo audit` | dependencies with known vulnerabilities |
 
