@@ -80,6 +80,8 @@ so an old password is not lost by accident, and you can go back to it.
 
 **AAD (associated data)** — Extra information that is not hidden but *is* covered by the tamper check. We use it to tie a record to its vault, item and revision, so records cannot be swapped around. See [Security words](vocabulary.md).
 
+**Accessibility (a11y)** — Making software usable by people with disabilities: using only a keyboard, a screen reader, high contrast or large text. "a11y" is short for "a, then 11 letters, then y". See [Accessibility](desktop-app.md#accessibility).
+
 **AEAD** — Authenticated encryption with associated data: encrypting *and* detecting any change in one step. Ours is XChaCha20-Poly1305.
 
 **Argon2id** — A deliberately slow, memory-hungry way to turn a password into a key, so that guessing passwords is expensive for an attacker.
@@ -252,6 +254,8 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Schema** — The layout of a database (its tables and columns), or of an item's saved data. It has a version number.
 
+**Screen reader** — Software (Orca on Linux) that reads the screen aloud or to a braille display. It relies on each control having a clear text name, which is why a button must say *what* it copies.
+
 **Scrollback** — Everything your terminal remembers having shown. A password printed by `rk get` stays there; `--copy` avoids that.
 
 **Secret Key** — A planned, optional extra random key kept only on your devices and combined with your password, so a stolen vault is safe even against a weak password. Not built yet.
@@ -293,6 +297,8 @@ so an old password is not lost by accident, and you can go back to it.
 **Vault key (VK)** — The random key that protects your items. It is stored in the header, locked by the key made from your password.
 
 **Wayland / X11** — The two ways Linux draws a desktop. The clipboard tools differ between them.
+
+**WCAG** — The Web Content Accessibility Guidelines. Level AA is the usual target: text contrast of at least 4.5 to 1, 3 to 1 for control edges, everything usable by keyboard.
 
 **WebAssembly (WASM / WASI)** — A format that lets the same code run in a browser or another sandbox. We build for it so the web app can share the code. `wasmtime` runs it in tests.
 

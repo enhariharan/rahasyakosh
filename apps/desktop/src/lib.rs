@@ -413,18 +413,21 @@ fn Main() -> Element {
                     }
                 },
             }
-            nav {
+            nav { aria_label: "Main",
                 button {
+                    aria_current: if view == View::Items || view == View::Form { "page" } else { "false" },
                     class: if view == View::Items || view == View::Form { "tab on" } else { "tab" },
                     onclick: move |_| { if let Some(m) = ctx.model.write().as_mut() { m.show(View::Items, now()); } },
                     "Items"
                 }
                 button {
+                    aria_current: if view == View::Trash { "page" } else { "false" },
                     class: if view == View::Trash { "tab on" } else { "tab" },
                     onclick: move |_| { if let Some(m) = ctx.model.write().as_mut() { m.show(View::Trash, now()); } },
                     "Trash ({trash_count})"
                 }
                 button {
+                    aria_current: if view == View::Settings { "page" } else { "false" },
                     class: if view == View::Settings { "tab on" } else { "tab" },
                     onclick: move |_| { if let Some(m) = ctx.model.write().as_mut() { m.show(View::Settings, now()); } },
                     "Settings"
@@ -474,20 +477,21 @@ fn Browser() -> Element {
                 if rows.is_empty() {
                     p { class: "muted pad", if trash { "The trash is empty." } else { "Nothing here yet." } }
                 }
-                ul { class: "list",
+                ul { class: "list", aria_label: "Item list",
                     for r in rows {
                         li { key: "{r.id}",
                             button {
                                 class: if selected == Some(r.id) { "row on" } else { "row" },
+                                aria_current: if selected == Some(r.id) { "true" } else { "false" },
                                 onclick: move |_| select(model, r.id),
-                                span { class: "title", if r.favourite { "★ " } "{r.title}" }
+                                span { class: "title", if r.favourite { span { class: "sr-only", "Pinned: " } span { aria_hidden: "true", "★ " } } "{r.title}" }
                                 span { class: "sub", "{r.subtitle}" }
                             }
                         }
                     }
                 }
             }
-            section { class: "detail", aria_live: "polite",
+            main { class: "detail", aria_label: "Item details",
                 { detail_pane(ctx.clone()) }
             }
         }
@@ -543,18 +547,18 @@ fn detail_pane(ctx: Ctx) -> Element {
                             div { class: "field", key: "{f.name}",
                                 dt { "{f.label}" }
                                 dd {
-                                    if f.secret && f.value.is_none() { span { class: "mask", aria_label: "hidden", "••••••••••" } }
+                                    if f.secret && f.value.is_none() { span { class: "mask", role: "img", aria_label: "{f.label} is hidden", "••••••••••" } }
                                     else if f.name == "notes" { span { class: "notes", "{f.value.clone().unwrap_or_default()}" } }
                                     else { span { class: if f.secret { "mono" } else { "" }, "{f.value.clone().unwrap_or_default()}" } }
                                     span { class: "row tight",
                                         if f.secret {
                                             if f.value.is_none() {
-                                                button { onclick: act!(m, now => m.reveal(&n1, now)), "Show" }
+                                                button { aria_label: "Show {f.label}", onclick: act!(m, now => m.reveal(&n1, now)), "Show" }
                                             } else {
-                                                button { onclick: act!(m, now => m.hide(&n2, now)), "Hide" }
+                                                button { aria_label: "Hide {f.label}", onclick: act!(m, now => m.hide(&n2, now)), "Hide" }
                                             }
                                         }
-                                        button { onclick: act!(m, now => m.copy(&n3, now)), "Copy" }
+                                        button { aria_label: "Copy {f.label}", onclick: act!(m, now => m.copy(&n3, now)), "Copy" }
                                     }
                                 }
                             }
@@ -567,14 +571,14 @@ fn detail_pane(ctx: Ctx) -> Element {
                         dd {
                             span { class: "mono big", "{t.code}" }
                             span { class: "muted small", " {t.seconds_left} s" }
-                            span { class: "row tight", button { onclick: act!(m, now => m.copy("totp", now)), "Copy" } }
+                            span { class: "row tight", button { aria_label: "Copy two-factor code", onclick: act!(m, now => m.copy("totp", now)), "Copy" } }
                         }
                     }
                 }
                 for u in d.urls.clone() {
                     div { class: "field", key: "{u}",
                         dt { "Website" }
-                        dd { span { "{u}" } span { class: "row tight", button { onclick: act!(m, now => m.copy("url", now)), "Copy" } } }
+                        dd { span { "{u}" } span { class: "row tight", button { aria_label: "Copy website {u}", onclick: act!(m, now => m.copy("url", now)), "Copy" } } }
                     }
                 }
                 if !d.tags.is_empty() {
@@ -591,7 +595,7 @@ fn detail_pane(ctx: Ctx) -> Element {
                         li { key: "{h.index}",
                             span { "{h.when}: changed {h.changed}" }
                             if !d.trashed {
-                                button { onclick: act!(m, now => m.revert_selected(h.index, now)), "Go back to this" }
+                                button { aria_label: "Go back to the version from {h.when}", onclick: act!(m, now => m.revert_selected(h.index, now)), "Go back to this" }
                             }
                         }
                     }
@@ -640,6 +644,7 @@ fn FormView() -> Element {
                     button {
                         r#type: "button",
                         onclick: move |_| { if let Some(m) = ctx.model.write().as_mut() { m.generate_password(20); } },
+                        aria_label: "Generate a random password",
                         "Generate"
                     }
                 }

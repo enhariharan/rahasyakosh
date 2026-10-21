@@ -78,7 +78,19 @@ You can also **change the master password** there (the new one must pass the str
 - **Linux only.** macOS and Windows need their own clipboard handling and packaging.
 - **No import or export screen.** Use `rk import` and `rk export` (see [Importing and exporting](import-export.md)).
 - **No browser autofill and no syncing between devices.**
-- **It has not been through an accessibility review** (US-A11Y-01). It uses real buttons, labels and keyboard focus, but nobody has tested it with a screen reader yet.
+- **It has had a desk review for accessibility, not testing with real assistive software** (US-A11Y-01). See [Accessibility](#accessibility) below.
+
+## Accessibility
+
+Accessibility means people who cannot use a mouse, cannot see the screen, or need strong contrast can still use the app. What has been done (US-A11Y-01):
+
+- **Keyboard only.** Everything is a real button, link or form field, so Tab, Shift+Tab, Enter and Space work, and a thick outline shows where you are. **Ctrl+K** jumps to search.
+- **Screen-reader names.** A screen reader reads a button's label out of context, so a row of identical "Copy" buttons would be useless. Each one now says what it acts on ("Copy Password", "Show Password", "Copy two-factor code"). A hidden password is announced as "Password is hidden", not as ten dots. The menu says which page you are on, and the list says which item is selected.
+- **Secrets are not read aloud.** An earlier version marked the whole detail pane as a "live region", which makes a screen reader speak every change. That would have read out a revealed password, and the two-factor code every 30 seconds. The pane is no longer live; only short notices ("Copied", errors) are announced.
+- **Contrast.** Text meets WCAG 2.2 level AA (at least 4.5 to 1), and the edges of fields and buttons and the focus outline meet 3 to 1, in both light and dark mode. A test (`cargo test` in `apps/desktop`) measures every colour pair, so a later colour change that breaks this fails the build.
+- **No colour-only meaning.** Errors and successes are written out in words; the pinned star is also spelled "Pinned" for screen readers.
+
+**Not done:** nobody has yet used the app with a real screen reader such as Orca, so the labels are reviewed but not heard. Large text and 200% zoom have not been checked either. If you rely on assistive software, your feedback is the most useful thing you can give.
 
 ### Files the app creates besides your vault
 

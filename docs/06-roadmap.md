@@ -43,7 +43,8 @@ security-relevant changes reviewed by a second maintainer.
 - [x] Fuzzing: ten targets (header, record, payload, item JSON, CSV import, TOTP, bundle, directory store, SQLite store, strength) with seed corpus, regression replay in `cargo test`, and a weekly GitHub job. Fixed on the way: a 32-bit overflow in `unpad`.
 - [x] M3 session crate: `Session<S>` in `rahasyakosh-app` (idle auto-lock, 1/2/4…300 s backoff after 3 wrong passwords, reveal-then-hide, clipboard-clear bookkeeping, settings), `rahasyakosh-clipboard` shared with `rk`
 - [x] M3 desktop app (Linux): `apps/desktop` (Dioxus + WebKitGTK), 19 model tests, gallery, `install-local.sh`, own supply-chain policy, CI job
-- [ ] Next: macOS/Windows clipboard and packaging, tray + global shortcut (Wayland portal), accessibility review (US-A11Y-01), then M4 sync. Fuzzing of header/record parsers and importers is still open (see Testing strategy)
+- [x] M3 accessibility desk review of the desktop app (US-A11Y-01 partly): screen-reader names, no live region over secrets, WCAG AA contrast enforced by a test. Still to do: try it with Orca, check 200% zoom
+- [ ] Next: macOS/Windows clipboard and packaging, tray + global shortcut (Wayland portal), then M4 sync. Fuzzing of header/record parsers and importers is still open (see Testing strategy)
 
 ## Original order
 1. Workspace + `rahasyakosh-core` (M1) with tests.
