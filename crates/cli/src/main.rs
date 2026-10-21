@@ -76,7 +76,10 @@ enum Cmd {
 }
 
 fn now() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
 }
 
 fn default_path() -> Result<PathBuf> {
@@ -117,7 +120,10 @@ fn find<'a>(items: &'a [Item], q: &str) -> Result<&'a Item> {
         [one] => Ok(one),
         many => bail!(
             "'{q}' is ambiguous: {}",
-            many.iter().map(|i| i.title.as_str()).collect::<Vec<_>>().join(", ")
+            many.iter()
+                .map(|i| i.title.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
         ),
     }
 }
@@ -131,8 +137,17 @@ fn main() -> Result<()> {
     let mut rng = rand::rng();
 
     match cli.cmd {
-        Cmd::Gen { length, no_symbols, avoid_ambiguous } => {
-            let spec = PasswordSpec { length, symbols: !no_symbols, avoid_ambiguous, ..Default::default() };
+        Cmd::Gen {
+            length,
+            no_symbols,
+            avoid_ambiguous,
+        } => {
+            let spec = PasswordSpec {
+                length,
+                symbols: !no_symbols,
+                avoid_ambiguous,
+                ..Default::default()
+            };
             println!("{}", *generator::generate_password(&spec, &mut rng)?);
             return Ok(());
         }
@@ -142,7 +157,11 @@ fn main() -> Result<()> {
             }
             let pw = new_password()?;
             let vault = UnlockedVault::create(&pw, KdfParams::DESKTOP, &mut rng)?;
-            VaultFile { header: vault.header().clone(), records: vec![] }.save(&path)?;
+            VaultFile {
+                header: vault.header().clone(),
+                records: vec![],
+            }
+            .save(&path)?;
             eprintln!("Created {}", path.display());
             return Ok(());
         }
@@ -152,7 +171,11 @@ fn main() -> Result<()> {
     let mut vf = VaultFile::load(&path).with_context(|| format!("opening {}", path.display()))?;
     let pw = read_password("Master password: ")?;
     let mut vault = vf.header.unlock(&pw)?;
-    let mut items: Vec<Item> = vf.records.iter().map(|r| vault.open_record(r)).collect::<Result<_, _>>()?;
+    let mut items: Vec<Item> = vf
+        .records
+        .iter()
+        .map(|r| vault.open_record(r))
+        .collect::<Result<_, _>>()?;
 
     match cli.cmd {
         Cmd::List { query } => {
@@ -168,7 +191,11 @@ fn main() -> Result<()> {
         }
         Cmd::Get { query, field } => {
             let item = find(&items, &query)?;
-            let f = if field == "notes" { None } else { item.field(&field) };
+            let f = if field == "notes" {
+                None
+            } else {
+                item.field(&field)
+            };
             match (field.as_str(), f) {
                 ("notes", _) => println!("{}", item.notes),
                 (_, Some(f)) => println!("{}", f.value),
@@ -178,11 +205,22 @@ fn main() -> Result<()> {
         Cmd::Totp { query } => {
             let item = find(&items, &query)?;
             let f = item.field("totp").context("item has no TOTP field")?;
-            let t = if f.value.starts_with("otpauth://") { Totp::from_uri(&f.value)? } else { Totp::from_base32(&f.value)? };
+            let t = if f.value.starts_with("otpauth://") {
+                Totp::from_uri(&f.value)?
+            } else {
+                Totp::from_base32(&f.value)?
+            };
             let ts = now() as u64;
             println!("{}\t({}s left)", t.code_at(ts), t.seconds_remaining(ts));
         }
-        Cmd::Add { title, username, url, password_stdin, generate, totp } => {
+        Cmd::Add {
+            title,
+            username,
+            url,
+            password_stdin,
+            generate,
+            totp,
+        } => {
             let password = if generate {
                 generator::generate_password(&PasswordSpec::default(), &mut rng)?
             } else if password_stdin {
@@ -195,7 +233,11 @@ fn main() -> Result<()> {
             let mut item = Item::login(&title, &username, &password, now(), Uuid::now_v7());
             item.urls.extend(url);
             if let Some(t) = totp {
-                if t.starts_with("otpauth://") { Totp::from_uri(&t)?; } else { Totp::from_base32(&t)?; }
+                if t.starts_with("otpauth://") {
+                    Totp::from_uri(&t)?;
+                } else {
+                    Totp::from_base32(&t)?;
+                }
                 item.fields.push(Field::secret("totp", &t));
             }
             let rec = vault.seal_item(&item, 1, &mut rng)?;

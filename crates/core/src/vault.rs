@@ -1,5 +1,5 @@
 //! Vault header, key wrapping and per-item records. See docs/04-security-and-crypto.md.
-use crate::crypto::{self, Key, KdfParams, Sealed, NONCE_LEN, SALT_LEN};
+use crate::crypto::{self, KdfParams, Key, Sealed, NONCE_LEN, SALT_LEN};
 use crate::item::Item;
 use crate::{Error, Result};
 use rand_core::CryptoRng;
@@ -18,7 +18,9 @@ mod b64 {
     pub fn serialize<S: Serializer>(v: &impl AsRef<[u8]>, s: S) -> Result<S::Ok, S::Error> {
         s.serialize_str(&E.encode(v))
     }
-    pub fn deserialize<'de, D: Deserializer<'de>, T: TryFrom<Vec<u8>>>(d: D) -> Result<T, D::Error> {
+    pub fn deserialize<'de, D: Deserializer<'de>, T: TryFrom<Vec<u8>>>(
+        d: D,
+    ) -> Result<T, D::Error> {
         let s = String::deserialize(d)?;
         let v = E.decode(s).map_err(serde::de::Error::custom)?;
         T::try_from(v).map_err(|_| serde::de::Error::custom("wrong length"))
@@ -35,12 +37,18 @@ pub struct SealedKey {
 
 impl From<Sealed> for SealedKey {
     fn from(s: Sealed) -> Self {
-        Self { nonce: s.nonce, ct: s.ct }
+        Self {
+            nonce: s.nonce,
+            ct: s.ct,
+        }
     }
 }
 impl From<&SealedKey> for Sealed {
     fn from(s: &SealedKey) -> Self {
-        Self { nonce: s.nonce, ct: s.ct.clone() }
+        Self {
+            nonce: s.nonce,
+            ct: s.ct.clone(),
+        }
     }
 }
 
@@ -69,7 +77,10 @@ impl VaultHeader {
         let kek = derive_kek(password, &self.salt, &self.kdf)?;
         let vk_bytes = crypto::open(&kek, &(&self.wrapped_vk).into(), &self.aad())?;
         let vk: [u8; 32] = vk_bytes.as_slice().try_into().map_err(|_| Error::Decrypt)?;
-        Ok(UnlockedVault { header: self.clone(), vk: Zeroizing::new(vk) })
+        Ok(UnlockedVault {
+            header: self.clone(),
+            vk: Zeroizing::new(vk),
+        })
     }
 }
 
@@ -128,13 +139,21 @@ impl UnlockedVault {
             vault_id,
             kdf,
             salt,
-            wrapped_vk: SealedKey { nonce: [0; NONCE_LEN], ct: vec![] },
+            wrapped_vk: SealedKey {
+                nonce: [0; NONCE_LEN],
+                ct: vec![],
+            },
         };
         header.wrapped_vk = Self::wrap(password, &header, &vk, rng)?;
         Ok(Self { header, vk })
     }
 
-    fn wrap(password: &str, h: &VaultHeader, vk: &Key, rng: &mut impl CryptoRng) -> Result<SealedKey> {
+    fn wrap(
+        password: &str,
+        h: &VaultHeader,
+        vk: &Key,
+        rng: &mut impl CryptoRng,
+    ) -> Result<SealedKey> {
         let kek = derive_kek(password, &h.salt, &h.kdf)?;
         Ok(crypto::seal(&kek, vk.as_slice(), &h.aad(), rng).into())
     }
@@ -144,7 +163,12 @@ impl UnlockedVault {
     }
 
     /// Re-wrap the vault key under a new password (fresh salt). Items are untouched.
-    pub fn change_password(&mut self, new_password: &str, kdf: KdfParams, rng: &mut impl CryptoRng) -> Result<()> {
+    pub fn change_password(
+        &mut self,
+        new_password: &str,
+        kdf: KdfParams,
+        rng: &mut impl CryptoRng,
+    ) -> Result<()> {
         check_kdf(&kdf)?;
         let mut h = self.header.clone();
         h.kdf = kdf;
@@ -171,7 +195,8 @@ impl UnlockedVault {
     }
 
     pub fn seal_item(&self, item: &Item, rev: u64, rng: &mut impl CryptoRng) -> Result<Record> {
-        let json = Zeroizing::new(serde_json::to_vec(item).map_err(|e| Error::Malformed(e.to_string()))?);
+        let json =
+            Zeroizing::new(serde_json::to_vec(item).map_err(|e| Error::Malformed(e.to_string()))?);
         let padded = pad(&json);
         let s = crypto::seal(
             &self.item_key(&item.id),
@@ -179,7 +204,13 @@ impl UnlockedVault {
             &self.record_aad(&item.id, rev, RECORD_VERSION),
             rng,
         );
-        Ok(Record { record_version: RECORD_VERSION, item_id: item.id, rev, nonce: s.nonce, ct: s.ct })
+        Ok(Record {
+            record_version: RECORD_VERSION,
+            item_id: item.id,
+            rev,
+            nonce: s.nonce,
+            ct: s.ct,
+        })
     }
 
     pub fn open_record(&self, r: &Record) -> Result<Item> {
@@ -188,10 +219,14 @@ impl UnlockedVault {
         }
         let pt = crypto::open(
             &self.item_key(&r.item_id),
-            &Sealed { nonce: r.nonce, ct: r.ct.clone() },
+            &Sealed {
+                nonce: r.nonce,
+                ct: r.ct.clone(),
+            },
             &self.record_aad(&r.item_id, r.rev, r.record_version),
         )?;
-        let item: Item = serde_json::from_slice(unpad(&pt)?).map_err(|e| Error::Malformed(e.to_string()))?;
+        let item: Item =
+            serde_json::from_slice(unpad(&pt)?).map_err(|e| Error::Malformed(e.to_string()))?;
         if item.id != r.item_id {
             return Err(Error::Decrypt);
         }
@@ -282,7 +317,8 @@ mod tests {
         let mut v = UnlockedVault::create("old", KdfParams::INSECURE_TEST, &mut r).unwrap();
         let item = Item::login("x", "u", "p", 1, new_id(&mut r));
         let rec = v.seal_item(&item, 1, &mut r).unwrap();
-        v.change_password("new", KdfParams::INSECURE_TEST, &mut r).unwrap();
+        v.change_password("new", KdfParams::INSECURE_TEST, &mut r)
+            .unwrap();
         assert!(v.header().unlock("old").is_err());
         let v2 = v.header().unlock("new").unwrap();
         assert_eq!(v2.open_record(&rec).unwrap(), item);
@@ -293,8 +329,12 @@ mod tests {
         let mut r = rng();
         let v = UnlockedVault::create("a", KdfParams::INSECURE_TEST, &mut r).unwrap();
         let id = new_id(&mut r);
-        let r1 = v.seal_item(&Item::login("t", "u", "p", 1, id), 1, &mut r).unwrap();
-        let r2 = v.seal_item(&Item::login("t", "u", "pp", 1, id), 1, &mut r).unwrap();
+        let r1 = v
+            .seal_item(&Item::login("t", "u", "p", 1, id), 1, &mut r)
+            .unwrap();
+        let r2 = v
+            .seal_item(&Item::login("t", "u", "pp", 1, id), 1, &mut r)
+            .unwrap();
         assert_eq!(r1.ct.len(), r2.ct.len());
     }
 }

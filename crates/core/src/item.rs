@@ -24,17 +24,32 @@ pub struct Field {
 
 impl std::fmt::Debug for Field {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let v = if self.concealed { "[REDACTED]" } else { self.value.as_str() };
-        f.debug_struct("Field").field("name", &self.name).field("value", &v).finish()
+        let v = if self.concealed {
+            "[REDACTED]"
+        } else {
+            self.value.as_str()
+        };
+        f.debug_struct("Field")
+            .field("name", &self.name)
+            .field("value", &v)
+            .finish()
     }
 }
 
 impl Field {
     pub fn text(name: &str, value: &str) -> Self {
-        Self { name: name.into(), value: value.into(), concealed: false }
+        Self {
+            name: name.into(),
+            value: value.into(),
+            concealed: false,
+        }
     }
     pub fn secret(name: &str, value: &str) -> Self {
-        Self { name: name.into(), value: value.into(), concealed: true }
+        Self {
+            name: name.into(),
+            value: value.into(),
+            concealed: true,
+        }
     }
 }
 
@@ -98,7 +113,9 @@ impl Item {
     }
 
     pub fn field(&self, name: &str) -> Option<&Field> {
-        self.fields.iter().find(|f| f.name.eq_ignore_ascii_case(name))
+        self.fields
+            .iter()
+            .find(|f| f.name.eq_ignore_ascii_case(name))
     }
 
     /// Case-insensitive match on title, URLs, tags and non-concealed fields.
@@ -107,6 +124,9 @@ impl Item {
         self.title.to_lowercase().contains(&q)
             || self.urls.iter().any(|u| u.to_lowercase().contains(&q))
             || self.tags.iter().any(|t| t.to_lowercase().contains(&q))
-            || self.fields.iter().any(|f| !f.concealed && f.value.to_lowercase().contains(&q))
+            || self
+                .fields
+                .iter()
+                .any(|f| !f.concealed && f.value.to_lowercase().contains(&q))
     }
 }

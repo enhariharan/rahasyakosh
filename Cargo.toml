@@ -6,7 +6,7 @@ members = ["crates/core", "crates/cli"]
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/rahasyakosh/rahasyakosh"
+repository = "https://github.com/enhariharan/rahasyakosh"
 rust-version = "1.85"
 
 [profile.release]

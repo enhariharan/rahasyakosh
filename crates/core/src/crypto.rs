@@ -35,16 +35,32 @@ impl KdfParams {
     pub const MAX_T: u32 = 20;
     pub const MAX_P: u32 = 16;
 
-    pub const DESKTOP: Self = Self { m_kib: 64 * 1024, t: 3, p: 1 };
-    pub const MOBILE: Self = Self { m_kib: 32 * 1024, t: 3, p: 1 };
+    pub const DESKTOP: Self = Self {
+        m_kib: 64 * 1024,
+        t: 3,
+        p: 1,
+    };
+    pub const MOBILE: Self = Self {
+        m_kib: 32 * 1024,
+        t: 3,
+        p: 1,
+    };
     /// Cheap parameters for unit tests only; rejected by `validate`.
-    pub const INSECURE_TEST: Self = Self { m_kib: 8, t: 1, p: 1 };
+    pub const INSECURE_TEST: Self = Self {
+        m_kib: 8,
+        t: 1,
+        p: 1,
+    };
 
     pub fn validate(&self) -> Result<()> {
         if self.m_kib < Self::MIN_M_KIB || self.t < Self::MIN_T {
             return Err(Error::KdfParams("below minimum strength".into()));
         }
-        if self.m_kib > Self::MAX_M_KIB || self.t > Self::MAX_T || self.p == 0 || self.p > Self::MAX_P {
+        if self.m_kib > Self::MAX_M_KIB
+            || self.t > Self::MAX_T
+            || self.p == 0
+            || self.p > Self::MAX_P
+        {
             return Err(Error::KdfParams("above maximum".into()));
         }
         Ok(())
@@ -77,7 +93,8 @@ pub fn derive_master_key(password: &[u8], salt: &[u8], params: &KdfParams) -> Re
 pub fn hkdf_expand(ikm: &[u8], salt: Option<&[u8]>, info: &[u8]) -> Key {
     let hk = Hkdf::<Sha256>::new(salt, ikm);
     let mut out = Zeroizing::new([0u8; KEY_LEN]);
-    hk.expand(info, &mut *out).expect("32 bytes is a valid HKDF-SHA256 length");
+    hk.expand(info, &mut *out)
+        .expect("32 bytes is a valid HKDF-SHA256 length");
     out
 }
 
@@ -92,7 +109,13 @@ pub fn seal(key: &Key, plaintext: &[u8], aad: &[u8], rng: &mut impl CryptoRng) -
     let nonce = random_bytes::<NONCE_LEN>(rng);
     let cipher = XChaCha20Poly1305::new_from_slice(key.as_slice()).expect("32-byte key");
     let ct = cipher
-        .encrypt(&XNonce::from(nonce), Payload { msg: plaintext, aad })
+        .encrypt(
+            &XNonce::from(nonce),
+            Payload {
+                msg: plaintext,
+                aad,
+            },
+        )
         .expect("XChaCha20-Poly1305 encryption cannot fail for in-memory buffers");
     Sealed { nonce, ct }
 }
@@ -100,7 +123,13 @@ pub fn seal(key: &Key, plaintext: &[u8], aad: &[u8], rng: &mut impl CryptoRng) -
 pub fn open(key: &Key, sealed: &Sealed, aad: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
     let cipher = XChaCha20Poly1305::new_from_slice(key.as_slice()).expect("32-byte key");
     cipher
-        .decrypt(&XNonce::from(sealed.nonce), Payload { msg: &sealed.ct, aad })
+        .decrypt(
+            &XNonce::from(sealed.nonce),
+            Payload {
+                msg: &sealed.ct,
+                aad,
+            },
+        )
         .map(Zeroizing::new)
         .map_err(|_| Error::Decrypt)
 }

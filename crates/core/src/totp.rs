@@ -28,7 +28,12 @@ impl Totp {
         if !(6..=8).contains(&digits) || period == 0 || secret.is_empty() {
             return Err(Error::InvalidArgument("bad TOTP parameters".into()));
         }
-        Ok(Self { secret, algorithm, digits, period })
+        Ok(Self {
+            secret,
+            algorithm,
+            digits,
+            period,
+        })
     }
 
     /// Standard defaults: SHA-1, 6 digits, 30 s, secret given as base32.
@@ -44,7 +49,9 @@ impl Totp {
         let query = rest.split_once('?').map(|x| x.1).unwrap_or("");
         let (mut secret, mut algo, mut digits, mut period) = (None, Algorithm::Sha1, 6, 30);
         for kv in query.split('&') {
-            let Some((k, v)) = kv.split_once('=') else { continue };
+            let Some((k, v)) = kv.split_once('=') else {
+                continue;
+            };
             match k {
                 "secret" => secret = Some(base32_decode(v)?),
                 "algorithm" => {
@@ -55,12 +62,25 @@ impl Totp {
                         _ => return Err(Error::InvalidArgument("unknown algorithm".into())),
                     }
                 }
-                "digits" => digits = v.parse().map_err(|_| Error::InvalidArgument("digits".into()))?,
-                "period" => period = v.parse().map_err(|_| Error::InvalidArgument("period".into()))?,
+                "digits" => {
+                    digits = v
+                        .parse()
+                        .map_err(|_| Error::InvalidArgument("digits".into()))?
+                }
+                "period" => {
+                    period = v
+                        .parse()
+                        .map_err(|_| Error::InvalidArgument("period".into()))?
+                }
                 _ => {}
             }
         }
-        Self::new(secret.ok_or_else(|| Error::InvalidArgument("missing secret".into()))?, algo, digits, period)
+        Self::new(
+            secret.ok_or_else(|| Error::InvalidArgument("missing secret".into()))?,
+            algo,
+            digits,
+            period,
+        )
     }
 
     pub fn code_at(&self, unix_time: u64) -> String {
@@ -126,16 +146,34 @@ mod tests {
             (20000000000, "65353130", "77737706", "47863826"),
         ];
         for (t, a, b, c) in cases {
-            assert_eq!(Totp::new(s1.clone(), Algorithm::Sha1, 8, 30).unwrap().code_at(t), a);
-            assert_eq!(Totp::new(s256.clone(), Algorithm::Sha256, 8, 30).unwrap().code_at(t), b);
-            assert_eq!(Totp::new(s512.clone(), Algorithm::Sha512, 8, 30).unwrap().code_at(t), c);
+            assert_eq!(
+                Totp::new(s1.clone(), Algorithm::Sha1, 8, 30)
+                    .unwrap()
+                    .code_at(t),
+                a
+            );
+            assert_eq!(
+                Totp::new(s256.clone(), Algorithm::Sha256, 8, 30)
+                    .unwrap()
+                    .code_at(t),
+                b
+            );
+            assert_eq!(
+                Totp::new(s512.clone(), Algorithm::Sha512, 8, 30)
+                    .unwrap()
+                    .code_at(t),
+                c
+            );
         }
     }
 
     #[test]
     fn base32_and_uri() {
         assert_eq!(base32_decode("MZXW6YTBOI======").unwrap(), b"foobar");
-        let t = Totp::from_uri("otpauth://totp/Ex:alice?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&digits=8").unwrap();
+        let t = Totp::from_uri(
+            "otpauth://totp/Ex:alice?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&digits=8",
+        )
+        .unwrap();
         assert_eq!(t.code_at(59), "94287082");
         assert!(base32_decode("1!").is_err());
     }

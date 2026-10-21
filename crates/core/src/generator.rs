@@ -21,7 +21,14 @@ pub struct PasswordSpec {
 
 impl Default for PasswordSpec {
     fn default() -> Self {
-        Self { length: 20, lower: true, upper: true, digits: true, symbols: true, avoid_ambiguous: false }
+        Self {
+            length: 20,
+            lower: true,
+            upper: true,
+            digits: true,
+            symbols: true,
+            avoid_ambiguous: false,
+        }
     }
 }
 
@@ -38,7 +45,10 @@ pub fn uniform(rng: &mut impl CryptoRng, n: usize) -> usize {
     }
 }
 
-pub fn generate_password(spec: &PasswordSpec, rng: &mut impl CryptoRng) -> Result<Zeroizing<String>> {
+pub fn generate_password(
+    spec: &PasswordSpec,
+    rng: &mut impl CryptoRng,
+) -> Result<Zeroizing<String>> {
     let classes: Vec<Vec<char>> = [
         (spec.lower, LOWER),
         (spec.upper, UPPER),
@@ -47,11 +57,17 @@ pub fn generate_password(spec: &PasswordSpec, rng: &mut impl CryptoRng) -> Resul
     ]
     .into_iter()
     .filter(|(on, _)| *on)
-    .map(|(_, s)| s.chars().filter(|c| !(spec.avoid_ambiguous && AMBIGUOUS.contains(*c))).collect())
+    .map(|(_, s)| {
+        s.chars()
+            .filter(|c| !(spec.avoid_ambiguous && AMBIGUOUS.contains(*c)))
+            .collect()
+    })
     .collect();
 
     if classes.is_empty() {
-        return Err(Error::InvalidArgument("select at least one character class".into()));
+        return Err(Error::InvalidArgument(
+            "select at least one character class".into(),
+        ));
     }
     if spec.length < classes.len() || spec.length > 1024 {
         return Err(Error::InvalidArgument("length out of range".into()));
@@ -78,14 +94,18 @@ pub fn generate_passphrase(
     rng: &mut impl CryptoRng,
 ) -> Result<Zeroizing<String>> {
     if wordlist.len() < 2 || !(3..=32).contains(&words) {
-        return Err(Error::InvalidArgument("need a wordlist and 3..=32 words".into()));
+        return Err(Error::InvalidArgument(
+            "need a wordlist and 3..=32 words".into(),
+        ));
     }
     let picked: Vec<String> = (0..words)
         .map(|_| {
             let w = wordlist[uniform(rng, wordlist.len())];
             if capitalize {
                 let mut c = w.chars();
-                c.next().map(|f| f.to_uppercase().chain(c).collect()).unwrap_or_default()
+                c.next()
+                    .map(|f| f.to_uppercase().chain(c).collect())
+                    .unwrap_or_default()
             } else {
                 w.to_string()
             }
@@ -97,12 +117,24 @@ pub fn generate_passphrase(
 /// Rough entropy estimate in bits for a random password of this spec (upper bound for UI hints).
 pub fn entropy_bits(spec: &PasswordSpec) -> f64 {
     let mut pool = 0usize;
-    for (on, s) in [(spec.lower, LOWER), (spec.upper, UPPER), (spec.digits, DIGITS), (spec.symbols, SYMBOLS)] {
+    for (on, s) in [
+        (spec.lower, LOWER),
+        (spec.upper, UPPER),
+        (spec.digits, DIGITS),
+        (spec.symbols, SYMBOLS),
+    ] {
         if on {
-            pool += s.chars().filter(|c| !(spec.avoid_ambiguous && AMBIGUOUS.contains(*c))).count();
+            pool += s
+                .chars()
+                .filter(|c| !(spec.avoid_ambiguous && AMBIGUOUS.contains(*c)))
+                .count();
         }
     }
-    if pool == 0 { 0.0 } else { spec.length as f64 * (pool as f64).log2() }
+    if pool == 0 {
+        0.0
+    } else {
+        spec.length as f64 * (pool as f64).log2()
+    }
 }
 
 #[cfg(test)]
@@ -114,7 +146,14 @@ mod tests {
     fn password_has_each_class_and_length() {
         let mut r = ChaCha20Rng::seed_from_u64(1);
         for _ in 0..200 {
-            let p = generate_password(&PasswordSpec { length: 8, ..Default::default() }, &mut r).unwrap();
+            let p = generate_password(
+                &PasswordSpec {
+                    length: 8,
+                    ..Default::default()
+                },
+                &mut r,
+            )
+            .unwrap();
             assert_eq!(p.chars().count(), 8);
             assert!(p.chars().any(|c| c.is_ascii_lowercase()));
             assert!(p.chars().any(|c| c.is_ascii_uppercase()));
@@ -126,7 +165,11 @@ mod tests {
     #[test]
     fn ambiguous_excluded() {
         let mut r = ChaCha20Rng::seed_from_u64(2);
-        let spec = PasswordSpec { length: 500, avoid_ambiguous: true, ..Default::default() };
+        let spec = PasswordSpec {
+            length: 500,
+            avoid_ambiguous: true,
+            ..Default::default()
+        };
         let p = generate_password(&spec, &mut r).unwrap();
         assert!(!p.chars().any(|c| AMBIGUOUS.contains(c)));
     }
@@ -138,15 +181,31 @@ mod tests {
         for _ in 0..60_000 {
             counts[uniform(&mut r, 6)] += 1;
         }
-        assert!(counts.iter().all(|&c| (9_000..11_000).contains(&c)), "{counts:?}");
+        assert!(
+            counts.iter().all(|&c| (9_000..11_000).contains(&c)),
+            "{counts:?}"
+        );
     }
 
     #[test]
     fn rejects_bad_specs() {
         let mut r = ChaCha20Rng::seed_from_u64(4);
-        let none = PasswordSpec { lower: false, upper: false, digits: false, symbols: false, ..Default::default() };
+        let none = PasswordSpec {
+            lower: false,
+            upper: false,
+            digits: false,
+            symbols: false,
+            ..Default::default()
+        };
         assert!(generate_password(&none, &mut r).is_err());
-        assert!(generate_password(&PasswordSpec { length: 2, ..Default::default() }, &mut r).is_err());
+        assert!(generate_password(
+            &PasswordSpec {
+                length: 2,
+                ..Default::default()
+            },
+            &mut r
+        )
+        .is_err());
     }
 
     #[test]
@@ -154,6 +213,8 @@ mod tests {
         let mut r = ChaCha20Rng::seed_from_u64(5);
         let p = generate_passphrase(&["alpha", "bravo", "charlie"], 4, "-", true, &mut r).unwrap();
         assert_eq!(p.split('-').count(), 4);
-        assert!(p.split('-').all(|w| w.chars().next().unwrap().is_uppercase()));
+        assert!(p
+            .split('-')
+            .all(|w| w.chars().next().unwrap().is_uppercase()));
     }
 }
