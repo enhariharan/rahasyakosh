@@ -823,6 +823,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rahasyakosh-store"
+version = "0.1.0"
+dependencies = [
+ "rahasyakosh-core",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "uuid",
+]
+
+[[package]]
 name = "rahasyakosh-strength"
 version = "0.1.0"
 dependencies = [
