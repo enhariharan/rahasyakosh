@@ -213,6 +213,34 @@ impl UnlockedVault {
         })
     }
 
+    /// Seal `padded` byte-for-byte as a record's payload, bypassing the item model and the padding step.
+    ///
+    /// **Only for fuzzing and tests.** Random bytes can never pass authentication, so this is the only way to reach the
+    /// code that parses a decrypted payload (`unpad` and the item JSON) with hostile input, which is what a buggy or
+    /// newer program could produce. It is hidden from the documentation and never used by the programs.
+    #[doc(hidden)]
+    pub fn seal_raw_payload_for_fuzzing(
+        &self,
+        id: Uuid,
+        rev: u64,
+        padded: &[u8],
+        rng: &mut impl CryptoRng,
+    ) -> Record {
+        let s = crypto::seal(
+            &self.item_key(&id),
+            padded,
+            &self.record_aad(&id, rev, RECORD_VERSION),
+            rng,
+        );
+        Record {
+            record_version: RECORD_VERSION,
+            item_id: id,
+            rev,
+            nonce: s.nonce,
+            ct: s.ct,
+        }
+    }
+
     pub fn open_record(&self, r: &Record) -> Result<Item> {
         if r.record_version != RECORD_VERSION {
             return Err(Error::UnsupportedVersion(r.record_version));
@@ -246,7 +274,9 @@ fn pad(data: &[u8]) -> Zeroizing<Vec<u8>> {
 
 fn unpad(p: &[u8]) -> Result<&[u8]> {
     let len = u32::from_le_bytes(p.get(..4).ok_or(Error::Decrypt)?.try_into().unwrap()) as usize;
-    p.get(4..4 + len).ok_or(Error::Decrypt)
+    // `4 + len` must not overflow on 32-bit targets (WebAssembly), where a length near 4 GiB would wrap or panic.
+    let end = len.checked_add(4).ok_or(Error::Decrypt)?;
+    p.get(4..end).ok_or(Error::Decrypt)
 }
 
 #[cfg(test)]

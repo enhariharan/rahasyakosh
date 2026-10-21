@@ -1,0 +1,85 @@
+[package]
+name = "rahasyakosh-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+rahasyakosh-fuzzcheck = { path = "../crates/fuzzcheck" }
+
+# Kept out of the main workspace: fuzzing needs a nightly toolchain and instrumented builds.
+[workspace]
+
+[[bin]]
+name = "vault_header"
+path = "fuzz_targets/vault_header.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "record"
+path = "fuzz_targets/record.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "payload"
+path = "fuzz_targets/payload.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "item_json"
+path = "fuzz_targets/item_json.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "csv_import"
+path = "fuzz_targets/csv_import.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "totp"
+path = "fuzz_targets/totp.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "bundle"
+path = "fuzz_targets/bundle.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "directory_store"
+path = "fuzz_targets/directory_store.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sqlite_store"
+path = "fuzz_targets/sqlite_store.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "strength"
+path = "fuzz_targets/strength.rs"
+test = false
+doc = false
+bench = false

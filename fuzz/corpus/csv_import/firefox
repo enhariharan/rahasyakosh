@@ -1,0 +1,2 @@
+url,username,password,httpRealm,formActionOrigin,guid
+https://www.example.com/a,bob,pw,,https://www.example.com,{x}

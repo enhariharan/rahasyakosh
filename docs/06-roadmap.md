@@ -16,7 +16,7 @@
 ## Testing strategy
 - Unit + KAT (RFC 6238, Argon2 reference vectors, XChaCha20-Poly1305 vectors).
 - Property tests: encrypt→decrypt identity, tamper → error, any bit-flip in header/record rejected.
-- Fuzzing: header/record parsers, importers.
+- Fuzzing: `cargo fuzz` targets for every parser of untrusted input (`fuzz/`, checks in `crates/fuzzcheck`); corpus and past crashes replayed in normal CI; weekly fuzz job.
 - Cross-platform golden vault in `spec/vectors/` opened by native and WASM tests in CI.
 - UI: component snapshot tests; e2e with WebDriver for web/extension; manual a11y passes.
 
@@ -40,7 +40,8 @@ security-relevant changes reviewed by a second maintainer.
 - [x] M2 work package 4: `Item.history` (`ITEM_SCHEMA` 2; newest first, capped at 10, revert keeps the past); schema-1 payloads and the golden vault still load
 - [x] M2 work package 5: `rahasyakosh-app` (`Vault<S>`) tested on memory, directory and SQLite stores, with a random-operation model test and a two-session race test
 - [x] M2 work packages 6-7: CLI on `Vault<SqliteStore>` (default `vault.db`; `rk migrate`, `history`, `revert`, `edit --favourite`; trash auto-purge after 30 days at unlock); performance tests (unlock 10k items ~0.8 s, search 5k items 2-5 ms); book chapter `storage.md`
-- [ ] Next: M3 (session crate, desktop app). Open from earlier: fuzzing of header/record parsers and importers. Fuzzing of header/record parsers and importers is still open (see Testing strategy)
+- [x] Fuzzing: ten targets (header, record, payload, item JSON, CSV import, TOTP, bundle, directory store, SQLite store, strength) with seed corpus, regression replay in `cargo test`, and a weekly GitHub job. Fixed on the way: a 32-bit overflow in `unpad`.
+- [ ] Next: M3 (session crate, desktop app). Fuzzing of header/record parsers and importers is still open (see Testing strategy)
 
 ## Original order
 1. Workspace + `rahasyakosh-core` (M1) with tests.

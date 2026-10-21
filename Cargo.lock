@@ -895,6 +895,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "rahasyakosh-fuzzcheck"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "rahasyakosh-app",
+ "rahasyakosh-core",
+ "rahasyakosh-store",
+ "rahasyakosh-strength",
+ "rahasyakosh-transfer",
+ "rand_chacha",
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
 name = "rahasyakosh-store"
 version = "0.1.0"
 dependencies = [

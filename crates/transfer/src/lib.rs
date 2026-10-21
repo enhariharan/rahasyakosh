@@ -2,6 +2,10 @@
 //! terminal or clock access; the caller supplies the time and a fresh-id generator.
 //!
 //! Exported plaintext holds every secret in the clear. Callers must warn and re-authenticate first.
+mod bundle;
+
+pub use bundle::{Bundle, MAX_BUNDLE_BYTES};
+
 use rahasyakosh_core::item::{Field, Item, ITEM_SCHEMA};
 use rahasyakosh_core::totp::Totp;
 use std::collections::HashSet;
@@ -16,6 +20,8 @@ pub enum Error {
     Mapping(String),
     #[error("export failed: {0}")]
     Export(String),
+    #[error("not a valid vault bundle: {0}")]
+    Bundle(String),
 }
 pub type Result<T> = std::result::Result<T, Error>;
 

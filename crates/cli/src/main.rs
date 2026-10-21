@@ -7,7 +7,6 @@ mod file;
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
-use file::VaultFile;
 use rahasyakosh_app::{Config, Scope, Vault};
 use rahasyakosh_core::{
     crypto::KdfParams,
@@ -534,8 +533,7 @@ fn main() -> Result<()> {
                     path.display()
                 );
             }
-            let bundle =
-                VaultFile::load(file).with_context(|| format!("reading {}", file.display()))?;
+            let bundle = file::load(file).with_context(|| format!("reading {}", file.display()))?;
             let pw = read_password("Master password of the old vault: ")?;
             // Copy first, then prove the copy opens with the password: a wrong password or damaged data must not
             // leave a half-built vault behind.
@@ -885,11 +883,13 @@ fn main() -> Result<()> {
                 if out.exists() && !force {
                     bail!("{} exists (use --force to overwrite)", out.display());
                 }
-                VaultFile {
-                    header: vault.store().header()?,
-                    records: vault.store().all()?,
-                }
-                .save(&out)?;
+                file::save(
+                    &transfer::Bundle {
+                        header: vault.store().header()?,
+                        records: vault.store().all()?,
+                    },
+                    &out,
+                )?;
                 eprintln!("Wrote encrypted copy to {}", out.display());
                 return Ok(());
             }

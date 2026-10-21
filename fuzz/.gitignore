@@ -1,0 +1,4 @@
+target/
+artifacts/
+# The seed corpus (corpus/) and past crashes (regressions/) ARE committed; fuzzer-grown corpus entries beyond the
+# seeds are not, to keep the repository small. See docs/book/src/fuzzing.md.

@@ -1,0 +1,3 @@
+title,url,username,password,notes,totp,tags
+Bank,bank.test,me,pw,"line1
+line2",JBSWY3DPEHPK3PXP,a;b

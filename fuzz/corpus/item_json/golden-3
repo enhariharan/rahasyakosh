@@ -1,0 +1,1 @@
+{"schema":1,"id":"01900000-0000-7000-8000-000000000004","kind":"login","title":"Old site","fields":[{"name":"username","value":"bob","concealed":false},{"name":"password","value":"old-password","concealed":true}],"urls":[],"tags":[],"notes":"","favourite":false,"created_at":1700000180,"updated_at":1700000180,"deleted_at":1700100000,"history":[]}

@@ -124,6 +124,8 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Constant-time** — Code that takes the same time whatever the secret is, so timing cannot leak it.
 
+**Corpus / seed** — The collection of inputs a fuzzer works from. Seeds are the small valid inputs it starts with.
+
 **CSPRNG** — A random-number generator safe for secrets (cryptographically secure). Every key and nonce here comes from one.
 
 **CSV** — A simple table in plain text (comma-separated values). Browsers export passwords this way. CSV exports are **unencrypted**.
@@ -149,6 +151,8 @@ so an old password is not lost by accident, and you can go back to it.
 **Fixture** — A saved sample used by a test. Ours (the golden vault, the schema database) are never changed.
 
 **Fsync / full sync** — Asking the operating system to confirm that data has really reached the disk, not just a memory buffer. Slower, but a committed change survives a power cut.
+
+**Fuzzing / fuzzer** — Feeding a program huge numbers of automatically made-up inputs to find crashes. A coverage-guided fuzzer keeps the inputs that reach new code and mutates them. See [Fuzzing](fuzzing.md).
 
 **Golden file** — A saved known-good file that the code must always be able to open. See [Testing with known answers and properties](testing-with-known-answers.md).
 
@@ -194,6 +198,8 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Native / WebAssembly** — "Native" means an ordinary program for your computer. Some tests run only natively; the important ones also run as WebAssembly.
 
+**Nightly Rust** — The experimental Rust toolchain. Only fuzzing needs it; everything else builds on stable.
+
 **Nonce** — "Number used once": a value that must never repeat for the same key. Ours are 24 random bytes.
 
 **OpenSSL / ring** — Widely used C and Rust cryptography libraries. We do not link them, to keep builds pure Rust and portable to WebAssembly. OpenSSL was used *once*, as an independent source for expected test values.
@@ -201,6 +207,10 @@ so an old password is not lost by accident, and you can go back to it.
 **otpauth URI** — The `otpauth://totp/...` link inside a two-factor QR code; it contains the secret and settings.
 
 **Padding** — Extra filler added so all encrypted items fall into a few size groups. See Bucket.
+
+**Panic** — Rust stopping a program because an assumption was wrong (an out-of-range index, an impossible value). In a parser, a panic on hostile input is a bug.
+
+**Parser** — Code that reads data and makes sense of it (a vault file, a CSV, an `otpauth://` link). Any parser of data from outside is a door to attack.
 
 **Passphrase** — A password made of several random words, such as `correct-horse-battery-staple`.
 
@@ -218,6 +228,8 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Redundant protection** — Two independent safeguards against the same attack. Deliberate: if one has a flaw, the other still holds.
 
+**Regression test** — A test that keeps a fixed bug from coming back. Every input that ever crashed a fuzzer is replayed on each change.
+
 **Rejection sampling** — Throwing away random numbers that would make a choice slightly uneven. Avoids "modulo bias".
 
 **Revision (rev)** — A counter on each record that goes up with every change. A write that is not newer than what is stored is refused.
@@ -225,6 +237,8 @@ so an old password is not lost by accident, and you can go back to it.
 **RFC** — A published technical standard ("Request for Comments"). The test vectors come from them.
 
 **Salt** — Random public data mixed into password hashing so identical passwords give different keys.
+
+**Sanitizer (AddressSanitizer)** — Instrumentation that makes memory errors, such as reading freed memory, crash immediately. Useful for the C code inside SQLite.
 
 **Schema** — The layout of a database (its tables and columns), or of an item's saved data. It has a version number.
 

@@ -13,6 +13,7 @@ rahasyakosh/
     ├── core/             rahasyakosh-core: all security-relevant logic
     ├── store/            rahasyakosh-store: saves encrypted records (SQLite, directory and memory backends)
     ├── app/              rahasyakosh-app: the unlocked vault (items, trash, history, search)
+    ├── fuzzcheck/        rahasyakosh-fuzzcheck: robustness checks for every parser, used by tests and by `fuzz/`
     ├── strength/         rahasyakosh-strength: advisory password strength meter (zxcvbn)
     ├── transfer/         rahasyakosh-transfer: CSV import and CSV/JSON export (pure conversion)
     └── cli/              rk: the command-line front-end
@@ -38,6 +39,11 @@ That is what makes it testable and portable to WebAssembly.
 
 `store` saves and loads encrypted records and never has a key; `app` holds the keys and the decrypted items and offers one tested set of operations to every
 front-end. See [Where your data lives](storage.md).
+
+## `crates/fuzzcheck` and `fuzz/` — attacking our own parsers
+
+`fuzzcheck` holds ten functions that must survive any input; `fuzz/` is the `cargo fuzz` project that drives them with a fuzzer, with `fuzz/corpus/` (seeds) and
+`fuzz/regressions/` (every past crash). See [Fuzzing](fuzzing.md).
 
 ## `crates/strength` — the strength meter
 

@@ -21,6 +21,12 @@ CARGO_TARGET_WASM32_WASIP1_RUNNER=wasmtime cargo test -p rahasyakosh-core -p rah
 ```
 CI runs the same checks. Minimum supported Rust version is set in `Cargo.toml` (`rust-version`).
 
+## Fuzzing
+Every parser of untrusted input has a check in `crates/fuzzcheck` and a fuzz target in `fuzz/`. `cargo test` replays the committed corpus and past
+crashes on stable Rust. To hunt for new bugs you need nightly: `cd fuzz && cargo +nightly fuzz run -s none <target>`. If you add a parser, add a check,
+a target (and a line in `.github/workflows/fuzz.yml`) and seeds. If the fuzzer finds a crash, fix it and copy the input to `fuzz/regressions/<target>/`.
+See `docs/book/src/fuzzing.md`.
+
 ## Rules for changes
 - `rahasyakosh-core` does no I/O and must stay WASM-safe; inject RNG and clock.
 - No new `unsafe` without discussion. No logging of secrets. Secret types must `zeroize` on drop.

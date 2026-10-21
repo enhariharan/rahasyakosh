@@ -1,0 +1,51 @@
+name: Fuzz
+
+# Coverage-guided fuzzing of every parser of untrusted input (see docs/book/src/fuzzing.md).
+# Too slow for every push, so it runs weekly and on demand. Ordinary CI replays the committed corpus and past crashes.
+on:
+  schedule:
+    - cron: "17 3 * * 0"
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: "Seconds to fuzz each target"
+        default: "180"
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - vault_header
+          - record
+          - payload
+          - item_json
+          - csv_import
+          - totp
+          - bundle
+          - directory_store
+          - sqlite_store
+          - strength
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: fuzz
+      - run: cargo install cargo-fuzz --locked
+      - name: Fuzz ${{ matrix.target }}
+        working-directory: fuzz
+        run: >
+          cargo fuzz run -s none ${{ matrix.target }} corpus/${{ matrix.target }} --
+          -max_total_time=${{ inputs.seconds || 180 }} -timeout=10 -rss_limit_mb=3072 -max_len=4096
+      - name: Keep the crashing input
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: crash-${{ matrix.target }}
+          path: fuzz/artifacts/${{ matrix.target }}/
