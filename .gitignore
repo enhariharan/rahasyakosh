@@ -1,3 +1,6 @@
 target/
 *.rkv
 *.rkv.tmp
+
+# Personal vaults stay out of git, but the committed test vectors are part of the repo.
+!spec/vectors/*.rkv
