@@ -1,4 +1,5 @@
 //! `rk` — Rahasyakosh command-line password manager (M1b: single-file vault).
+mod clipboard;
 mod file;
 
 use anyhow::{bail, Context, Result};
@@ -89,10 +90,25 @@ enum Cmd {
         query: String,
         #[arg(short, long, default_value = "password")]
         field: String,
+        #[command(flatten)]
+        copy: CopyOpts,
     },
     /// Print the current TOTP code
-    Totp { query: String },
-    /// Move an item to trash (or --purge to delete forever)
+    Totp {
+        query: String,
+        #[command(flatten)]
+        copy: CopyOpts,
+    },
+    #[command(hide = true, name = "clipboard-clear")]
+    ClipboardClear {
+        #[arg(long)]
+        after: u64,
+    },
+    /// List items in the trash
+    Trash,
+    /// Bring an item back from the trash
+    Restore { query: String },
+    /// Move an item to trash (or --purge to delete forever, also from the trash)
     Rm {
         query: String,
         #[arg(long)]
@@ -156,6 +172,35 @@ enum ExportFormat {
     Json,
     /// Encrypted copy of the vault file (safe to store; needs your master password to open)
     Vault,
+}
+
+/// Copy to the clipboard instead of printing.
+#[derive(clap::Args)]
+struct CopyOpts {
+    /// Copy to the clipboard instead of printing it, and clear the clipboard afterwards
+    #[arg(short, long)]
+    copy: bool,
+    /// Seconds before the clipboard is cleared (0 = never)
+    #[arg(long, default_value_t = 20, requires = "copy", value_name = "SECONDS")]
+    clear_after: u64,
+}
+
+/// Print `value`, or copy it when asked (then say so on stderr and keep it off the screen).
+fn output(value: &str, what: &str, opts: &CopyOpts) -> Result<()> {
+    if !opts.copy {
+        println!("{value}");
+        return Ok(());
+    }
+    clipboard::copy_and_schedule_clear(value, opts.clear_after)?;
+    if opts.clear_after == 0 {
+        eprintln!("Copied {what}. It will stay on the clipboard until you replace it.");
+    } else {
+        eprintln!(
+            "Copied {what}; the clipboard clears in {}s.",
+            opts.clear_after
+        );
+    }
+    Ok(())
 }
 
 /// How the new master password is chosen.
@@ -312,22 +357,55 @@ fn confirm(question: &str) -> Result<bool> {
     Ok(matches!(line.trim(), "y" | "Y" | "yes"))
 }
 
+/// Which items a lookup may return.
+#[derive(Clone, Copy, PartialEq)]
+enum Scope {
+    Live,
+    Trashed,
+    /// Live items first, then trashed ones.
+    Any,
+}
+
 fn find<'a>(items: &'a [Item], q: &str) -> Result<&'a Item> {
-    let live = || items.iter().filter(|i| i.deleted_at.is_none());
-    if let Some(i) = live().find(|i| i.title.eq_ignore_ascii_case(q)) {
+    find_in(items, q, Scope::Live)
+}
+
+fn find_in<'a>(items: &'a [Item], q: &str, scope: Scope) -> Result<&'a Item> {
+    let wanted = |i: &&Item| match scope {
+        Scope::Live => i.deleted_at.is_none(),
+        Scope::Trashed => i.deleted_at.is_some(),
+        Scope::Any => true,
+    };
+    // Live items sort before trashed ones, so an exact title match prefers the live item.
+    let mut pool: Vec<&Item> = items.iter().filter(wanted).collect();
+    pool.sort_by_key(|i| i.deleted_at.is_some());
+    if let Some(i) = pool.iter().find(|i| i.title.eq_ignore_ascii_case(q)) {
         return Ok(i);
     }
-    let hits: Vec<_> = live().filter(|i| i.matches(q)).collect();
+    let hits: Vec<_> = pool.into_iter().filter(|i| i.matches(q)).collect();
     match hits.as_slice() {
         [] => bail!("no item matches '{q}'"),
         [one] => Ok(one),
         many => bail!(
             "'{q}' is ambiguous: {}",
             many.iter()
-                .map(|i| i.title.as_str())
+                .map(|i| if i.deleted_at.is_some() {
+                    format!("{} (in trash)", i.title)
+                } else {
+                    i.title.clone()
+                })
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
+    }
+}
+
+/// "today", "1 day ago", "5 days ago".
+fn days_ago(then: i64, now: i64) -> String {
+    match ((now - then).max(0)) / 86_400 {
+        0 => "today".into(),
+        1 => "1 day ago".into(),
+        n => format!("{n} days ago"),
     }
 }
 
@@ -372,6 +450,7 @@ fn main() -> Result<()> {
             eprintln!("Strength: {}/4 ({})", s.score, s.label());
             return Ok(());
         }
+        Cmd::ClipboardClear { after } => return clipboard::run_clearer(after),
         Cmd::Init(opts) => {
             if path.exists() {
                 bail!("{} already exists", path.display());
@@ -410,20 +489,21 @@ fn main() -> Result<()> {
                 println!("{}\t{}", i.title, user);
             }
         }
-        Cmd::Get { query, field } => {
+        Cmd::Get { query, field, copy } => {
             let item = find(&items, &query)?;
             let f = if field == "notes" {
                 None
             } else {
                 item.field(&field)
             };
+            let what = format!("{field} of '{}'", item.title);
             match (field.as_str(), f) {
-                ("notes", _) => println!("{}", item.notes),
-                (_, Some(f)) => println!("{}", f.value),
+                ("notes", _) => output(&item.notes, &what, &copy)?,
+                (_, Some(f)) => output(&f.value, &what, &copy)?,
                 _ => bail!("no field '{field}' on '{}'", item.title),
             }
         }
-        Cmd::Totp { query } => {
+        Cmd::Totp { query, copy } => {
             let item = find(&items, &query)?;
             let f = item.field("totp").context("item has no TOTP field")?;
             let t = if f.value.starts_with("otpauth://") {
@@ -432,7 +512,16 @@ fn main() -> Result<()> {
                 Totp::from_base32(&f.value)?
             };
             let ts = now() as u64;
-            println!("{}\t({}s left)", t.code_at(ts), t.seconds_remaining(ts));
+            if copy.copy {
+                output(
+                    &t.code_at(ts),
+                    &format!("TOTP code for '{}'", item.title),
+                    &copy,
+                )?;
+                eprintln!("The code is valid for {}s more.", t.seconds_remaining(ts));
+            } else {
+                println!("{}\t({}s left)", t.code_at(ts), t.seconds_remaining(ts));
+            }
         }
         Cmd::Add {
             title,
@@ -553,8 +642,49 @@ fn main() -> Result<()> {
             }
             eprintln!("Updated '{title}'");
         }
+        Cmd::Trash => {
+            let mut trashed: Vec<_> = items.iter().filter(|i| i.deleted_at.is_some()).collect();
+            trashed.sort_by_key(|i| std::cmp::Reverse(i.deleted_at));
+            let t = now();
+            for i in &trashed {
+                let user = i.field("username").map(|f| f.value.as_str()).unwrap_or("");
+                println!(
+                    "{}\t{}\tdeleted {}",
+                    i.title,
+                    user,
+                    days_ago(i.deleted_at.unwrap_or(t), t)
+                );
+            }
+            eprintln!(
+                "{} item(s) in trash. `rk restore <item>` brings one back; `rk rm --purge <item>` deletes it forever.",
+                trashed.len()
+            );
+        }
+        Cmd::Restore { query } => {
+            let id = find_in(&items, &query, Scope::Trashed)
+                .context("nothing in the trash matches (see `rk trash`)")?
+                .id;
+            let idx = items.iter().position(|i| i.id == id).unwrap();
+            let item = &mut items[idx];
+            item.deleted_at = None;
+            item.updated_at = now();
+            let old = vf.records.iter_mut().find(|r| r.item_id == id).unwrap();
+            *old = vault.seal_item(item, old.rev + 1, &mut rng)?;
+            let title = item.title.clone();
+            vf.save(&path)?;
+            eprintln!("Restored '{title}'");
+        }
         Cmd::Rm { query, purge } => {
-            let id = find(&items, &query)?.id;
+            let scope = if purge { Scope::Any } else { Scope::Live };
+            let id = match find_in(&items, &query, scope) {
+                Ok(i) => i.id,
+                Err(e) => {
+                    if !purge && find_in(&items, &query, Scope::Trashed).is_ok() {
+                        bail!("'{query}' is already in the trash (`rk restore` it, or `rk rm --purge` to delete it forever)");
+                    }
+                    return Err(e);
+                }
+            };
             let idx = items.iter().position(|i| i.id == id).unwrap();
             if purge {
                 vf.records.retain(|r| r.item_id != id);
@@ -664,7 +794,7 @@ fn main() -> Result<()> {
                 None => print!("{}", *text),
             }
         }
-        Cmd::Init(_) | Cmd::Gen { .. } => unreachable!(),
+        Cmd::Init(_) | Cmd::Gen { .. } | Cmd::ClipboardClear { .. } => unreachable!(),
     }
     Ok(())
 }

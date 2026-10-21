@@ -6,6 +6,7 @@
 **Base32** — Text encoding using A–Z and 2–7; used for TOTP secrets.
 **Bit** — A single 0/1. A 256-bit key has 2²⁵⁶ possible values.
 **Ciphertext** — Encrypted data.
+**Clipboard helper** — The small background process that clears a copied secret after a delay.
 **Constant-time** — Taking the same time regardless of secret values.
 **CSPRNG** — Cryptographically secure pseudo-random number generator.
 **Downgrade attack** — Tricking software into using weaker settings.
@@ -38,6 +39,7 @@
 **Test vector** — A published input/output pair used to verify an implementation.
 **Threat model** — Statement of who we defend against and who we don't.
 **TOTP** — Time-based one-time password (RFC 6238).
+**Trash** — Items marked deleted inside the encrypted data; restorable until purged.
 **Vault** — The encrypted file holding all items.
 **VK** — Vault key: the random key that (via per-item keys) encrypts items.
 **Wrapped key** — A key encrypted under another key.

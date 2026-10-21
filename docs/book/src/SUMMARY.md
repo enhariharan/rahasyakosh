@@ -9,6 +9,7 @@
 - [Passwords and passphrases](passwords-and-passphrases.md)
 - [One-time codes (TOTP)](totp.md)
 - [Importing and exporting](import-export.md)
+- [The clipboard and the trash](clipboard.md)
 - [Writing code that handles secrets](safe-coding.md)
 - [Testing with known answers and properties](testing-with-known-answers.md)
 - [What we defend against](threat-model.md)

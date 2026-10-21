@@ -4,7 +4,7 @@
 |-----------|-------|---------|---------------|--------|---------|
 | **M0 Foundations** | Workspace, MIT licence, CI, `deny.toml`, SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md | US-OSS-01, US-OSS-02 | CI green on Linux + wasm32 build | done | CI, `deny.toml`, SECURITY.md, CONTRIBUTING.md and CODE_OF_CONDUCT.md in place |
 | **M1 Core** | `core`: KDF, key hierarchy, AEAD records, vault header, item model, generator, strength, TOTP; test vectors | US-VLT-01, US-VLT-02, US-VLT-03, US-VLT-04, US-ITM-01, US-GEN-01, US-GEN-02, US-GEN-03, US-TOT-01, US-TOT-02 | All KATs pass; round-trip property tests; wasm32 builds | done | Stories, KATs (HKDF, XChaCha20, Argon2id), golden vault (native + WASM in CI) and property tests (round-trip, bit-flip, tamper; proptest) done. US-VLT-04: key wiping on drop done; sessions, idle timeout and manual lock deferred to M3 |
-| **M1b CLI** | `rk` CLI on file backend | US-CLI-01, US-IMP-01 (CSV), US-IMP-03 | Usable daily by authors | done | `rk` has init, add, get, list, edit, totp, rm, gen, passwd, import, export. No `lock`: the CLI is stateless; sessions and `lock` come with M3 (US-VLT-04) |
+| **M1b CLI** | `rk` CLI on file backend | US-CLI-01, US-IMP-01 (CSV), US-IMP-03 | Usable daily by authors | done | `rk` has init, add, get (with `--copy`), list, edit, totp, rm, trash, restore, gen, passwd, import, export. No `lock`: the CLI is stateless; sessions and `lock` come with M3 (US-VLT-04) |
 | **M2 Store** | Store trait, SQLite + dir backends, trash, history, search index | US-ITM-02, US-ITM-03, US-ITM-04, US-ITM-05, US-ITM-08 | Migration tests; 10k items perf | to-do | Not started |
 | **M3 App + Desktop** | `app` session crate, Dioxus desktop, auto-lock, clipboard clear | US-SEC-01, US-SEC-02, US-SEC-03, US-SEC-04, US-DSK-01 | Alpha release (Linux/macOS/Win) | to-do | Not started |
 | **M4 Sync** | HLC merge, folder transport, device pairing, reference server | US-SYN-01, US-SYN-02, US-SYN-03, US-SYN-04, US-SYN-05 | Chaos tests: no data loss under concurrent edits | to-do | Not started |
@@ -34,6 +34,7 @@ security-relevant changes reviewed by a second maintainer.
 - [x] Known-answer tests for HKDF, XChaCha20-Poly1305, Argon2id; golden vault `spec/vectors/golden-v1.*` opened by native and WASM tests (CI `wasm-test` job)
 - [x] `rk edit` (title, username, URL, notes, password via prompt/stdin/generate, TOTP, tags); CLI end-to-end tests. `lock` deferred to M3 by decision: the CLI is stateless
 - [x] Property tests (`crates/core/tests/properties.rs`, `crates/transfer/tests/properties.rs`); mutation-checked. They found and fixed an importer bug (whitespace stripped from usernames/passwords)
+- [x] `rk get|totp --copy` with auto-clear (US-SEC-01 for the CLI; Wayland/X11 tools), `rk trash`, `rk restore`, `rk rm --purge` reaches trashed items
 - [ ] Next: M2 store (Store trait, SQLite + directory backends, trash, history, search). Fuzzing of header/record parsers and importers is still open (see Testing strategy)
 
 ## Original order

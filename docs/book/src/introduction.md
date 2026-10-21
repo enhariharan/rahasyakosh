@@ -23,6 +23,7 @@ If you are new to the subject, read the chapters in order. Each one builds on th
 | Decode jargon in a code review | [Security words you will meet](vocabulary.md) and the [Glossary](glossary.md) |
 | Know why we picked Argon2, XChaCha20 and friends | [The cryptography toolbox](crypto-toolbox.md) |
 | Follow a password from keyboard to disk | [How a vault works](how-a-vault-works.md) |
+| Copy passwords without printing them, or use the trash | [The clipboard and the trash](clipboard.md) |
 | Move logins in or out safely | [Importing and exporting](import-export.md) |
 | Work on the password generator | [Passwords and passphrases](passwords-and-passphrases.md) |
 | Understand how we know the crypto is right | [Testing with known answers](testing-with-known-answers.md) |

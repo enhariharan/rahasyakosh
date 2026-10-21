@@ -9,5 +9,5 @@ Design docs: [`docs/`](docs/README.md).
 cargo test --workspace
 cargo run -p rahasyakosh-cli -- init      # binary name: rk
 rk add GitHub -u alice --url github.com -g
-rk get github
+rk get github --copy     # to the clipboard, cleared after 20 s
 ```

@@ -111,7 +111,7 @@ derives the keys, decrypts every record once and builds the index; dropping it w
 | `add`, `edit` | Seal with `rev + 1`; the previous version is pushed onto the item's history first |
 | `trash` / `restore` | Set / clear `deleted_at` inside the payload (a normal edit, so it is also recorded in history) |
 | `purge` | `Store::purge`, tombstone left behind |
-| auto-purge | On unlock, items in the trash longer than 30 days (configurable) are purged. **The store cannot do this itself because `deleted_at` is encrypted**, so it is the vault's job |
+| auto-purge | (`rk trash` already lists trashed items; nothing purges them automatically yet.) On unlock, items in the trash longer than 30 days (configurable) are purged. **The store cannot do this itself because `deleted_at` is encrypted**, so it is the vault's job |
 | `history`, `revert` | List stored versions; `revert` makes a *new* version with the old content (never rewrites the past) |
 | tags, favourites | Part of the payload; tags are listed from the index; favourites sort first |
 | `search` | In-memory, see below |
@@ -132,7 +132,7 @@ index structure to keep consistent or to leak. Updated incrementally on every op
 ## 7. CLI changes
 
 - Default vault becomes `~/.local/share/rahasyakosh/vault.db` (SQLite). `--vault` / `RK_VAULT` unchanged.
-- New: `rk migrate`, `rk trash` (list), `rk restore <item>`, `rk history <item>`, `rk revert <item> <version>`, `rk rm --purge` unchanged.
+- New: `rk migrate`, `rk history <item>`, `rk revert <item> <version>`. (`rk trash`, `rk restore` and `rk rm --purge` already exist and keep their behaviour.)
 - `rk export -f vault` keeps writing the **portable JSON bundle** (header + records), so backups stay human-inspectable and the format
   in `spec/vectors/` stays the interchange format. Add `rk import-vault <file>` to load such a bundle.
 - Still stateless: no sessions, so no `lock` (decided earlier).
