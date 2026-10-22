@@ -327,8 +327,11 @@ fn Setup() -> Element {
             main { class: "centre landing",
                 Logo {}
                 h1 { "Welcome to Rahasyakosh" }
-                p { class: "tagline", "A secure store for your passwords." }
-                p { class: "tagline spaced", "Stored in an encrypted file on this computer." br {} "Protected by a master passphrase." }
+                p { class: "tagline spaced",
+                    "A secure store for your passwords." br {}
+                    "Stored in an encrypted file on this computer." br {}
+                    "Protected by a master passphrase."
+                }
                 button { class: "primary", onclick: move |_| started.set(true), "Create master passphrase" }
             }
         };
@@ -404,7 +407,7 @@ fn Unlock() -> Element {
         main { class: "centre landing",
             Logo {}
             h1 { "Rahasyakosh" }
-            p { class: "muted tagline", "Vault locked." }
+            p { class: "tagline spaced", "Vault locked." }
             form {
                 onsubmit: move |e| { e.prevent_default(); submit(); },
                 label { class: "sr-only", r#for: "master", "Master password" }
