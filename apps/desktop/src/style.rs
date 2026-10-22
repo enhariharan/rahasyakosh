@@ -48,6 +48,7 @@ label.check { font-weight: 400; margin-top: 1rem; }
 .centre .logo { display: block; margin-bottom: .8rem; }
 .landing .logo { margin-left: auto; margin-right: auto; }
 .landing h1, .landing .tagline { text-align: center; }
+.landing .spaced { line-height: 2; }
 .landing form { width: 20rem; max-width: 100%; margin: 0 auto; }
 .landing .primary { display: block; margin-left: auto; margin-right: auto; }
 .centre h1 { font-size: 1.6rem; margin-bottom: .6rem; }
