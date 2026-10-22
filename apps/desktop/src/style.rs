@@ -49,6 +49,11 @@ label.check { font-weight: 400; margin-top: 1rem; }
 .landing .logo { margin-left: auto; margin-right: auto; }
 .landing h1, .landing .tagline { text-align: center; }
 .landing .spaced { line-height: 2; }
+.landing .warn { text-align: center; }
+.emph { font-weight: 700; text-decoration: underline; }
+.landing .passphrase { text-align: center; margin: 0; padding-right: 3rem; padding-left: 3rem; }
+.passbox { position: relative; margin: .4rem 0 .9rem; }
+button.icon { position: absolute; top: .5rem; right: .5rem; padding: .35rem; line-height: 0; }
 .landing form { width: 20rem; max-width: 100%; margin: 0 auto; }
 .landing .primary { display: block; margin-left: auto; margin-right: auto; }
 .centre h1 { font-size: 1.6rem; margin-bottom: .6rem; }

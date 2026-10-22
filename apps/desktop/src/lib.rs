@@ -292,6 +292,7 @@ fn Setup() -> Element {
     let mut pw = use_signal(String::new);
     let mut pw2 = use_signal(String::new);
     let mut saved = use_signal(|| false);
+    let mut copied = use_signal(|| false);
     let mut error = use_signal(|| Option::<String>::None);
     let strength = rahasyakosh_strength::estimate(&pw.read(), &[]);
 
@@ -337,16 +338,47 @@ fn Setup() -> Element {
         };
     }
 
+    // Copy the generated passphrase, and take it off the clipboard again after the usual delay if it is still there.
+    let copy_passphrase = move |_| {
+        let text = passphrase.read().clone();
+        if model::Clipboard::copy(&mut SystemClipboard, &text).is_err() {
+            error.set(Some("Could not copy to the clipboard.".into()));
+            return;
+        }
+        error.set(None);
+        copied.set(true);
+        spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            copied.set(false);
+        });
+        let secs = load_settings().clipboard_clear_secs;
+        if secs > 0 {
+            spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(u64::from(secs))).await;
+                let _ = model::Clipboard::clear_if_unchanged(&mut SystemClipboard, &text);
+            });
+        }
+    };
+
     rsx! {
         main { class: "centre landing",
             h1 { "Create a master passphrase" }
-            p { class: "warn", "This master passphrase is shown only once. Keep it safe." }
+            p { class: "warn", "This master passphrase is shown " span { class: "emph", "only once" } ". Keep it safe." }
             if !own() {
                 section { aria_label: "Generated passphrase",
                     p { class: "label", "Your new master passphrase" }
-                    p { class: "passphrase", "{passphrase}" }
+                    div { class: "passbox",
+                        p { class: "passphrase", "{passphrase}" }
+                        button {
+                            class: "icon", r#type: "button",
+                            aria_label: if copied() { "Passphrase copied" } else { "Copy passphrase" },
+                            title: if copied() { "Copied" } else { "Copy to clipboard" },
+                            onclick: copy_passphrase,
+                            if copied() { CheckIcon {} } else { CopyIcon {} }
+                        }
+                    }
                     div { class: "row",
-                        button { onclick: move |_| passphrase.set(new_passphrase()), "Generate another" }
+                        button { onclick: move |_| { passphrase.set(new_passphrase()); saved.set(false); }, "Generate another" }
                         button { class: "link", onclick: move |_| own.set(true), "Choose my own instead" }
                     }
                     label { class: "check",
@@ -368,8 +400,29 @@ fn Setup() -> Element {
                 }
             }
             if let Some(e) = error() { p { class: "error", role: "alert", "{e}" } }
-            button { class: "primary", onclick: create, "Create vault" }
+            button { class: "primary", onclick: create, disabled: !own() && !saved(), "Create vault" }
             p { class: "small", "Vault location: {vault_path().display()}" }
+        }
+    }
+}
+
+#[component]
+fn CopyIcon() -> Element {
+    rsx! {
+        svg { view_box: "0 0 24 24", width: "20", height: "20", fill: "none", stroke: "currentColor", stroke_width: "2",
+            stroke_linecap: "round", stroke_linejoin: "round", "aria-hidden": "true",
+            rect { x: "9", y: "9", width: "11", height: "11", rx: "2" }
+            path { d: "M5 15V6a2 2 0 0 1 2-2h9" }
+        }
+    }
+}
+
+#[component]
+fn CheckIcon() -> Element {
+    rsx! {
+        svg { view_box: "0 0 24 24", width: "20", height: "20", fill: "none", stroke: "currentColor", stroke_width: "2.5",
+            stroke_linecap: "round", stroke_linejoin: "round", "aria-hidden": "true",
+            path { d: "M5 12.5l4.5 4.5L19 7" }
         }
     }
 }

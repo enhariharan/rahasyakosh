@@ -24,7 +24,7 @@ If there is no vault yet, the app opens on a short welcome page. Click **Create 
 
 ![The welcome page: the app icon, a one-line description and one button](images/desktop-welcome.png)
 
-The next page, **Create a master passphrase**, generates a six-word **master passphrase** and shows it once, with the note "This master passphrase is shown only once. Keep it safe." Write it down (on paper is best), then tick the box. You can
+The next page, **Create a master passphrase**, generates a six-word **master passphrase** and shows it once, with the note "This master passphrase is shown only once. Keep it safe." Write it down (on paper is best), then tick the box; **Create vault** stays greyed out until you do. The copy icon in the corner of the passphrase puts it on the clipboard, and the app clears it again after the usual delay (20 seconds unless you changed it in Settings) if nothing else has been copied since. You can
 instead type your own password, and the app rates its strength and refuses weak ones. **There is no way to recover a lost master passphrase.**
 
 ![Create a master passphrase: a generated passphrase, a warning, and a confirmation box](images/desktop-setup.png)
