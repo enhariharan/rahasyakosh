@@ -397,9 +397,10 @@ fn Unlock() -> Element {
             p { class: "muted tagline", "Vault locked." }
             form {
                 onsubmit: move |e| { e.prevent_default(); submit(); },
-                label { r#for: "master", "Master password" }
+                label { class: "sr-only", r#for: "master", "Master password" }
                 input {
                     id: "master", r#type: "password", autofocus: true, autocomplete: "off",
+                    placeholder: "Enter master password",
                     value: "{pw}", oninput: move |e| pw.set(e.value()),
                 }
                 if let Some(e) = err { p { class: "error", role: "alert", "{e}" } }
