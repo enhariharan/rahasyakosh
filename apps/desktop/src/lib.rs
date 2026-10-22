@@ -322,11 +322,12 @@ fn Setup() -> Element {
     };
 
     rsx! {
-        main { class: "centre",
+        main { class: "centre landing",
             Logo {}
             h1 { "Welcome to Rahasyakosh" }
-            p { "Your passwords live in one encrypted file on this computer, opened by a single master passphrase." }
-            p { class: "warn", "This passphrase is shown only once. Keep it safe." }
+            p { class: "tagline", "A secure store for your passwords." }
+            p { "Your passwords live in one encrypted file on this computer, protected by a single master passphrase." }
+            p { class: "warn", "This master passphrase is shown only once. Keep it safe." }
             if !own() {
                 section { aria_label: "Generated passphrase",
                     p { class: "label", "Your new master passphrase" }

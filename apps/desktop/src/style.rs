@@ -46,6 +46,8 @@ label.check { font-weight: 400; margin-top: 1rem; }
 
 .centre { max-width: 34rem; margin: 6vh auto; padding: 1.5rem; }
 .centre .logo { display: block; margin-bottom: .8rem; }
+.landing .logo { margin-left: auto; margin-right: auto; }
+.landing h1, .landing .tagline { text-align: center; }
 .centre h1 { font-size: 1.6rem; margin-bottom: .6rem; }
 .centre .primary { margin-top: 1.2rem; padding: .6rem 1.4rem; }
 .warn { background: var(--warn-bg); padding: .6rem .8rem; border-radius: 6px; }
