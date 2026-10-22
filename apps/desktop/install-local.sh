@@ -22,5 +22,7 @@ install -m 755 target/release/rahasyakosh-desktop "$bin"
 install -m 644 packaging/rahasyakosh-chest.svg "$icon"
 sed "s|@EXEC@|$bin|" packaging/rahasyakosh.desktop > "$desktop"
 chmod 644 "$desktop"
+# A stale per-user icon cache hides newly installed icons from the app grid, so drop it (it is rebuilt on demand).
+rm -f "$HOME/.local/share/icons/hicolor/icon-theme.cache"
 command -v update-desktop-database >/dev/null && update-desktop-database "$HOME/.local/share/applications" || true
 echo "Installed. Find 'Rahasyakosh' in your app grid, or run: $bin"
