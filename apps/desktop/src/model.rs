@@ -352,17 +352,12 @@ impl<S: Store, C: Clipboard> Model<S, C> {
                     );
                 }
             }
-            Err(UnlockError::WrongPassword { retry_in_secs, .. }) if retry_in_secs > 0 => {
-                self.unlock_error =
-                    Some(format!("Wrong password. Try again in {retry_in_secs} s."));
-            }
+            // The unlock screen shows the live countdown, so the messages do not repeat the wait.
             Err(UnlockError::WrongPassword { .. }) => {
                 self.unlock_error = Some("Wrong password.".into())
             }
-            Err(UnlockError::LockedOut { retry_in_secs }) => {
-                self.unlock_error = Some(format!(
-                    "Too many wrong passwords. Try again in {retry_in_secs} s."
-                ));
+            Err(UnlockError::LockedOut { .. }) => {
+                self.unlock_error = Some("Too many wrong passwords.".into());
             }
             Err(e) => self.unlock_error = Some(e.to_string()),
         }

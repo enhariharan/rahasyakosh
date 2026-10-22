@@ -73,15 +73,9 @@ fn a_wrong_password_shows_a_message_and_the_wait() {
     assert_eq!(m.unlock_error.as_deref(), Some("Wrong password."));
     m.unlock("nope", 100);
     m.unlock("nope", 100);
-    // The third consecutive failure starts the backoff.
-    assert!(
-        m.unlock_error
-            .as_deref()
-            .unwrap()
-            .contains("Try again in 1 s"),
-        "{:?}",
-        m.unlock_error
-    );
+    // The third consecutive failure starts the backoff, which the unlock screen shows as a countdown.
+    assert_eq!(m.unlock_error.as_deref(), Some("Wrong password."));
+    assert!(m.session.retry_in(100) > 0);
     m.unlock(PW, 100);
     assert!(m
         .unlock_error

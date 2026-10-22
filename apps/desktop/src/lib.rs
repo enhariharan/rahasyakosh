@@ -393,7 +393,7 @@ fn Unlock() -> Element {
         main { class: "centre",
             Logo {}
             h1 { "Rahasyakosh" }
-            p { class: "muted", "The vault is locked." }
+            p { class: "muted", "Vault locked." }
             form {
                 onsubmit: move |e| { e.prevent_default(); submit(); },
                 label { r#for: "master", "Master password" }
@@ -402,7 +402,7 @@ fn Unlock() -> Element {
                     value: "{pw}", oninput: move |e| pw.set(e.value()),
                 }
                 if let Some(e) = err { p { class: "error", role: "alert", "{e}" } }
-                if wait > 0 { p { class: "muted", "You can try again in {wait} s." } }
+                if wait > 0 { p { class: "muted", "Try again in {wait} s." } }
                 button { class: "primary", r#type: "submit", disabled: wait > 0, "Unlock" }
             }
         }
