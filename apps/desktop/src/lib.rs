@@ -144,7 +144,12 @@ pub fn launch_with(initial: Option<AppModel>) {
 
 /// The taskbar / title-bar icon: the chest, pre-rendered to raw 64x64 RGBA (see `packaging/`).
 fn window_icon() -> Option<dioxus::desktop::tao::window::Icon> {
-    dioxus::desktop::tao::window::Icon::from_rgba(include_bytes!("../packaging/window-icon-64.rgba").to_vec(), 64, 64).ok()
+    dioxus::desktop::tao::window::Icon::from_rgba(
+        include_bytes!("../packaging/window-icon-64.rgba").to_vec(),
+        64,
+        64,
+    )
+    .ok()
 }
 
 /// The app icon (same drawing as `packaging/rahasyakosh-chest.svg`), shown above the title on the first-run and unlock screens.
