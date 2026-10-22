@@ -79,7 +79,11 @@ button.icon { position: absolute; top: .5rem; right: .5rem; padding: .35rem; lin
 .toast.error { background: var(--error-bg); color: var(--error-text); }
 
 .split { flex: 1; display: grid; grid-template-columns: minmax(240px, 340px) 1fr; min-height: 0; }
-.split aside { border-right: 1px solid var(--line); overflow: auto; background: var(--panel); }
+.pane { position: relative; min-height: 0; display: flex; flex-direction: column; }
+.split aside { flex: 1; border-right: 1px solid var(--line); overflow: auto; background: var(--panel); padding-bottom: 5rem; }
+/* The "New item" bar floats over the bottom of the list, so it stays in reach however long the list is. */
+button.fab { position: absolute; left: 1rem; right: 1rem; bottom: 1rem; display: flex; align-items: center; justify-content: center;
+  gap: .5rem; padding: .7rem 1rem; border-radius: 999px; box-shadow: 0 4px 14px #0006; }
 .detail { overflow: auto; }
 .list { list-style: none; margin: 0; padding: 0; }
 .row { }

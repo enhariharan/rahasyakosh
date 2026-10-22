@@ -39,7 +39,7 @@ Type the master password and press Enter. After three wrong passwords in a row t
 
 ![The main window: items on the left, the selected item on the right](images/desktop-detail.png)
 
-- **Left:** your items. Pinned favourites (★) come first. **Ctrl+K** jumps to the search box; searching looks in titles, usernames, websites and tags, never in passwords or notes.
+- **Left:** your items. Pinned favourites (★) come first. **Ctrl+K** jumps to the search box; searching looks in titles, usernames, websites and tags, never in passwords or notes. A **New item** bar floats at the bottom of the list, so it stays in reach however long the list is; hover over it to see its shortcut, **Ctrl+N**.
 - **Right:** the selected item. Passwords and notes show as dots until you press **Show**, then hide again after 10 seconds (or press **Hide**).
   **Copy** puts a value on the clipboard and clears it after 20 seconds, if you have not copied something else meanwhile.
 - **Two-factor code:** if the item has a two-factor secret, the current six-digit code is shown with its countdown. The secret itself is never displayed.
@@ -52,6 +52,7 @@ Type the master password and press Enter. After three wrong passwords in a row t
   | Trash | **Ctrl+2** |
   | Settings | **Ctrl+3** |
   | Lock | **Ctrl+L** |
+  | New item | **Ctrl+N** |
 
   The buttons show an icon and text by default. **Settings → Top-bar buttons show** switches them to text only or icons only (the name stays available to screen readers either way).
 

@@ -581,6 +581,7 @@ enum Shortcut {
     Trash,
     Settings,
     Lock,
+    NewItem,
 }
 
 impl Shortcut {
@@ -590,6 +591,7 @@ impl Shortcut {
             "2" => Some(Self::Trash),
             "3" => Some(Self::Settings),
             "l" | "L" => Some(Self::Lock),
+            "n" | "N" => Some(Self::NewItem),
             _ => None,
         }
     }
@@ -600,6 +602,7 @@ impl Shortcut {
             Self::Trash => "Ctrl+2",
             Self::Settings => "Ctrl+3",
             Self::Lock => "Ctrl+L",
+            Self::NewItem => "Ctrl+N",
         }
     }
 
@@ -609,6 +612,7 @@ impl Shortcut {
             Self::Trash => "Control+2",
             Self::Settings => "Control+3",
             Self::Lock => "Control+L",
+            Self::NewItem => "Control+N",
         }
     }
 
@@ -618,6 +622,7 @@ impl Shortcut {
             Self::Trash => "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
             Self::Settings => "M4 7h10M18 7h2M4 17h2M10 17h10M16 4v6M8 14v6",
             Self::Lock => "M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z",
+            Self::NewItem => "M12 5v14M5 12h14",
         }
     }
 
@@ -627,6 +632,7 @@ impl Shortcut {
             Self::Trash => m.show(View::Trash, now),
             Self::Settings => m.show(View::Settings, now),
             Self::Lock => m.lock(),
+            Self::NewItem => m.start_new(now),
         }
     }
 }
@@ -658,14 +664,9 @@ fn Browser() -> Element {
     let trash = view == View::Trash;
     rsx! {
         div { class: "split",
+          div { class: "pane",
             aside { aria_label: if trash { "Deleted items" } else { "Items" },
-                if !trash {
-                    button {
-                        class: "primary wide",
-                        onclick: move |_| { if let Some(m) = model.write().as_mut() { m.start_new(now()); } },
-                        "+ New item"
-                    }
-                } else {
+                if trash {
                     p { class: "muted small pad", "Items are deleted for good after 30 days." }
                 }
                 if rows.is_empty() {
@@ -685,6 +686,20 @@ fn Browser() -> Element {
                     }
                 }
             }
+            if !trash {
+                button {
+                    class: "primary fab",
+                    aria_keyshortcuts: Shortcut::NewItem.aria(),
+                    title: "New item ({Shortcut::NewItem.hint()})",
+                    onclick: move |_| { if let Some(m) = model.write().as_mut() { Shortcut::NewItem.run(m, now()); } },
+                    svg { view_box: "0 0 24 24", width: "18", height: "18", fill: "none", stroke: "currentColor", stroke_width: "2.5",
+                        stroke_linecap: "round", "aria-hidden": "true",
+                        path { d: "{Shortcut::NewItem.icon()}" }
+                    }
+                    span { "New item" }
+                }
+            }
+          }
             main { class: "detail", aria_label: "Item details",
                 { detail_pane(ctx.clone()) }
             }
