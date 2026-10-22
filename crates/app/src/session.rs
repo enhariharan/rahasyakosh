@@ -20,6 +20,16 @@ use rahasyakosh_store::{Store, Uuid};
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
+/// How a front-end draws its top-bar buttons (icon and text, text only, or icon only).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolbarStyle {
+    #[default]
+    IconAndText,
+    TextOnly,
+    IconOnly,
+}
+
 /// User-adjustable behaviour (US-SET-01). Contains no secrets, so a front-end may keep it in a plain file.
 /// Missing fields take their defaults, so older settings files keep working when options are added.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -41,6 +51,8 @@ pub struct Settings {
     pub kdf_memory_mib: u32,
     /// Passes of the key derivation.
     pub kdf_passes: u32,
+    /// How the desktop top-bar buttons are drawn.
+    pub toolbar_style: ToolbarStyle,
 }
 
 impl Default for Settings {
@@ -54,6 +66,7 @@ impl Default for Settings {
             history_limit: DEFAULT_HISTORY_LIMIT,
             kdf_memory_mib: KdfParams::DESKTOP.m_kib / 1024,
             kdf_passes: KdfParams::DESKTOP.t,
+            toolbar_style: ToolbarStyle::default(),
         }
     }
 }

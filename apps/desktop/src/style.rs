@@ -19,7 +19,7 @@ body { background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, "Se
 h1 { font-size: 1.15rem; margin: 0; }
 h2 { font-size: 1.3rem; margin: 0; }
 h3 { font-size: 1rem; margin: 1.4rem 0 .4rem; }
-button, input, textarea { font: inherit; color: inherit; }
+button, input, textarea, select { font: inherit; color: inherit; }
 button {
   background: var(--panel); border: 1px solid var(--control); border-radius: 6px; padding: .4rem .8rem; cursor: pointer;
 }
@@ -30,9 +30,12 @@ button.danger { color: var(--danger); }
 button.link { border: none; background: none; color: var(--accent); text-decoration: underline; padding: .2rem; }
 button.wide { width: calc(100% - 1.2rem); margin: .6rem; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
-input, textarea {
+input, textarea, select {
   background: var(--panel); border: 1px solid var(--control); border-radius: 6px; padding: .45rem .6rem; width: 100%;
 }
+select { appearance: none; padding-right: 2rem;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round'/></svg>");
+  background-repeat: no-repeat; background-position: right .7rem center; }
 input[type=checkbox] { width: auto; }
 label { display: block; margin: .8rem 0 .25rem; font-weight: 600; font-size: .9rem; }
 label.check { font-weight: 400; margin-top: 1rem; }
@@ -69,6 +72,7 @@ button.icon { position: absolute; top: .5rem; right: .5rem; padding: .35rem; lin
 .bar input[type=search] { max-width: 22rem; }
 .bar nav { display: flex; gap: .25rem; margin-left: auto; }
 .tab { border-color: transparent; background: none; }
+.bar nav button, .bar > button { display: inline-flex; align-items: center; gap: .4rem; }
 .tab.on { background: var(--row-on); border-color: var(--accent); }
 .toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background: var(--toast); color: var(--toast-text);
   padding: .6rem 1rem; border-radius: 8px; z-index: 5; box-shadow: 0 4px 16px #0004; }

@@ -1,6 +1,6 @@
 //! The session state machine: auto-lock, backoff, reveal and clipboard bookkeeping. Time is passed in, so none of it sleeps.
 use rahasyakosh_app::{
-    backoff_secs, should_clear, Locked, Scope, Session, Settings, UnlockError, Vault,
+    backoff_secs, should_clear, Locked, Scope, Session, Settings, ToolbarStyle, UnlockError, Vault,
 };
 use rahasyakosh_core::crypto::KdfParams;
 use rahasyakosh_core::item::Item;
@@ -512,5 +512,24 @@ mod model {
                 prop_assert_eq!(s.failed_attempts(), failures);
             }
         }
+    }
+}
+
+#[test]
+fn toolbar_style_defaults_for_old_files_and_round_trips() {
+    // A settings file written before the option existed.
+    let old = Settings::from_json(br#"{"idle_lock_secs": 60}"#);
+    assert_eq!(old.toolbar_style, ToolbarStyle::IconAndText);
+    assert_eq!(old.idle_lock_secs, 60);
+    for style in [
+        ToolbarStyle::IconAndText,
+        ToolbarStyle::TextOnly,
+        ToolbarStyle::IconOnly,
+    ] {
+        let s = Settings {
+            toolbar_style: style,
+            ..Settings::default()
+        };
+        assert_eq!(Settings::from_json(&s.to_json()).toolbar_style, style);
     }
 }

@@ -8,7 +8,7 @@ mod style;
 use dioxus::desktop::{Config, LogicalSize, WindowBuilder};
 use dioxus::prelude::*;
 use model::{Model, NoticeKind, SystemClipboard, View};
-use rahasyakosh_app::{Session, Settings};
+use rahasyakosh_app::{Session, Settings, ToolbarStyle};
 use rahasyakosh_store::{SqliteStore, Uuid};
 use std::cell::Cell;
 use std::path::{Path, PathBuf};
@@ -258,6 +258,17 @@ fn app() -> Element {
             onpointerdown: move |_| input_down.set(now()),
             onkeydown: move |e| {
                 input_key.set(now());
+                if e.modifiers().ctrl() && !e.modifiers().alt() {
+                    if let Key::Character(c) = e.key() {
+                        let unlocked = model.read().as_ref().is_some_and(|m| m.is_unlocked());
+                        if let Some(shortcut) = Shortcut::from_key(&c).filter(|_| unlocked) {
+                            e.prevent_default();
+                            if let Some(m) = model.write().as_mut() {
+                                shortcut.run(m, now());
+                            }
+                        }
+                    }
+                }
                 if e.modifiers().ctrl() && e.key() == Key::Character("k".into()) {
                     e.prevent_default();
                     spawn(async move {
@@ -488,7 +499,7 @@ fn Unlock() -> Element {
 fn Main() -> Element {
     let mut ctx = use_context::<Ctx>();
     let t = (ctx.clock)();
-    let (view, query, left, notice, trash_count) = {
+    let (view, query, left, notice, trash_count, style) = {
         let m = ctx.model.read();
         let m = m.as_ref().expect("unlocked");
         (
@@ -497,6 +508,7 @@ fn Main() -> Element {
             m.session.seconds_until_lock(t),
             m.notice.clone(),
             m.trash_count(),
+            m.session.settings().toolbar_style,
         )
     };
     let lock = move |_| {
@@ -523,27 +535,29 @@ fn Main() -> Element {
                 },
             }
             nav { aria_label: "Main",
-                button {
-                    aria_current: if view == View::Items || view == View::Form { "page" } else { "false" },
-                    class: if view == View::Items || view == View::Form { "tab on" } else { "tab" },
-                    onclick: move |_| { if let Some(m) = ctx.model.write().as_mut() { m.show(View::Items, now()); } },
-                    "Items"
-                }
-                button {
-                    aria_current: if view == View::Trash { "page" } else { "false" },
-                    class: if view == View::Trash { "tab on" } else { "tab" },
-                    onclick: move |_| { if let Some(m) = ctx.model.write().as_mut() { m.show(View::Trash, now()); } },
-                    "Trash ({trash_count})"
-                }
-                button {
-                    aria_current: if view == View::Settings { "page" } else { "false" },
-                    class: if view == View::Settings { "tab on" } else { "tab" },
-                    onclick: move |_| { if let Some(m) = ctx.model.write().as_mut() { m.show(View::Settings, now()); } },
-                    "Settings"
+                for (sc, on, label) in [
+                    (Shortcut::Items, view == View::Items || view == View::Form, "Items".to_string()),
+                    (Shortcut::Trash, view == View::Trash, format!("Trash ({trash_count})")),
+                    (Shortcut::Settings, view == View::Settings, "Settings".to_string()),
+                ] {
+                    button {
+                        key: "{label}",
+                        aria_current: if on { "page" } else { "false" },
+                        aria_label: "{label}",
+                        aria_keyshortcuts: sc.aria(),
+                        title: "{label} ({sc.hint()})",
+                        class: if on { "tab on" } else { "tab" },
+                        onclick: move |_| { if let Some(m) = ctx.model.write().as_mut() { sc.run(m, now()); } },
+                        NavContent { icon: sc.icon(), label: label.clone(), style }
+                    }
                 }
             }
             span { class: "muted small", "{lock_text}" }
-            button { class: "danger", onclick: lock, "Lock" }
+            button {
+                class: "danger", onclick: lock,
+                aria_label: "Lock", aria_keyshortcuts: Shortcut::Lock.aria(), title: "Lock ({Shortcut::Lock.hint()})",
+                NavContent { icon: Shortcut::Lock.icon(), label: "Lock".to_string(), style }
+            }
         }
         if let Some(n) = notice {
             div {
@@ -557,6 +571,77 @@ fn Main() -> Element {
             View::Form => rsx! { FormView {} },
             _ => rsx! { Browser {} },
         }
+    }
+}
+
+/// A top-bar action with its keyboard shortcut (Ctrl + the key).
+#[derive(Clone, Copy, PartialEq)]
+enum Shortcut {
+    Items,
+    Trash,
+    Settings,
+    Lock,
+}
+
+impl Shortcut {
+    fn from_key(c: &str) -> Option<Self> {
+        match c {
+            "1" => Some(Self::Items),
+            "2" => Some(Self::Trash),
+            "3" => Some(Self::Settings),
+            "l" | "L" => Some(Self::Lock),
+            _ => None,
+        }
+    }
+
+    fn hint(self) -> &'static str {
+        match self {
+            Self::Items => "Ctrl+1",
+            Self::Trash => "Ctrl+2",
+            Self::Settings => "Ctrl+3",
+            Self::Lock => "Ctrl+L",
+        }
+    }
+
+    fn aria(self) -> &'static str {
+        match self {
+            Self::Items => "Control+1",
+            Self::Trash => "Control+2",
+            Self::Settings => "Control+3",
+            Self::Lock => "Control+L",
+        }
+    }
+
+    fn icon(self) -> &'static str {
+        match self {
+            Self::Items => "M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01",
+            Self::Trash => "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
+            Self::Settings => "M4 7h10M18 7h2M4 17h2M10 17h10M16 4v6M8 14v6",
+            Self::Lock => "M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z",
+        }
+    }
+
+    fn run(self, m: &mut AppModel, now: i64) {
+        match self {
+            Self::Items => m.show(View::Items, now),
+            Self::Trash => m.show(View::Trash, now),
+            Self::Settings => m.show(View::Settings, now),
+            Self::Lock => m.lock(),
+        }
+    }
+}
+
+/// The inside of a top-bar button: an icon, the text, or both, as the setting says.
+#[component]
+fn NavContent(icon: &'static str, label: String, style: ToolbarStyle) -> Element {
+    rsx! {
+        if style != ToolbarStyle::TextOnly {
+            svg { view_box: "0 0 24 24", width: "18", height: "18", fill: "none", stroke: "currentColor", stroke_width: "2",
+                stroke_linecap: "round", stroke_linejoin: "round", "aria-hidden": "true",
+                path { d: "{icon}" }
+            }
+        }
+        if style != ToolbarStyle::IconOnly { span { "{label}" } }
     }
 }
 
@@ -825,6 +910,17 @@ fn SettingsView() -> Element {
                 input { id: "s-trash", r#type: "number", min: "0", value: "{s.read().trash_retention_days}", oninput: num!(trash_retention_days, u32) }
                 label { r#for: "s-hist", "Earlier versions kept per item" }
                 input { id: "s-hist", r#type: "number", min: "0", value: "{s.read().history_limit}", oninput: num!(history_limit, usize) }
+                label { r#for: "s-toolbar", "Top-bar buttons show" }
+                select { id: "s-toolbar",
+                    onchange: move |e| s.write().toolbar_style = match e.value().as_str() {
+                        "text" => ToolbarStyle::TextOnly,
+                        "icons" => ToolbarStyle::IconOnly,
+                        _ => ToolbarStyle::IconAndText,
+                    },
+                    option { value: "both", selected: s.read().toolbar_style == ToolbarStyle::IconAndText, "Icons and text" }
+                    option { value: "text", selected: s.read().toolbar_style == ToolbarStyle::TextOnly, "Text only" }
+                    option { value: "icons", selected: s.read().toolbar_style == ToolbarStyle::IconOnly, "Icons only" }
+                }
                 h3 { "Protection against password guessing" }
                 p { class: "muted small",
                     "How costly it is to guess your master password from a stolen copy of the vault. Higher is safer but makes unlocking slower. "

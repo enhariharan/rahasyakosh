@@ -1,9 +1,10 @@
 //! Development aid: open a screen of the app on sample data, already unlocked, to look at the design.
 //!
 //!     GALLERY=detail cargo run --example gallery        # detail | revealed | list | form | settings | trash | setup
+//!     TOOLBAR=icons (or text) GALLERY=detail ...       # the top-bar button style
 //!
 //! It uses an in-memory vault, never touches your real one, and is not part of the shipped program.
-use rahasyakosh_app::{Session, Settings};
+use rahasyakosh_app::{Session, Settings, ToolbarStyle};
 use rahasyakosh_core::crypto::KdfParams;
 use rahasyakosh_core::item::Item;
 use rahasyakosh_desktop::model::{Model, SystemClipboard, View};
@@ -22,6 +23,11 @@ fn main() {
         kdf_passes: KdfParams::MIN_T,
         idle_lock_secs: 0,
         reveal_secs: 0,
+        toolbar_style: match std::env::var("TOOLBAR").as_deref() {
+            Ok("text") => ToolbarStyle::TextOnly,
+            Ok("icons") => ToolbarStyle::IconOnly,
+            _ => ToolbarStyle::IconAndText,
+        },
         ..Settings::default()
     };
     let mut session = Session::create(

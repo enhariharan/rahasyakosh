@@ -44,7 +44,16 @@ Type the master password and press Enter. After three wrong passwords in a row t
   **Copy** puts a value on the clipboard and clears it after 20 seconds, if you have not copied something else meanwhile.
 - **Two-factor code:** if the item has a two-factor secret, the current six-digit code is shown with its countdown. The secret itself is never displayed.
 - **Earlier versions:** each time you change an item, the old version is kept. **Go back to this** restores one (the present content is kept too).
-- **Top bar:** **Trash** (deleted items, restorable, emptied after 30 days), **Settings**, a countdown to the automatic lock, and **Lock** to lock right now.
+- **Top bar:** **Items**, **Trash** (deleted items, restorable, emptied after 30 days), **Settings**, a countdown to the automatic lock, and **Lock** to lock right now. Each button has an icon and a keyboard shortcut, shown when you hover over it:
+
+  | Button | Shortcut |
+  |---|---|
+  | Items | **Ctrl+1** |
+  | Trash | **Ctrl+2** |
+  | Settings | **Ctrl+3** |
+  | Lock | **Ctrl+L** |
+
+  The buttons show an icon and text by default. **Settings → Top-bar buttons show** switches them to text only or icons only (the name stays available to screen readers either way).
 
 ![A password and notes revealed on request](images/desktop-revealed.png)
 
@@ -72,7 +81,7 @@ The details, and what they cannot do, are in [Sessions: locking, hiding and clea
 ## Settings
 
 Under **Settings**: auto-lock minutes, lock on focus loss, how long a copied password stays on the clipboard, how long a shown password stays visible,
-how long deleted items are kept, history length, and the cost of the password-guessing protection (applied when a vault is created or its master password is changed).
+how long deleted items are kept, history length, whether the top-bar buttons show icons and text, text only or icons only, and the cost of the password-guessing protection (applied when a vault is created or its master password is changed).
 You can also **change the master password** there (the new one must pass the strength check).
 
 ## What it does not do yet
