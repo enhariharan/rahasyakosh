@@ -137,7 +137,7 @@ pub fn launch() {
 pub fn launch_with(initial: Option<AppModel>) {
     INITIAL.with(|c| *c.borrow_mut() = initial);
     let window = WindowBuilder::new()
-        .with_title("Rahasyakosh")
+        .with_title(tr(load_settings().language, Msg::AppName))
         .with_window_icon(window_icon())
         .with_inner_size(LogicalSize::new(1080.0, 720.0))
         .with_min_inner_size(LogicalSize::new(760.0, 520.0));
@@ -159,8 +159,9 @@ fn window_icon() -> Option<dioxus::desktop::tao::window::Icon> {
 /// The app icon (same drawing as `packaging/rahasyakosh-chest.svg`), shown above the title on the first-run and unlock screens.
 #[component]
 fn Logo() -> Element {
+    let lang = lang_of(&use_context::<Ctx>());
     rsx! {
-        svg { class: "logo", view_box: "0 0 128 128", width: "72", height: "72", role: "img", "aria-label": "Rahasyakosh",
+        svg { class: "logo", view_box: "0 0 128 128", width: "72", height: "72", role: "img", "aria-label": tr(lang, Msg::AppName),
             defs {
                 linearGradient { id: "logo-bg", x1: "0", y1: "0", x2: "0", y2: "1",
                     stop { offset: "0", stop_color: "#2f3a8f" }
@@ -280,6 +281,7 @@ fn app() -> Element {
             ThemeMode::Dark => "dark",
             ThemeMode::System => "system",
         };
+        dioxus::desktop::window().set_title(tr(lang, Msg::AppName));
         let (code, dir) = (lang.code(), if lang.is_rtl() { "rtl" } else { "ltr" });
         spawn(async move {
             let _ = dioxus::document::eval(&format!(
@@ -324,7 +326,7 @@ fn app() -> Element {
 fn screen(ctx: Ctx) -> Element {
     let _ = (ctx.clock)(); // redraw every second
     if let Some(msg) = (ctx.broken)() {
-        return rsx! { main { class: "centre", h1 { "Rahasyakosh" } p { class: "error", role: "alert", "{msg}" } } };
+        return rsx! { main { class: "centre", h1 { {tr(lang_of(&ctx), Msg::AppName)} } p { class: "error", role: "alert", "{msg}" } } };
     }
     let state = {
         let m = ctx.model.read();
@@ -547,7 +549,7 @@ fn Unlock() -> Element {
     rsx! {
         main { class: "centre landing",
             Logo {}
-            h1 { "Rahasyakosh" }
+            h1 { {tr(lang, Msg::AppName)} }
             p { class: "tagline spaced", {tr(lang, Msg::VaultLockedTag)} }
             form {
                 onsubmit: move |e| { e.prevent_default(); submit(); },
@@ -596,7 +598,7 @@ fn Main() -> Element {
     };
     rsx! {
         header { class: "bar",
-            h1 { "Rahasyakosh" }
+            h1 { {tr(lang, Msg::AppName)} }
             input {
                 id: "search", r#type: "search", placeholder: tr(lang, Msg::SearchPlaceholder), aria_label: tr(lang, Msg::Search),
                 value: "{query}",
