@@ -326,7 +326,7 @@ fn Setup() -> Element {
             Logo {}
             h1 { "Welcome to Rahasyakosh" }
             p { "Your passwords live in one encrypted file on this computer, opened by a single master passphrase." }
-            p { class: "warn", "This passphrase is shown only once. Write it down and keep it safe." }
+            p { class: "warn", "This passphrase is shown only once. Keep it safe." }
             if !own() {
                 section { aria_label: "Generated passphrase",
                     p { class: "label", "Your new master passphrase" }
