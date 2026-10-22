@@ -41,9 +41,12 @@ button.wide { width: calc(100% - 1.2rem); margin: .6rem; }
 input, textarea, select {
   background: var(--panel); border: 1px solid var(--control); border-radius: 6px; padding: .45rem .6rem; width: 100%;
 }
-select { appearance: none; padding-right: 2rem;
+select { appearance: none; padding-inline-end: 2rem;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round'/></svg>");
   background-repeat: no-repeat; background-position: right .7rem center; }
+:root[dir="rtl"] select { background-position: left .7rem center; }
+/* Passwords, addresses and codes read left to right even on a right-to-left page, but sit at the page's start edge. */
+:root[dir="rtl"] .ltr { text-align: right; }
 input[type=checkbox] { width: auto; }
 label { display: block; margin: .8rem 0 .25rem; font-weight: 600; font-size: .9rem; }
 label.check { font-weight: 400; margin-top: 1rem; }
@@ -51,7 +54,7 @@ label.check { font-weight: 400; margin-top: 1rem; }
 .big { font-size: 1.5rem; letter-spacing: .08em; }
 .muted { color: var(--muted); } .small { font-size: .85rem; } .pad { padding: 1rem; }
 .error { color: var(--danger); } .ok { color: var(--ok); }
-.row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; } .row.tight { gap: .3rem; margin-left: auto; }
+.row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; } .row.tight { gap: .3rem; margin-inline-start: auto; }
 .grow { flex: 1; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
@@ -61,10 +64,10 @@ label.check { font-weight: 400; margin-top: 1rem; }
 .landing h1, .landing .tagline { text-align: center; }
 .landing .spaced { line-height: 2; }
 .landing .warn { text-align: center; }
-.emph { font-weight: 700; text-decoration: underline; }
+.lang-pick { width: 12rem; margin: 1.2rem auto 0; }
 .landing .passphrase { text-align: center; margin: 0; padding-right: 3rem; padding-left: 3rem; }
 .passbox { position: relative; margin: .4rem 0 .9rem; }
-button.icon { position: absolute; top: .5rem; right: .5rem; padding: .35rem; line-height: 0; }
+button.icon { position: absolute; top: .5rem; inset-inline-end: .5rem; padding: .35rem; line-height: 0; }
 .landing form { width: 20rem; max-width: 100%; margin: 0 auto; }
 .landing .primary { display: block; margin-left: auto; margin-right: auto; }
 .centre h1 { font-size: 1.6rem; margin-bottom: .6rem; }
@@ -78,7 +81,7 @@ button.icon { position: absolute; top: .5rem; right: .5rem; padding: .35rem; lin
 
 .bar { display: flex; gap: 1rem; align-items: center; padding: .55rem 1rem; background: var(--panel); border-bottom: 1px solid var(--line); }
 .bar input[type=search] { max-width: 22rem; }
-.bar nav { display: flex; gap: .25rem; margin-left: auto; }
+.bar nav { display: flex; gap: .25rem; margin-inline-start: auto; }
 .tab { border-color: transparent; background: none; }
 .bar nav button, .bar > button { display: inline-flex; align-items: center; gap: .4rem; }
 .tab.on { background: var(--row-on); border-color: var(--accent); }
@@ -88,7 +91,7 @@ button.icon { position: absolute; top: .5rem; right: .5rem; padding: .35rem; lin
 
 .split { flex: 1; display: grid; grid-template-columns: minmax(240px, 340px) 1fr; min-height: 0; }
 .pane { position: relative; min-height: 0; display: flex; flex-direction: column; }
-.split aside { flex: 1; border-right: 1px solid var(--line); overflow: auto; background: var(--panel); padding-bottom: 5rem; }
+.split aside { flex: 1; border-inline-end: 1px solid var(--line); overflow: auto; background: var(--panel); padding-bottom: 5rem; }
 /* The "New item" bar floats over the bottom of the list, so it stays in reach however long the list is. */
 button.fab { position: absolute; left: 1rem; right: 1rem; bottom: 1rem; display: flex; align-items: center; justify-content: center;
   gap: .5rem; padding: .7rem 1rem; border-radius: 999px; box-shadow: 0 4px 14px #0006; }
@@ -96,7 +99,7 @@ button.fab { position: absolute; left: 1rem; right: 1rem; bottom: 1rem; display:
 .list { list-style: none; margin: 0; padding: 0; }
 .row { }
 button.row { display: flex; flex-direction: column; align-items: flex-start; width: 100%; border: none; border-radius: 0;
-  border-bottom: 1px solid var(--line); background: none; padding: .6rem 1rem; text-align: left; gap: 0; }
+  border-bottom: 1px solid var(--line); background: none; padding: .6rem 1rem; text-align: start; gap: 0; }
 button.row.on { background: var(--row-on); }
 .title { font-weight: 600; } .sub { color: var(--muted); font-size: .85rem; }
 
@@ -109,7 +112,7 @@ dl { margin: 0; }
 .field dd .row.tight { flex-wrap: nowrap; flex-shrink: 0; }
 .notes { white-space: pre-wrap; }
 .mask { letter-spacing: .1em; color: var(--muted); }
-.tag { background: var(--row-on); border-radius: 999px; padding: .1rem .6rem; margin-right: .3rem; font-size: .85rem; }
+.tag { background: var(--row-on); border-radius: 999px; padding: .1rem .6rem; margin-inline-end: .3rem; font-size: .85rem; }
 .history { list-style: none; padding: 0; margin: 0; }
 .history li { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .35rem 0; border-bottom: 1px solid var(--line); }
 

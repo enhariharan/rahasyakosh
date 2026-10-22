@@ -1,5 +1,6 @@
 //! Rahasyakosh desktop app (library, so examples can launch the same screens). This file only draws screens and forwards clicks; the behaviour lives in `model.rs`
 //! (tested without a window) and in the session of `rahasyakosh-app`.
+pub mod i18n;
 pub mod model;
 #[cfg(test)]
 mod model_tests;
@@ -8,7 +9,8 @@ mod style;
 use dioxus::desktop::{Config, LogicalSize, WindowBuilder};
 use dioxus::prelude::*;
 use model::{Model, NoticeKind, SystemClipboard, View};
-use rahasyakosh_app::{Session, Settings, ThemeMode, ToolbarStyle};
+use i18n::{t as tr, trf, Msg};
+use rahasyakosh_app::{Language, Session, Settings, ThemeMode, ToolbarStyle};
 use rahasyakosh_store::{SqliteStore, Uuid};
 use std::cell::Cell;
 use std::path::{Path, PathBuf};
@@ -102,7 +104,7 @@ fn startup(path: &Path) -> Startup {
     }
     match SqliteStore::open(path) {
         Ok(store) => Startup::Ready(Box::new(make_model(Session::new(store, load_settings())))),
-        Err(e) => Startup::Broken(format!("Cannot open the vault: {e}")),
+        Err(e) => Startup::Broken(trf(load_settings().language, Msg::CannotOpenVault, &[&e])),
     }
 }
 
@@ -117,6 +119,8 @@ struct Ctx {
     last_input: Rc<Cell<i64>>,
     /// Set when the vault file is unusable.
     broken: Signal<Option<String>>,
+    /// The language chosen on the first-run screens, before there is a vault with settings.
+    setup_lang: Signal<Language>,
 }
 
 thread_local! {
@@ -180,6 +184,14 @@ fn Logo() -> Element {
     }
 }
 
+/// The language to draw in: the open vault's setting, else the saved settings (the first-run and broken screens).
+fn lang_of(ctx: &Ctx) -> Language {
+    ctx.model
+        .read()
+        .as_ref()
+        .map_or_else(|| (ctx.setup_lang)(), |m| m.lang())
+}
+
 fn app() -> Element {
     let mut model: Signal<Option<AppModel>> = use_signal(|| None);
     let mut broken: Signal<Option<String>> = use_signal(|| None);
@@ -196,11 +208,13 @@ fn app() -> Element {
             Startup::Broken(msg) => broken.set(Some(msg)),
         };
     });
+    let setup_lang = use_signal(|| load_settings().language);
     let ctx = use_context_provider(|| Ctx {
         model,
         clock,
         last_input: last_input.clone(),
         broken,
+        setup_lang,
     });
 
     // Once a second: pass on user input, apply the inactivity lock, clear the clipboard when due, and redraw.
@@ -254,20 +268,29 @@ fn app() -> Element {
         .read()
         .as_ref()
         .map_or(ThemeMode::System, |m| m.session.settings().theme);
-    use_effect(use_reactive!(|theme| {
+    // On the first-run screen there is no vault yet, so the language lives in `setup_lang`.
+    let lang = model.read().as_ref().map_or_else(|| (ctx.setup_lang)(), |m| m.lang());
+    let dir = if lang.is_rtl() { "rtl" } else { "ltr" };
+    use_effect(use_reactive!(|theme, lang| {
         let name = match theme {
             ThemeMode::Light => "light",
             ThemeMode::Dark => "dark",
             ThemeMode::System => "system",
         };
+        let (code, dir) = (lang.code(), if lang.is_rtl() { "rtl" } else { "ltr" });
         spawn(async move {
-            let _ = dioxus::document::eval(&format!("document.documentElement.dataset.theme='{name}'")).await;
+            let _ = dioxus::document::eval(&format!(
+                "const d=document.documentElement;d.dataset.theme='{name}';d.lang='{code}';d.dir='{dir}'"
+            ))
+            .await;
         });
     }));
     rsx! {
         style { "{style::CSS}" }
         div {
             class: "app",
+            dir: "{dir}",
+            lang: "{lang.code()}",
             onpointermove: move |_| input.set(now()),
             onpointerdown: move |_| input_down.set(now()),
             onkeydown: move |e| {
@@ -316,6 +339,7 @@ fn screen(ctx: Ctx) -> Element {
 #[component]
 fn Setup() -> Element {
     let mut ctx = use_context::<Ctx>();
+    let lang = lang_of(&ctx);
     let mut passphrase = use_signal(new_passphrase);
     let mut started = use_signal(|| false);
     let mut own = use_signal(|| false);
@@ -328,6 +352,7 @@ fn Setup() -> Element {
 
     let create = move |_| {
         let password = match model::new_master_password(
+            lang,
             own(),
             &passphrase.read(),
             saved(),
@@ -340,7 +365,7 @@ fn Setup() -> Element {
                 return;
             }
         };
-        let settings = load_settings();
+        let settings = Settings { language: lang, ..load_settings() };
         let path = vault_path();
         match SqliteStore::open(&path)
             .map_err(|e| e.to_string())
@@ -348,8 +373,11 @@ fn Setup() -> Element {
                 Session::create(store, &password, settings, now(), &mut rand::rng())
                     .map_err(|e| e.to_string())
             }) {
-            Ok(session) => ctx.model.set(Some(make_model(session))),
-            Err(e) => error.set(Some(format!("Could not create the vault: {e}"))),
+            Ok(session) => {
+                save_settings(session.settings());
+                ctx.model.set(Some(make_model(session)));
+            }
+            Err(e) => error.set(Some(trf(lang, Msg::CouldNotCreateVault, &[&e]))),
         }
     };
 
@@ -357,13 +385,14 @@ fn Setup() -> Element {
         return rsx! {
             main { class: "centre landing",
                 Logo {}
-                h1 { "Welcome to Rahasyakosh" }
+                h1 { {tr(lang, Msg::WelcomeTitle)} }
                 p { class: "tagline spaced",
-                    "A secure store for your passwords." br {}
-                    "Stored in an encrypted file on this computer." br {}
-                    "Protected by a master passphrase."
+                    {tr(lang, Msg::TaglineStore)} br {}
+                    {tr(lang, Msg::TaglineFile)} br {}
+                    {tr(lang, Msg::TaglineProtected)}
                 }
-                button { class: "primary", onclick: move |_| started.set(true), "Create master passphrase" }
+                LanguagePicker {}
+                button { class: "primary", onclick: move |_| started.set(true), {tr(lang, Msg::CreatePassphraseButton)} }
             }
         };
     }
@@ -372,7 +401,7 @@ fn Setup() -> Element {
     let copy_passphrase = move |_| {
         let text = passphrase.read().clone();
         if model::Clipboard::copy(&mut SystemClipboard, &text).is_err() {
-            error.set(Some("Could not copy to the clipboard.".into()));
+            error.set(Some(tr(lang, Msg::CouldNotCopy).into()));
             return;
         }
         error.set(None);
@@ -392,46 +421,68 @@ fn Setup() -> Element {
 
     rsx! {
         main { class: "centre landing",
-            h1 { "Create a master passphrase" }
-            p { class: "warn", "This master passphrase is shown " span { class: "emph", "only once" } ". Keep it safe." }
+            h1 { {tr(lang, Msg::CreatePassphraseTitle)} }
+            p { class: "warn", {tr(lang, Msg::ShownOnce)} }
             if !own() {
-                section { aria_label: "Generated passphrase",
-                    p { class: "label", "Your new master passphrase" }
+                section { aria_label: tr(lang, Msg::GeneratedPassphrase),
+                    p { class: "label", {tr(lang, Msg::YourNewPassphrase)} }
                     div { class: "passbox",
-                        p { class: "passphrase", "{passphrase}" }
+                        p { class: "passphrase", dir: "ltr", "{passphrase}" }
                         button {
                             class: "icon", r#type: "button",
-                            aria_label: if copied() { "Passphrase copied" } else { "Copy passphrase" },
-                            title: if copied() { "Copied" } else { "Copy to clipboard" },
+                            aria_label: if copied() { tr(lang, Msg::PassphraseCopied) } else { tr(lang, Msg::CopyPassphrase) },
+                            title: if copied() { tr(lang, Msg::Copied) } else { tr(lang, Msg::CopyToClipboard) },
                             onclick: copy_passphrase,
                             if copied() { CheckIcon {} } else { CopyIcon {} }
                         }
                     }
                     div { class: "row",
-                        button { onclick: move |_| { passphrase.set(new_passphrase()); saved.set(false); }, "Generate another" }
-                        button { class: "link", onclick: move |_| own.set(true), "Choose my own instead" }
+                        button { onclick: move |_| { passphrase.set(new_passphrase()); saved.set(false); }, {tr(lang, Msg::GenerateAnother)} }
+                        button { class: "link", onclick: move |_| own.set(true), {tr(lang, Msg::ChooseOwn)} }
                     }
                     label { class: "check",
                         input { r#type: "checkbox", checked: saved(), onchange: move |e| saved.set(e.checked()) }
-                        " I have written it down"
+                        {tr(lang, Msg::WrittenDown)}
                     }
                 }
             } else {
-                section { aria_label: "Choose a master password",
-                    label { r#for: "pw", "Master password" }
-                    input { id: "pw", r#type: "password", value: "{pw}", oninput: move |e| pw.set(e.value()) }
-                    label { r#for: "pw2", "Repeat it" }
-                    input { id: "pw2", r#type: "password", value: "{pw2}", oninput: move |e| pw2.set(e.value()) }
+                section { aria_label: tr(lang, Msg::ChooseMasterPassword),
+                    label { r#for: "pw", {tr(lang, Msg::MasterPassword)} }
+                    input { id: "pw", class: "ltr", dir: "ltr", r#type: "password", value: "{pw}", oninput: move |e| pw.set(e.value()) }
+                    label { r#for: "pw2", {tr(lang, Msg::RepeatIt)} }
+                    input { id: "pw2", class: "ltr", dir: "ltr", r#type: "password", value: "{pw2}", oninput: move |e| pw2.set(e.value()) }
                     if !pw.read().is_empty() {
-                        p { class: "meter", "Strength: {strength.label()} (offline cracking time: {strength.crack_time})" }
+                        p { class: "meter", "{trf(lang, Msg::StrengthLine, &[&model::strength_label(lang, strength.score), &strength.crack_time])}" }
                         if let Some(w) = strength.warning.clone() { p { class: "hint", "{w}" } }
                     }
-                    button { class: "link", onclick: move |_| own.set(false), "Use a generated passphrase instead" }
+                    button { class: "link", onclick: move |_| own.set(false), {tr(lang, Msg::UseGenerated)} }
                 }
             }
             if let Some(e) = error() { p { class: "error", role: "alert", "{e}" } }
-            button { class: "primary", onclick: create, disabled: !own() && !saved(), "Create vault" }
-            p { class: "small", "Vault location: {vault_path().display()}" }
+            button { class: "primary", onclick: create, disabled: !own() && !saved(), {tr(lang, Msg::CreateVault)} }
+            p { class: "small", "{trf(lang, Msg::VaultLocation, &[&vault_path().display()])}" }
+        }
+    }
+}
+
+/// A language chooser for the first-run screens, where there is no vault yet to keep a setting in.
+#[component]
+fn LanguagePicker() -> Element {
+    let mut ctx = use_context::<Ctx>();
+    let lang = lang_of(&ctx);
+    rsx! {
+        div { class: "lang-pick",
+            label { class: "sr-only", r#for: "setup-lang", {tr(lang, Msg::SetLanguage)} }
+            select { id: "setup-lang",
+                onchange: move |e| {
+                    if let Some(l) = Language::ALL.into_iter().find(|l| l.code() == e.value()) {
+                        ctx.setup_lang.set(l);
+                    }
+                },
+                for l in Language::ALL {
+                    option { key: "{l.code()}", value: "{l.code()}", selected: l == lang, lang: "{l.code()}", "{l.native_name()}" }
+                }
+            }
         }
     }
 }
@@ -469,6 +520,7 @@ fn new_passphrase() -> String {
 #[component]
 fn Unlock() -> Element {
     let mut ctx = use_context::<Ctx>();
+    let lang = lang_of(&ctx);
     let mut pw = use_signal(String::new);
     let t = (ctx.clock)();
     let (err, wait) = {
@@ -490,18 +542,18 @@ fn Unlock() -> Element {
         main { class: "centre landing",
             Logo {}
             h1 { "Rahasyakosh" }
-            p { class: "tagline spaced", "Vault locked." }
+            p { class: "tagline spaced", {tr(lang, Msg::VaultLockedTag)} }
             form {
                 onsubmit: move |e| { e.prevent_default(); submit(); },
-                label { class: "sr-only", r#for: "master", "Master password" }
+                label { class: "sr-only", r#for: "master", {tr(lang, Msg::MasterPassword)} }
                 input {
-                    id: "master", r#type: "password", autofocus: true, autocomplete: "off",
-                    placeholder: "Enter master password",
+                    id: "master", class: "ltr", dir: "ltr", r#type: "password", autofocus: true, autocomplete: "off",
+                    placeholder: tr(lang, Msg::EnterMasterPassword),
                     value: "{pw}", oninput: move |e| pw.set(e.value()),
                 }
                 if let Some(e) = err { p { class: "error", role: "alert", "{e}" } }
-                if wait > 0 { p { class: "muted", "Try again in {wait} s." } }
-                button { class: "primary", r#type: "submit", disabled: wait > 0, "Unlock" }
+                if wait > 0 { p { class: "muted", "{trf(lang, Msg::TryAgainIn, &[&wait])}" } }
+                button { class: "primary", r#type: "submit", disabled: wait > 0, {tr(lang, Msg::Unlock)} }
             }
         }
     }
@@ -512,6 +564,7 @@ fn Unlock() -> Element {
 #[component]
 fn Main() -> Element {
     let mut ctx = use_context::<Ctx>();
+    let lang = lang_of(&ctx);
     let t = (ctx.clock)();
     let (view, query, left, notice, trash_count, style) = {
         let m = ctx.model.read();
@@ -531,15 +584,15 @@ fn Main() -> Element {
         }
     };
     let lock_text = match left {
-        Some(s) if s < 60 => format!("Locks in {s} s"),
-        Some(s) => format!("Locks in {} min", (s + 59) / 60),
-        None => "Auto-lock off".to_string(),
+        Some(s) if s < 60 => trf(lang, Msg::LocksInSecs, &[&s]),
+        Some(s) => trf(lang, Msg::LocksInMins, &[&((s + 59) / 60)]),
+        None => tr(lang, Msg::AutoLockOff).to_string(),
     };
     rsx! {
         header { class: "bar",
             h1 { "Rahasyakosh" }
             input {
-                id: "search", r#type: "search", placeholder: "Search  (Ctrl+K)", aria_label: "Search",
+                id: "search", r#type: "search", placeholder: tr(lang, Msg::SearchPlaceholder), aria_label: tr(lang, Msg::Search),
                 value: "{query}",
                 oninput: move |e| {
                     if let Some(m) = ctx.model.write().as_mut() {
@@ -548,11 +601,11 @@ fn Main() -> Element {
                     }
                 },
             }
-            nav { aria_label: "Main",
+            nav { aria_label: tr(lang, Msg::MainNav),
                 for (sc, on, label) in [
-                    (Shortcut::Items, view == View::Items || view == View::Form, "Items".to_string()),
-                    (Shortcut::Trash, view == View::Trash, format!("Trash ({trash_count})")),
-                    (Shortcut::Settings, view == View::Settings, "Settings".to_string()),
+                    (Shortcut::Items, view == View::Items || view == View::Form, tr(lang, Msg::Items).to_string()),
+                    (Shortcut::Trash, view == View::Trash, trf(lang, Msg::TrashCount, &[&trash_count])),
+                    (Shortcut::Settings, view == View::Settings, tr(lang, Msg::Settings).to_string()),
                 ] {
                     button {
                         key: "{label}",
@@ -569,8 +622,8 @@ fn Main() -> Element {
             span { class: "muted small", "{lock_text}" }
             button {
                 class: "danger", onclick: lock,
-                aria_label: "Lock", aria_keyshortcuts: Shortcut::Lock.aria(), title: "Lock ({Shortcut::Lock.hint()})",
-                NavContent { icon: Shortcut::Lock.icon(), label: "Lock".to_string(), style }
+                aria_label: tr(lang, Msg::Lock), aria_keyshortcuts: Shortcut::Lock.aria(), title: "{tr(lang, Msg::Lock)} ({Shortcut::Lock.hint()})",
+                NavContent { icon: Shortcut::Lock.icon(), label: tr(lang, Msg::Lock).to_string(), style }
             }
         }
         if let Some(n) = notice {
@@ -670,30 +723,31 @@ fn Browser() -> Element {
     let ctx = use_context::<Ctx>();
     let mut model = ctx.model;
     let _ = (ctx.clock)();
-    let (rows, selected, view) = {
+    let lang = lang_of(&ctx);
+    let (rows, selected, view, retention) = {
         let m = ctx.model.read();
         let m = m.as_ref().expect("unlocked");
-        (m.rows(), m.selected, m.view.clone())
+        (m.rows(), m.selected, m.view.clone(), m.session.settings().trash_retention_days)
     };
     let trash = view == View::Trash;
     rsx! {
         div { class: "split",
           div { class: "pane",
-            aside { aria_label: if trash { "Deleted items" } else { "Items" },
+            aside { aria_label: if trash { tr(lang, Msg::DeletedItems) } else { tr(lang, Msg::Items) },
                 if trash {
-                    p { class: "muted small pad", "Items are deleted for good after 30 days." }
+                    p { class: "muted small pad", "{trf(lang, Msg::TrashNote, &[&retention])}" }
                 }
                 if rows.is_empty() {
-                    p { class: "muted pad", if trash { "The trash is empty." } else { "Nothing here yet." } }
+                    p { class: "muted pad", if trash { {tr(lang, Msg::TrashEmpty)} } else { {tr(lang, Msg::NothingHere)} } }
                 }
-                ul { class: "list", aria_label: "Item list",
+                ul { class: "list", aria_label: tr(lang, Msg::ItemList),
                     for r in rows {
                         li { key: "{r.id}",
                             button {
                                 class: if selected == Some(r.id) { "row on" } else { "row" },
                                 aria_current: if selected == Some(r.id) { "true" } else { "false" },
                                 onclick: move |_| select(model, r.id),
-                                span { class: "title", if r.favourite { span { class: "sr-only", "Pinned: " } span { aria_hidden: "true", "★ " } } "{r.title}" }
+                                span { class: "title", if r.favourite { span { class: "sr-only", {tr(lang, Msg::Pinned)} } span { aria_hidden: "true", "★ " } } "{r.title}" }
                                 span { class: "sub", "{r.subtitle}" }
                             }
                         }
@@ -704,17 +758,17 @@ fn Browser() -> Element {
                 button {
                     class: "primary fab",
                     aria_keyshortcuts: Shortcut::NewItem.aria(),
-                    title: "New item ({Shortcut::NewItem.hint()})",
+                    title: "{tr(lang, Msg::NewItem)} ({Shortcut::NewItem.hint()})",
                     onclick: move |_| { if let Some(m) = model.write().as_mut() { Shortcut::NewItem.run(m, now()); } },
                     svg { view_box: "0 0 24 24", width: "18", height: "18", fill: "none", stroke: "currentColor", stroke_width: "2.5",
                         stroke_linecap: "round", "aria-hidden": "true",
                         path { d: "{Shortcut::NewItem.icon()}" }
                     }
-                    span { "New item" }
+                    span { {tr(lang, Msg::NewItem)} }
                 }
             }
           }
-            main { class: "detail", aria_label: "Item details",
+            main { class: "detail", aria_label: tr(lang, Msg::ItemDetails),
                 { detail_pane(ctx.clone()) }
             }
         }
@@ -729,9 +783,10 @@ fn select(mut model: Signal<Option<AppModel>>, id: Uuid) {
 
 fn detail_pane(ctx: Ctx) -> Element {
     let t = (ctx.clock)();
+    let lang = lang_of(&ctx);
     let detail = ctx.model.read().as_ref().and_then(|m| m.detail(t));
     let Some(d) = detail else {
-        return rsx! { p { class: "muted pad", "Select an item, or press Ctrl+K to search." } };
+        return rsx! { p { class: "muted pad", {tr(lang, Msg::SelectItem)} } };
     };
     let id = d.id;
     // `act!(m, now => m.something(now))`: a click handler that runs `body` on the model with the current time.
@@ -752,12 +807,12 @@ fn detail_pane(ctx: Ctx) -> Element {
                 h2 { if d.favourite { "★ " } "{d.title}" }
                 div { class: "row",
                     if d.trashed {
-                        button { class: "primary", onclick: act!(m, now => m.restore_selected(now)), "Restore" }
-                        button { class: "danger", onclick: act!(m, now => m.purge_selected(now)), "Delete for good" }
+                        button { class: "primary", onclick: act!(m, now => m.restore_selected(now)), {tr(lang, Msg::Restore)} }
+                        button { class: "danger", onclick: act!(m, now => m.purge_selected(now)), {tr(lang, Msg::DeleteForGood)} }
                     } else {
-                        button { onclick: act!(m, now => m.toggle_favourite(now)), if d.favourite { "Unpin" } else { "Pin" } }
-                        button { onclick: act!(m, now => m.start_edit(now)), "Edit" }
-                        button { class: "danger", onclick: act!(m, now => m.trash_selected(now)), "Move to trash" }
+                        button { onclick: act!(m, now => m.toggle_favourite(now)), if d.favourite { {tr(lang, Msg::Unpin)} } else { {tr(lang, Msg::Pin)} } }
+                        button { onclick: act!(m, now => m.start_edit(now)), {tr(lang, Msg::Edit)} }
+                        button { class: "danger", onclick: act!(m, now => m.trash_selected(now)), {tr(lang, Msg::MoveToTrash)} }
                     }
                 }
             }
@@ -770,18 +825,18 @@ fn detail_pane(ctx: Ctx) -> Element {
                             div { class: "field", key: "{f.name}",
                                 dt { "{f.label}" }
                                 dd {
-                                    if f.secret && f.value.is_none() { span { class: "mask", role: "img", aria_label: "{f.label} is hidden", "••••••••••" } }
+                                    if f.secret && f.value.is_none() { span { class: "mask", role: "img", aria_label: "{trf(lang, Msg::IsHidden, &[&f.label])}", "••••••••••" } }
                                     else if f.name == "notes" { span { class: "notes", "{f.value.clone().unwrap_or_default()}" } }
-                                    else { span { class: if f.secret { "mono" } else { "" }, "{f.value.clone().unwrap_or_default()}" } }
+                                    else { span { class: if f.secret { "mono ltr" } else { "" }, dir: if f.secret { "ltr" } else { "auto" }, "{f.value.clone().unwrap_or_default()}" } }
                                     span { class: "row tight",
                                         if f.secret {
                                             if f.value.is_none() {
-                                                button { aria_label: "Show {f.label}", onclick: act!(m, now => m.reveal(&n1, now)), "Show" }
+                                                button { aria_label: "{trf(lang, Msg::ShowField, &[&f.label])}", onclick: act!(m, now => m.reveal(&n1, now)), {tr(lang, Msg::Show)} }
                                             } else {
-                                                button { aria_label: "Hide {f.label}", onclick: act!(m, now => m.hide(&n2, now)), "Hide" }
+                                                button { aria_label: "{trf(lang, Msg::HideField, &[&f.label])}", onclick: act!(m, now => m.hide(&n2, now)), {tr(lang, Msg::Hide)} }
                                             }
                                         }
-                                        button { aria_label: "Copy {f.label}", onclick: act!(m, now => m.copy(&n3, now)), "Copy" }
+                                        button { aria_label: "{trf(lang, Msg::CopyField, &[&f.label])}", onclick: act!(m, now => m.copy(&n3, now)), {tr(lang, Msg::Copy)} }
                                     }
                                 }
                             }
@@ -790,35 +845,35 @@ fn detail_pane(ctx: Ctx) -> Element {
                 }
                 if let Some(t) = d.totp.clone() {
                     div { class: "field",
-                        dt { "Two-factor code" }
+                        dt { {tr(lang, Msg::TwoFactorCode)} }
                         dd {
-                            span { class: "mono big", "{t.code}" }
+                            span { class: "mono big", dir: "ltr", "{t.code}" }
                             span { class: "muted small", " {t.seconds_left} s" }
-                            span { class: "row tight", button { aria_label: "Copy two-factor code", onclick: act!(m, now => m.copy("totp", now)), "Copy" } }
+                            span { class: "row tight", button { aria_label: tr(lang, Msg::CopyTwoFactor), onclick: act!(m, now => m.copy("totp", now)), {tr(lang, Msg::Copy)} } }
                         }
                     }
                 }
                 for u in d.urls.clone() {
                     div { class: "field", key: "{u}",
-                        dt { "Website" }
-                        dd { span { "{u}" } span { class: "row tight", button { aria_label: "Copy website {u}", onclick: act!(m, now => m.copy("url", now)), "Copy" } } }
+                        dt { {tr(lang, Msg::Website)} }
+                        dd { span { dir: "ltr", "{u}" } span { class: "row tight", button { aria_label: "{trf(lang, Msg::CopyWebsite, &[&u])}", onclick: act!(m, now => m.copy("url", now)), {tr(lang, Msg::Copy)} } } }
                     }
                 }
                 if !d.tags.is_empty() {
                     div { class: "field",
-                        dt { "Tags" }
+                        dt { {tr(lang, Msg::Tags)} }
                         dd { for tag in d.tags.clone() { span { class: "tag", key: "{tag}", "{tag}" } } }
                     }
                 }
             }
             if !d.history.is_empty() {
-                h3 { "Earlier versions" }
+                h3 { {tr(lang, Msg::EarlierVersions)} }
                 ul { class: "history",
                     for h in d.history.clone() {
                         li { key: "{h.index}",
-                            span { "{h.when}: changed {h.changed}" }
+                            span { "{trf(lang, Msg::ChangedLine, &[&h.when, &h.changed])}" }
                             if !d.trashed {
-                                button { aria_label: "Go back to the version from {h.when}", onclick: act!(m, now => m.revert_selected(h.index, now)), "Go back to this" }
+                                button { aria_label: "{trf(lang, Msg::GoBackToVersion, &[&h.when])}", onclick: act!(m, now => m.revert_selected(h.index, now)), {tr(lang, Msg::GoBackToThis)} }
                             }
                         }
                     }
@@ -835,6 +890,7 @@ fn detail_pane(ctx: Ctx) -> Element {
 fn FormView() -> Element {
     let mut ctx = use_context::<Ctx>();
     let _ = (ctx.clock)();
+    let lang = lang_of(&ctx);
     let form = ctx.model.read().as_ref().and_then(|m| m.form.clone());
     let Some(f) = form else { return rsx! {} };
     let editing = f.id.is_some();
@@ -854,40 +910,40 @@ fn FormView() -> Element {
     }
     rsx! {
         main { class: "form",
-            h2 { if editing { "Edit item" } else { "New item" } }
+            h2 { if editing { {tr(lang, Msg::EditItem)} } else { {tr(lang, Msg::NewItem)} } }
             form {
                 onsubmit: move |e| { e.prevent_default(); if let Some(m) = ctx.model.write().as_mut() { m.save_form(now()); } },
-                label { r#for: "f-title", "Title" }
+                label { r#for: "f-title", {tr(lang, Msg::FieldTitle)} }
                 input { id: "f-title", autofocus: true, value: "{f.title}", oninput: field!(title) }
-                label { r#for: "f-user", "Username or email" }
-                input { id: "f-user", autocomplete: "off", value: "{f.username}", oninput: field!(username) }
-                label { r#for: "f-pw", "Password" }
+                label { r#for: "f-user", {tr(lang, Msg::UsernameOrEmail)} }
+                input { id: "f-user", dir: "auto", autocomplete: "off", value: "{f.username}", oninput: field!(username) }
+                label { r#for: "f-pw", {tr(lang, Msg::FieldPassword)} }
                 div { class: "row",
-                    input { id: "f-pw", class: "grow mono", autocomplete: "off", value: "{f.password}", oninput: field!(password) }
+                    input { id: "f-pw", class: "grow mono ltr", dir: "ltr", autocomplete: "off", value: "{f.password}", oninput: field!(password) }
                     button {
                         r#type: "button",
                         onclick: move |_| { if let Some(m) = ctx.model.write().as_mut() { m.generate_password(20); } },
-                        aria_label: "Generate a random password",
-                        "Generate"
+                        aria_label: tr(lang, Msg::GenerateRandom),
+                        {tr(lang, Msg::Generate)}
                     }
                 }
                 if !f.password.is_empty() {
-                    p { class: "meter", "Strength: {strength.label()} (offline cracking time: {strength.crack_time})" }
+                    p { class: "meter", "{trf(lang, Msg::StrengthLine, &[&model::strength_label(lang, strength.score), &strength.crack_time])}" }
                 }
-                label { r#for: "f-url", "Website" }
-                input { id: "f-url", value: "{f.url}", oninput: field!(url) }
-                label { r#for: "f-totp", "Two-factor secret (base32 or otpauth:// link)" }
-                input { id: "f-totp", autocomplete: "off", value: "{f.totp}", oninput: field!(totp) }
-                label { r#for: "f-tags", "Tags (separated by commas)" }
-                input { id: "f-tags", value: "{f.tags}", oninput: field!(tags) }
-                label { r#for: "f-notes", "Notes" }
-                textarea { id: "f-notes", rows: "4", value: "{f.notes}", oninput: field!(notes) }
+                label { r#for: "f-url", {tr(lang, Msg::Website)} }
+                input { id: "f-url", class: "ltr", dir: "ltr", value: "{f.url}", oninput: field!(url) }
+                label { r#for: "f-totp", {tr(lang, Msg::TwoFactorSecret)} }
+                input { id: "f-totp", class: "ltr", dir: "ltr", autocomplete: "off", value: "{f.totp}", oninput: field!(totp) }
+                label { r#for: "f-tags", {tr(lang, Msg::TagsCommas)} }
+                input { id: "f-tags", dir: "auto", value: "{f.tags}", oninput: field!(tags) }
+                label { r#for: "f-notes", {tr(lang, Msg::Notes)} }
+                textarea { id: "f-notes", dir: "auto", rows: "4", value: "{f.notes}", oninput: field!(notes) }
                 div { class: "row",
-                    button { class: "primary", r#type: "submit", "Save" }
+                    button { class: "primary", r#type: "submit", {tr(lang, Msg::Save)} }
                     button {
                         r#type: "button",
                         onclick: move |_| { if let Some(m) = ctx.model.write().as_mut() { m.cancel_form(now()); } },
-                        "Cancel"
+                        {tr(lang, Msg::Cancel)}
                     }
                 }
             }
@@ -900,6 +956,7 @@ fn FormView() -> Element {
 #[component]
 fn SettingsView() -> Element {
     let mut ctx = use_context::<Ctx>();
+    let lang = lang_of(&ctx);
     let current = ctx
         .model
         .read()
@@ -921,75 +978,83 @@ fn SettingsView() -> Element {
     }
     rsx! {
         main { class: "form",
-            h2 { "Settings" }
+            h2 { {tr(lang, Msg::SettingsTitle)} }
             form {
                 onsubmit: move |e| { e.prevent_default(); let new = s.read().clone(); if let Some(m) = ctx.model.write().as_mut() { m.apply_settings(new, now()); } },
-                label { r#for: "s-idle", "Lock after this many minutes of inactivity (0 = never)" }
+                label { r#for: "s-idle", {tr(lang, Msg::SetIdle)} }
                 input { id: "s-idle", r#type: "number", min: "0", value: "{s.read().idle_lock_secs / 60}",
                     oninput: move |e| { if let Ok(v) = e.value().trim().parse::<u32>() { s.write().idle_lock_secs = v.saturating_mul(60); } } }
                 label { class: "check",
                     input { r#type: "checkbox", checked: s.read().lock_on_blur, onchange: move |e| s.write().lock_on_blur = e.checked() }
-                    " Lock as soon as this window loses focus"
+                    {tr(lang, Msg::SetBlur)}
                 }
-                label { r#for: "s-clip", "Clear a copied password from the clipboard after this many seconds (0 = never)" }
+                label { r#for: "s-clip", {tr(lang, Msg::SetClip)} }
                 input { id: "s-clip", r#type: "number", min: "0", value: "{s.read().clipboard_clear_secs}", oninput: num!(clipboard_clear_secs, u32) }
-                label { r#for: "s-reveal", "Hide a shown password again after this many seconds (0 = when I hide it)" }
+                label { r#for: "s-reveal", {tr(lang, Msg::SetReveal)} }
                 input { id: "s-reveal", r#type: "number", min: "0", value: "{s.read().reveal_secs}", oninput: num!(reveal_secs, u32) }
-                label { r#for: "s-trash", "Keep deleted items for this many days" }
+                label { r#for: "s-trash", {tr(lang, Msg::SetTrash)} }
                 input { id: "s-trash", r#type: "number", min: "0", value: "{s.read().trash_retention_days}", oninput: num!(trash_retention_days, u32) }
-                label { r#for: "s-hist", "Earlier versions kept per item" }
+                label { r#for: "s-hist", {tr(lang, Msg::SetHistory)} }
                 input { id: "s-hist", r#type: "number", min: "0", value: "{s.read().history_limit}", oninput: num!(history_limit, usize) }
-                label { r#for: "s-toolbar", "Top-bar buttons show" }
+                label { r#for: "s-toolbar", {tr(lang, Msg::SetToolbar)} }
                 select { id: "s-toolbar",
                     onchange: move |e| s.write().toolbar_style = match e.value().as_str() {
                         "text" => ToolbarStyle::TextOnly,
                         "icons" => ToolbarStyle::IconOnly,
                         _ => ToolbarStyle::IconAndText,
                     },
-                    option { value: "both", selected: s.read().toolbar_style == ToolbarStyle::IconAndText, "Icons and text" }
-                    option { value: "text", selected: s.read().toolbar_style == ToolbarStyle::TextOnly, "Text only" }
-                    option { value: "icons", selected: s.read().toolbar_style == ToolbarStyle::IconOnly, "Icons only" }
+                    option { value: "both", selected: s.read().toolbar_style == ToolbarStyle::IconAndText, {tr(lang, Msg::OptIconsText)} }
+                    option { value: "text", selected: s.read().toolbar_style == ToolbarStyle::TextOnly, {tr(lang, Msg::OptTextOnly)} }
+                    option { value: "icons", selected: s.read().toolbar_style == ToolbarStyle::IconOnly, {tr(lang, Msg::OptIconsOnly)} }
                 }
-                label { r#for: "s-theme", "Colour scheme" }
+                label { r#for: "s-theme", {tr(lang, Msg::SetTheme)} }
                 select { id: "s-theme",
                     onchange: move |e| s.write().theme = match e.value().as_str() {
                         "light" => ThemeMode::Light,
                         "dark" => ThemeMode::Dark,
                         _ => ThemeMode::System,
                     },
-                    option { value: "system", selected: s.read().theme == ThemeMode::System, "Same as the system" }
-                    option { value: "light", selected: s.read().theme == ThemeMode::Light, "Light" }
-                    option { value: "dark", selected: s.read().theme == ThemeMode::Dark, "Dark" }
+                    option { value: "system", selected: s.read().theme == ThemeMode::System, {tr(lang, Msg::OptSystem)} }
+                    option { value: "light", selected: s.read().theme == ThemeMode::Light, {tr(lang, Msg::OptLight)} }
+                    option { value: "dark", selected: s.read().theme == ThemeMode::Dark, {tr(lang, Msg::OptDark)} }
                 }
-                h3 { "Protection against password guessing" }
-                p { class: "muted small",
-                    "How costly it is to guess your master password from a stolen copy of the vault. Higher is safer but makes unlocking slower. "
-                    "This applies when a vault is created or its master password is changed."
+                label { r#for: "s-lang", {tr(lang, Msg::SetLanguage)} }
+                select { id: "s-lang",
+                    onchange: move |e| {
+                        if let Some(l) = Language::ALL.into_iter().find(|l| l.code() == e.value()) {
+                            s.write().language = l;
+                        }
+                    },
+                    for l in Language::ALL {
+                        option { key: "{l.code()}", value: "{l.code()}", selected: s.read().language == l, lang: "{l.code()}", "{l.native_name()}" }
+                    }
                 }
-                label { r#for: "s-mem", "Memory used, in MiB" }
+                h3 { {tr(lang, Msg::GuardTitle)} }
+                p { class: "muted small", {tr(lang, Msg::GuardNote)} }
+                label { r#for: "s-mem", {tr(lang, Msg::SetMemory)} }
                 input { id: "s-mem", r#type: "number", min: "19", value: "{s.read().kdf_memory_mib}", oninput: num!(kdf_memory_mib, u32) }
-                label { r#for: "s-pass", "Passes" }
+                label { r#for: "s-pass", {tr(lang, Msg::SetPasses)} }
                 input { id: "s-pass", r#type: "number", min: "2", value: "{s.read().kdf_passes}", oninput: num!(kdf_passes, u32) }
-                button { class: "primary", r#type: "submit", "Save settings" }
+                button { class: "primary", r#type: "submit", {tr(lang, Msg::SaveSettings)} }
             }
-            h3 { "Change the master password" }
+            h3 { {tr(lang, Msg::ChangeMasterTitle)} }
             form {
                 onsubmit: move |e| {
                     e.prevent_default();
                     let (a, b) = (new_pw.read().clone(), new_pw2.read().clone());
                     let r = ctx.model.write().as_mut().map(|m| m.change_master_password(&a, &b, now()));
                     match r {
-                        Some(Ok(())) => { new_pw.set(String::new()); new_pw2.set(String::new()); pw_msg.set(Some((true, "Master password changed.".into()))); }
+                        Some(Ok(())) => { new_pw.set(String::new()); new_pw2.set(String::new()); pw_msg.set(Some((true, tr(lang, Msg::MasterChanged).into()))); }
                         Some(Err(e)) => pw_msg.set(Some((false, e))),
                         None => {}
                     }
                 },
-                label { r#for: "p1", "New master password" }
-                input { id: "p1", r#type: "password", autocomplete: "off", value: "{new_pw}", oninput: move |e| new_pw.set(e.value()) }
-                label { r#for: "p2", "Repeat it" }
-                input { id: "p2", r#type: "password", autocomplete: "off", value: "{new_pw2}", oninput: move |e| new_pw2.set(e.value()) }
+                label { r#for: "p1", {tr(lang, Msg::NewMasterPassword)} }
+                input { id: "p1", class: "ltr", dir: "ltr", r#type: "password", autocomplete: "off", value: "{new_pw}", oninput: move |e| new_pw.set(e.value()) }
+                label { r#for: "p2", {tr(lang, Msg::RepeatIt)} }
+                input { id: "p2", class: "ltr", dir: "ltr", r#type: "password", autocomplete: "off", value: "{new_pw2}", oninput: move |e| new_pw2.set(e.value()) }
                 if let Some((ok, text)) = pw_msg() { p { class: if ok { "ok" } else { "error" }, role: "status", "{text}" } }
-                button { class: "primary", r#type: "submit", "Change master password" }
+                button { class: "primary", r#type: "submit", {tr(lang, Msg::ChangeMasterButton)} }
             }
         }
     }

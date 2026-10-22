@@ -246,6 +246,8 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Revision (rev)** — A counter on each record that goes up with every change. A write that is not newer than what is stored is refused.
 
+**Right to left (RTL)** — Writing that runs from the right edge of the page to the left, as in Urdu, Arabic and Hebrew. An app must mirror its whole layout for it, not just the letters.
+
 **RFC** — A published technical standard ("Request for Comments"). The test vectors come from them.
 
 **Salt** — Random public data mixed into password hashing so identical passwords give different keys.

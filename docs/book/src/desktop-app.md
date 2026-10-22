@@ -56,6 +56,7 @@ Type the master password and press Enter. After three wrong passwords in a row t
 
   The buttons show an icon and text by default. **Settings → Top-bar buttons show** switches them to text only or icons only (the name stays available to screen readers either way).
   **Settings → Colour scheme** chooses light, dark, or "Same as the system" (the default); the change shows as soon as you save.
+  **Settings → Language** chooses the language of the whole app (see [Languages](#languages) below).
 
 ![A password and notes revealed on request](images/desktop-revealed.png)
 
@@ -83,8 +84,22 @@ The details, and what they cannot do, are in [Sessions: locking, hiding and clea
 ## Settings
 
 Under **Settings**: auto-lock minutes, lock on focus loss, how long a copied password stays on the clipboard, how long a shown password stays visible,
-how long deleted items are kept, history length, whether the top-bar buttons show icons and text, text only or icons only, whether the app is light, dark or follows the system, and the cost of the password-guessing protection (applied when a vault is created or its master password is changed).
+how long deleted items are kept, history length, whether the top-bar buttons show icons and text, text only or icons only, whether the app is light, dark or follows the system, the display language, and the cost of the password-guessing protection (applied when a vault is created or its master password is changed).
 You can also **change the master password** there (the new one must pass the strength check).
+
+## Languages
+
+The app can be shown in **English, हिन्दी (Hindi), संस्कृतम् (Sanskrit), தமிழ் (Tamil), తెలుగు (Telugu), മലയാളം (Malayalam) and اردو (Urdu)** (US-I18N-01).
+Choose one under **Settings → Language** and press **Save settings**; the whole window changes at once. On the very first screen, before a vault exists, a language list sits under the welcome text, and the choice is saved with the new vault's settings.
+
+- **Where the text lives.** Every word the app shows is in one file, `apps/desktop/src/i18n.rs`, as a row of seven strings (one per language). A message cannot be added without all seven, because the program would not compile. Tests check that no entry is empty, that every language keeps the same `{0}` slots as the English text (the slots are where a number or name is put in, and each language may move them to suit its grammar), and that each translation really is written in its script.
+- **Right to left.** Urdu is written right to left, so choosing it turns the whole page around: the item list moves to the right, the top bar and buttons are mirrored, text lines up on the right, and the arrows and borders swap sides. Passwords, web addresses and two-factor codes stay left to right inside this mirrored page, because they are made of Latin letters and digits and would be hard to check by eye if reversed.
+- **Numbers** are shown with the digits 0–9 in every language.
+- **Still in English:** text produced by other libraries (the password-strength warnings such as "this is a very common password", and the estimated cracking time) and low-level error details from the vault file.
+- **Fonts.** The app uses your system's fonts, so the scripts show properly only if your computer has fonts for them (most Linux desktops include Noto fonts for all of these).
+- **Please review the translations.** They were written by an AI assistant, not by native speakers. The Sanskrit in particular uses simple formal phrasing and deserves a proper review. Corrections are welcome and only need edits to `i18n.rs`.
+
+**Not checked on screen yet:** the layout in Urdu (right to left) has been built and its logic tested, but nobody has looked at it in a running window.
 
 ## What it does not do yet
 

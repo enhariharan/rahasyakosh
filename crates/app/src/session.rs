@@ -40,6 +40,68 @@ pub enum ThemeMode {
     System,
 }
 
+/// The language a front-end shows its text in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Language {
+    #[default]
+    English,
+    Hindi,
+    Sanskrit,
+    Tamil,
+    Telugu,
+    Malayalam,
+    Urdu,
+}
+
+impl Language {
+    pub const ALL: [Language; 7] = [
+        Self::English,
+        Self::Hindi,
+        Self::Sanskrit,
+        Self::Tamil,
+        Self::Telugu,
+        Self::Malayalam,
+        Self::Urdu,
+    ];
+
+    /// Position in [`Self::ALL`], used to index translation tables.
+    pub fn index(self) -> usize {
+        self as usize
+    }
+
+    /// BCP 47 language code, for the `lang` attribute.
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::English => "en",
+            Self::Hindi => "hi",
+            Self::Sanskrit => "sa",
+            Self::Tamil => "ta",
+            Self::Telugu => "te",
+            Self::Malayalam => "ml",
+            Self::Urdu => "ur",
+        }
+    }
+
+    /// The language's own name for itself, so it can be found whatever language is showing.
+    pub fn native_name(self) -> &'static str {
+        match self {
+            Self::English => "English",
+            Self::Hindi => "हिन्दी",
+            Self::Sanskrit => "संस्कृतम्",
+            Self::Tamil => "தமிழ்",
+            Self::Telugu => "తెలుగు",
+            Self::Malayalam => "മലയാളം",
+            Self::Urdu => "اردو",
+        }
+    }
+
+    /// Whether the language is written right to left.
+    pub fn is_rtl(self) -> bool {
+        self == Self::Urdu
+    }
+}
+
 /// User-adjustable behaviour (US-SET-01). Contains no secrets, so a front-end may keep it in a plain file.
 /// Missing fields take their defaults, so older settings files keep working when options are added.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -65,6 +127,8 @@ pub struct Settings {
     pub toolbar_style: ToolbarStyle,
     /// Light, dark, or follow the system.
     pub theme: ThemeMode,
+    /// The language the text is shown in.
+    pub language: Language,
 }
 
 impl Default for Settings {
@@ -80,6 +144,7 @@ impl Default for Settings {
             kdf_passes: KdfParams::DESKTOP.t,
             toolbar_style: ToolbarStyle::default(),
             theme: ThemeMode::default(),
+            language: Language::default(),
         }
     }
 }

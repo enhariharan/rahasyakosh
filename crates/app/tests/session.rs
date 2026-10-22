@@ -547,3 +547,20 @@ fn theme_defaults_to_system_for_old_files_and_round_trips() {
         assert_eq!(Settings::from_json(&s.to_json()).theme, theme);
     }
 }
+
+#[test]
+fn language_defaults_to_english_for_old_files_and_round_trips() {
+    use rahasyakosh_app::Language;
+    let old = Settings::from_json(br#"{"idle_lock_secs": 60}"#);
+    assert_eq!(old.language, Language::English);
+    for (i, language) in Language::ALL.into_iter().enumerate() {
+        assert_eq!(language.index(), i);
+        let s = Settings {
+            language,
+            ..Settings::default()
+        };
+        assert_eq!(Settings::from_json(&s.to_json()).language, language);
+    }
+    assert!(Language::Urdu.is_rtl());
+    assert!(Language::ALL.iter().filter(|l| l.is_rtl()).count() == 1);
+}

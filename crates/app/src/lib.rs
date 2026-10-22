@@ -12,7 +12,7 @@ mod session;
 mod vault;
 
 pub use session::{
-    backoff_secs, should_clear, Locked, Session, Settings, ThemeMode, Tick, ToolbarStyle,
+    backoff_secs, should_clear, Language, Locked, Session, Settings, ThemeMode, Tick, ToolbarStyle,
     UnlockError, Unlocked,
 };
 pub use vault::{Config, Error, Result, Scope, UnlockFailed, Vault};

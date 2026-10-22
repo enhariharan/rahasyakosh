@@ -1,5 +1,5 @@
 use crate::model::*;
-use rahasyakosh_app::{Scope, Session, Settings};
+use rahasyakosh_app::{Language, Scope, Session, Settings};
 use rahasyakosh_core::crypto::KdfParams;
 use rahasyakosh_core::item::Item;
 use rahasyakosh_store::{MemoryStore, Uuid};
@@ -515,11 +515,11 @@ fn the_form_hides_secrets_in_debug_output() {
 
 #[test]
 fn age_text() {
-    assert_eq!(days_ago(0, 100), "today");
-    assert_eq!(days_ago(0, 86_400), "1 day ago");
-    assert_eq!(days_ago(0, 5 * 86_400 + 5), "5 days ago");
+    assert_eq!(days_ago(Language::English, 0, 100), "today");
+    assert_eq!(days_ago(Language::English, 0, 86_400), "1 day ago");
+    assert_eq!(days_ago(Language::English, 0, 5 * 86_400 + 5), "5 days ago");
     assert_eq!(
-        days_ago(100, 0),
+        days_ago(Language::English, 100, 0),
         "today",
         "a time in the future is not negative"
     );
@@ -528,22 +528,23 @@ fn age_text() {
 #[test]
 fn first_run_choices_are_validated() {
     // Generated passphrase: only once the user confirms they wrote it down.
-    assert!(new_master_password(false, "a-b-c", false, "", "")
+    assert!(new_master_password(Language::English, false, "a-b-c", false, "", "")
         .unwrap_err()
         .contains("written"));
     assert_eq!(
-        new_master_password(false, "a-b-c", true, "", "").unwrap(),
+        new_master_password(Language::English, false, "a-b-c", true, "", "").unwrap(),
         "a-b-c"
     );
     // Own password: must match and must not be weak.
-    assert!(new_master_password(true, "", false, "x", "y")
+    assert!(new_master_password(Language::English, true, "", false, "x", "y")
         .unwrap_err()
         .contains("do not match"));
-    assert!(new_master_password(true, "", false, "password", "password")
+    assert!(new_master_password(Language::English, true, "", false, "password", "password")
         .unwrap_err()
         .contains("too weak"));
     assert_eq!(
         new_master_password(
+            Language::English,
             true,
             "",
             false,
@@ -553,4 +554,29 @@ fn first_run_choices_are_validated() {
         .unwrap(),
         "an excellent long passphrase here"
     );
+}
+
+#[test]
+fn messages_follow_the_language_setting() {
+    let mut rng = ChaCha20Rng::seed_from_u64(1);
+    let session = Session::create(
+        MemoryStore::new(),
+        PW,
+        fast(Settings {
+            language: Language::Hindi,
+            ..Settings::default()
+        }),
+        0,
+        &mut rng,
+    )
+    .unwrap();
+    let mut m = Model::new(session, Fake::default(), None);
+    assert_eq!(m.lang(), Language::Hindi);
+    m.lock();
+    m.unlock("wrong password", 1);
+    assert_eq!(m.unlock_error.as_deref(), Some("गलत पासवर्ड।"));
+    assert_eq!(days_ago(Language::Urdu, 0, 3 * 86_400), "3 دن پہلے");
+    assert!(new_master_password(Language::Tamil, false, "a-b", false, "", "")
+        .unwrap_err()
+        .contains("கடவுச்சொற்றொடர்"));
 }

@@ -1,6 +1,7 @@
 //! Everything the screens do, with no GUI in it. The Dioxus layer in `main.rs` only draws this and forwards clicks, so the
 //! behaviour (locking, hiding, copying, forms, trash, settings) is tested here without a window.
-use rahasyakosh_app::{Locked, Scope, Session, Settings, UnlockError};
+use crate::i18n::{t, trf, Msg};
+use rahasyakosh_app::{Language, Locked, Scope, Session, Settings, UnlockError};
 use rahasyakosh_core::generator::{self, PasswordSpec};
 use rahasyakosh_core::item::{Field, Item, ItemVersion};
 use rahasyakosh_core::totp::Totp;
@@ -138,22 +139,19 @@ impl Form {
     }
 
     /// Why this form cannot be saved, if it cannot.
-    pub fn problem(&self) -> Option<String> {
+    pub fn problem(&self, lang: Language) -> Option<String> {
         if self.title.trim().is_empty() {
-            return Some("Give the item a title.".into());
+            return Some(t(lang, Msg::ErrTitle).into());
         }
-        let t = self.totp.trim();
-        if !t.is_empty() {
-            let ok = if t.starts_with("otpauth://") {
-                Totp::from_uri(t).is_ok()
+        let secret = self.totp.trim();
+        if !secret.is_empty() {
+            let ok = if secret.starts_with("otpauth://") {
+                Totp::from_uri(secret).is_ok()
             } else {
-                Totp::from_base32(t).is_ok()
+                Totp::from_base32(secret).is_ok()
             };
             if !ok {
-                return Some(
-                    "The two-factor secret is not valid (expected base32 or an otpauth:// link)."
-                        .into(),
-                );
+                return Some(t(lang, Msg::ErrTotp).into());
             }
         }
         None
@@ -198,6 +196,7 @@ impl Form {
 /// Either the generated `passphrase` (which the user must have confirmed they wrote down) or their own password
 /// (typed twice, and strong enough).
 pub fn new_master_password(
+    lang: Language,
     own: bool,
     passphrase: &str,
     written_down: bool,
@@ -208,48 +207,45 @@ pub fn new_master_password(
         return if written_down {
             Ok(passphrase.to_string())
         } else {
-            Err("Tick the box to confirm you have written the passphrase down.".into())
+            Err(t(lang, Msg::ErrTick).into())
         };
     }
     if password != repeat {
-        return Err("The two passwords do not match.".into());
+        return Err(t(lang, Msg::ErrMismatch).into());
     }
     let s = rahasyakosh_strength::estimate(password, &[]);
     if s.score < rahasyakosh_strength::Strength::MIN_MASTER_SCORE {
-        return Err(
-            "That password is too weak. Choose a longer one, or use the generated passphrase."
-                .into(),
-        );
+        return Err(t(lang, Msg::ErrWeakGenerated).into());
     }
     Ok(password.to_string())
 }
 
 /// "today", "1 day ago", "5 days ago".
-pub fn days_ago(then: i64, now: i64) -> String {
+pub fn days_ago(lang: Language, then: i64, now: i64) -> String {
     match (now - then).max(0) / 86_400 {
-        0 => "today".into(),
-        1 => "1 day ago".into(),
-        n => format!("{n} days ago"),
+        0 => t(lang, Msg::Today).into(),
+        1 => t(lang, Msg::OneDayAgo).into(),
+        n => trf(lang, Msg::DaysAgo, &[&n]),
     }
 }
 
 /// Which parts differ between two versions, never their values.
-pub fn changed_parts(a: &ItemVersion, b: &ItemVersion) -> String {
+pub fn changed_parts(lang: Language, a: &ItemVersion, b: &ItemVersion) -> String {
     let mut parts: Vec<String> = Vec::new();
     if a.title != b.title {
-        parts.push("title".into());
+        parts.push(t(lang, Msg::PartTitle).into());
     }
     if a.urls != b.urls {
-        parts.push("url".into());
+        parts.push(t(lang, Msg::PartUrl).into());
     }
     if a.tags != b.tags {
-        parts.push("tags".into());
+        parts.push(t(lang, Msg::PartTags).into());
     }
     if a.notes != b.notes {
-        parts.push("notes".into());
+        parts.push(t(lang, Msg::PartNotes).into());
     }
     if a.favourite != b.favourite {
-        parts.push("favourite".into());
+        parts.push(t(lang, Msg::PartFavourite).into());
     }
     let mut names: Vec<&str> = a
         .fields
@@ -267,11 +263,11 @@ pub fn changed_parts(a: &ItemVersion, b: &ItemVersion) -> String {
                 .map(|f| f.value.clone())
         };
         if find(a) != find(b) {
-            parts.push(name.to_string());
+            parts.push(label_lower(lang, name));
         }
     }
     if parts.is_empty() {
-        "no visible change".into()
+        t(lang, Msg::NoChange).into()
     } else {
         parts.join(", ")
     }
@@ -308,6 +304,11 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         }
     }
 
+    /// The language the settings ask for.
+    pub fn lang(&self) -> Language {
+        self.session.settings().language
+    }
+
     pub fn is_unlocked(&self) -> bool {
         self.session.is_unlocked()
     }
@@ -339,25 +340,20 @@ impl<S: Store, C: Clipboard> Model<S, C> {
     // ---- locking --------------------------------------------------------------------------------------
 
     pub fn unlock(&mut self, password: &str, now: i64) {
+        let lang = self.lang();
         match self.session.unlock(password, now) {
             Ok(u) => {
                 self.unlock_error = None;
                 if u.purged > 0 {
-                    self.info(
-                        format!(
-                            "Deleted {} item(s) that had been in the trash too long.",
-                            u.purged
-                        ),
-                        now,
-                    );
+                    self.info(trf(lang, Msg::DeletedOld, &[&u.purged]), now);
                 }
             }
             // The unlock screen shows the live countdown, so the messages do not repeat the wait.
             Err(UnlockError::WrongPassword { .. }) => {
-                self.unlock_error = Some("Wrong password.".into())
+                self.unlock_error = Some(t(lang, Msg::WrongPassword).into())
             }
             Err(UnlockError::LockedOut { .. }) => {
-                self.unlock_error = Some("Too many wrong passwords.".into());
+                self.unlock_error = Some(t(lang, Msg::TooManyWrong).into());
             }
             Err(e) => self.unlock_error = Some(e.to_string()),
         }
@@ -452,6 +448,7 @@ impl<S: Store, C: Clipboard> Model<S, C> {
     // ---- the detail pane -----------------------------------------------------------------------------
 
     pub fn detail(&self, now: i64) -> Option<Detail> {
+        let lang = self.lang();
         let id = self.selected?;
         let item = self.session.peek()?.get(id)?;
         let reveal = |name: &str| self.session.is_revealed(id, name, now);
@@ -462,7 +459,7 @@ impl<S: Store, C: Clipboard> Model<S, C> {
             }
             fields.push(FieldView {
                 name: f.name.clone(),
-                label: label(&f.name),
+                label: label(lang, &f.name),
                 secret: f.concealed,
                 value: (!f.concealed || reveal(&f.name)).then(|| f.value.clone()),
             });
@@ -470,7 +467,7 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         if !item.notes.is_empty() {
             fields.push(FieldView {
                 name: "notes".into(),
-                label: "Notes".into(),
+                label: t(lang, Msg::Notes).into(),
                 secret: true,
                 value: reveal("notes").then(|| item.notes.clone()),
             });
@@ -492,8 +489,8 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         for (i, v) in item.history.iter().enumerate() {
             history.push(HistoryRow {
                 index: i,
-                when: days_ago(v.replaced_at, now),
-                changed: changed_parts(v, &newer),
+                when: days_ago(lang, v.replaced_at, now),
+                changed: changed_parts(lang, v, &newer),
             });
             newer = v.clone();
         }
@@ -552,12 +549,9 @@ impl<S: Store, C: Clipboard> Model<S, C> {
                 let secs = self.session.settings().clipboard_clear_secs;
                 self.session.copied(&value, now);
                 if secs == 0 {
-                    self.info(
-                        "Copied. It stays on the clipboard until you replace it.",
-                        now,
-                    );
+                    self.info(t(self.lang(), Msg::CopiedStays), now);
                 } else {
-                    self.info(format!("Copied. The clipboard clears in {secs} s."), now);
+                    self.info(trf(self.lang(), Msg::CopiedClears, &[&secs]), now);
                 }
             }
             Err(e) => self.error(e, now),
@@ -609,16 +603,17 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         let Some(form) = self.form.clone() else {
             return;
         };
-        if let Some(problem) = form.problem() {
+        if let Some(problem) = form.problem(self.lang()) {
             self.error(problem, now);
             return;
         }
         let mut rng = rand::rng();
+        let lang = self.lang();
         let result: Result<Uuid, String> = (|| {
             let vault = self
                 .session
                 .vault(now)
-                .map_err(|Locked| "The vault is locked.".to_string())?;
+                .map_err(|Locked| t(lang, Msg::VaultIsLocked).to_string())?;
             match form.id {
                 Some(id) => {
                     vault
@@ -644,7 +639,7 @@ impl<S: Store, C: Clipboard> Model<S, C> {
                 self.form = None;
                 self.view = View::Items;
                 self.selected = Some(id);
-                self.info("Saved.", now);
+                self.info(t(self.lang(), Msg::Saved), now);
             }
             Err(e) if !self.is_unlocked() => {
                 self.forget_screen();
@@ -672,7 +667,7 @@ impl<S: Store, C: Clipboard> Model<S, C> {
                 .edit(id, now, &mut rand::rng(), change)
                 .map(|_| ())
                 .map_err(|e| e.to_string()),
-            Err(Locked) => Err("The vault is locked.".into()),
+            Err(Locked) => Err(t(self.lang(), Msg::VaultIsLocked).into()),
         };
         if let Err(e) = r {
             self.error(e, now);
@@ -691,7 +686,7 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         {
             Ok(Ok(())) => {
                 self.selected = None;
-                self.info("Moved to the trash.", now);
+                self.info(t(self.lang(), Msg::MovedToTrash), now);
             }
             Ok(Err(e)) => self.error(e.to_string(), now),
             Err(Locked) => self.forget_screen(),
@@ -708,7 +703,7 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         {
             Ok(Ok(())) => {
                 self.selected = None;
-                self.info("Restored.", now);
+                self.info(t(self.lang(), Msg::Restored), now);
             }
             Ok(Err(e)) => self.error(e.to_string(), now),
             Err(Locked) => self.forget_screen(),
@@ -721,7 +716,7 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         match self.session.vault(now).map(|v| v.purge(id)) {
             Ok(Ok(())) => {
                 self.selected = None;
-                self.info("Deleted for good.", now);
+                self.info(t(self.lang(), Msg::DeletedForGood), now);
             }
             Ok(Err(e)) => self.error(e.to_string(), now),
             Err(Locked) => self.forget_screen(),
@@ -738,10 +733,7 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         {
             Ok(Ok(())) => {
                 self.session.hide_all();
-                self.info(
-                    "Went back to that version. The previous content is kept in the history.",
-                    now,
-                );
+                self.info(t(self.lang(), Msg::WentBack), now);
             }
             Ok(Err(e)) => self.error(e.to_string(), now),
             Err(Locked) => self.forget_screen(),
@@ -756,7 +748,7 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         if let Some(save) = &mut self.save_settings {
             save(self.session.settings());
         }
-        self.info("Settings saved.", now);
+        self.info(t(self.lang(), Msg::SettingsSaved), now);
     }
 
     /// Change the master password. Returns an error message if it is refused.
@@ -767,35 +759,68 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         now: i64,
     ) -> Result<(), String> {
         self.activity(now);
+        let lang = self.lang();
         if new != again {
-            return Err("The two passwords do not match.".into());
+            return Err(t(lang, Msg::ErrMismatch).into());
         }
         let s = rahasyakosh_strength::estimate(new, &[]);
         if s.score < rahasyakosh_strength::Strength::MIN_MASTER_SCORE {
-            return Err(format!(
-                "That password is too weak ({}). {}",
-                s.label(),
-                s.warning
-                    .unwrap_or_else(|| "Choose a longer one or use a generated passphrase.".into())
+            let advice = s
+                .warning
+                .clone()
+                .unwrap_or_else(|| t(lang, Msg::ChooseLonger).into());
+            return Err(trf(
+                lang,
+                Msg::ErrWeakMaster,
+                &[&strength_label(lang, s.score), &advice],
             ));
         }
         let kdf = self.session.settings().kdf_params();
         let vault = self
             .session
             .vault(now)
-            .map_err(|Locked| "The vault is locked.".to_string())?;
+            .map_err(|Locked| t(lang, Msg::VaultIsLocked).to_string())?;
         vault
             .change_password(new, kdf, &mut rand::rng())
             .map_err(|e| e.to_string())?;
-        self.info("Master password changed.", now);
+        self.info(t(lang, Msg::MasterChanged), now);
         Ok(())
     }
 }
 
-fn label(name: &str) -> String {
+/// The shown name of a field: the translated name for the usual ones, else the stored name with a capital.
+fn label(lang: Language, name: &str) -> String {
+    match name {
+        "username" => return t(lang, Msg::FieldUsername).into(),
+        "password" => return t(lang, Msg::FieldPassword).into(),
+        _ => {}
+    }
     let mut c = name.chars();
     match c.next() {
         Some(f) => f.to_uppercase().chain(c).collect(),
         None => String::new(),
     }
+}
+
+/// Like [`label`] but for a list of changed parts, so it keeps the stored name as it is.
+fn label_lower(lang: Language, name: &str) -> String {
+    match name {
+        "username" => t(lang, Msg::FieldUsername).into(),
+        "password" => t(lang, Msg::FieldPassword).into(),
+        _ => name.to_string(),
+    }
+}
+
+/// "very weak" ... "very strong" for a password-strength score of 0 to 4.
+pub fn strength_label(lang: Language, score: u8) -> &'static str {
+    t(
+        lang,
+        match score {
+            0 => Msg::Strength0,
+            1 => Msg::Strength1,
+            2 => Msg::Strength2,
+            3 => Msg::Strength3,
+            _ => Msg::Strength4,
+        },
+    )
 }

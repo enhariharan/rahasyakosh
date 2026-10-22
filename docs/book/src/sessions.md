@@ -59,6 +59,8 @@ The settings hold no secrets, so they live in a plain file (`~/.config/rahasyako
 | Keep deleted items for | 30 days | Then they are deleted for good when you next unlock |
 | History per item | 10 versions | |
 | Key derivation memory / passes | 64 MiB / 3 | Higher is slower to guess offline, and slower to unlock |
+| Colour scheme | same as the system | Light, dark or system |
+| Language | English | English, Hindi, Sanskrit, Tamil, Telugu, Malayalam or Urdu (US-I18N-01) |
 
 A settings file is treated as untrusted: unreadable content gives the defaults, missing options take defaults (so an old file keeps working when options are added), and every number is clamped to a sane range.
 In particular, the key derivation can never be set below the floor the library enforces, so editing the file cannot weaken a vault.
