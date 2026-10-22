@@ -8,8 +8,8 @@ mod style;
 
 use dioxus::desktop::{Config, LogicalSize, WindowBuilder};
 use dioxus::prelude::*;
-use model::{Model, NoticeKind, SystemClipboard, View};
 use i18n::{t as tr, trf, Msg};
+use model::{Model, NoticeKind, SystemClipboard, View};
 use rahasyakosh_app::{Language, Session, Settings, ThemeMode, ToolbarStyle};
 use rahasyakosh_store::{SqliteStore, Uuid};
 use std::cell::Cell;
@@ -269,7 +269,10 @@ fn app() -> Element {
         .as_ref()
         .map_or(ThemeMode::System, |m| m.session.settings().theme);
     // On the first-run screen there is no vault yet, so the language lives in `setup_lang`.
-    let lang = model.read().as_ref().map_or_else(|| (ctx.setup_lang)(), |m| m.lang());
+    let lang = model
+        .read()
+        .as_ref()
+        .map_or_else(|| (ctx.setup_lang)(), |m| m.lang());
     let dir = if lang.is_rtl() { "rtl" } else { "ltr" };
     use_effect(use_reactive!(|theme, lang| {
         let name = match theme {
@@ -365,7 +368,10 @@ fn Setup() -> Element {
                 return;
             }
         };
-        let settings = Settings { language: lang, ..load_settings() };
+        let settings = Settings {
+            language: lang,
+            ..load_settings()
+        };
         let path = vault_path();
         match SqliteStore::open(&path)
             .map_err(|e| e.to_string())
@@ -727,7 +733,12 @@ fn Browser() -> Element {
     let (rows, selected, view, retention) = {
         let m = ctx.model.read();
         let m = m.as_ref().expect("unlocked");
-        (m.rows(), m.selected, m.view.clone(), m.session.settings().trash_retention_days)
+        (
+            m.rows(),
+            m.selected,
+            m.view.clone(),
+            m.session.settings().trash_retention_days,
+        )
     };
     let trash = view == View::Trash;
     rsx! {

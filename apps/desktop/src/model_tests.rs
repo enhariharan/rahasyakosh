@@ -528,20 +528,26 @@ fn age_text() {
 #[test]
 fn first_run_choices_are_validated() {
     // Generated passphrase: only once the user confirms they wrote it down.
-    assert!(new_master_password(Language::English, false, "a-b-c", false, "", "")
-        .unwrap_err()
-        .contains("written"));
+    assert!(
+        new_master_password(Language::English, false, "a-b-c", false, "", "")
+            .unwrap_err()
+            .contains("written")
+    );
     assert_eq!(
         new_master_password(Language::English, false, "a-b-c", true, "", "").unwrap(),
         "a-b-c"
     );
     // Own password: must match and must not be weak.
-    assert!(new_master_password(Language::English, true, "", false, "x", "y")
-        .unwrap_err()
-        .contains("do not match"));
-    assert!(new_master_password(Language::English, true, "", false, "password", "password")
-        .unwrap_err()
-        .contains("too weak"));
+    assert!(
+        new_master_password(Language::English, true, "", false, "x", "y")
+            .unwrap_err()
+            .contains("do not match")
+    );
+    assert!(
+        new_master_password(Language::English, true, "", false, "password", "password")
+            .unwrap_err()
+            .contains("too weak")
+    );
     assert_eq!(
         new_master_password(
             Language::English,
@@ -576,7 +582,9 @@ fn messages_follow_the_language_setting() {
     m.unlock("wrong password", 1);
     assert_eq!(m.unlock_error.as_deref(), Some("गलत पासवर्ड।"));
     assert_eq!(days_ago(Language::Urdu, 0, 3 * 86_400), "3 دن پہلے");
-    assert!(new_master_password(Language::Tamil, false, "a-b", false, "", "")
-        .unwrap_err()
-        .contains("கடவுச்சொற்றொடர்"));
+    assert!(
+        new_master_password(Language::Tamil, false, "a-b", false, "", "")
+            .unwrap_err()
+            .contains("கடவுச்சொற்றொடரை")
+    );
 }

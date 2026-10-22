@@ -214,10 +214,7 @@ mod tests {
     fn every_message_has_text_in_every_language() {
         for &m in Msg::ALL {
             for lang in Language::ALL {
-                assert!(
-                    !t(lang, m).trim().is_empty(),
-                    "{m:?} is empty in {lang:?}"
-                );
+                assert!(!t(lang, m).trim().is_empty(), "{m:?} is empty in {lang:?}");
             }
         }
     }
@@ -242,15 +239,13 @@ mod tests {
             trf(Language::English, Msg::LocksInSecs, &[&5]),
             "Locks in 5 s"
         );
-        assert_eq!(
-            trf(Language::Urdu, Msg::DaysAgo, &[&3]),
-            "3 دن پہلے"
-        );
+        assert_eq!(trf(Language::Urdu, Msg::DaysAgo, &[&3]), "3 دن پہلے");
     }
 
     #[test]
     fn scripts_match_the_language() {
-        let in_range = |s: &str, lo: u32, hi: u32| s.chars().any(|c| (lo..=hi).contains(&(c as u32)));
+        let in_range =
+            |s: &str, lo: u32, hi: u32| s.chars().any(|c| (lo..=hi).contains(&(c as u32)));
         let ranges = [
             (Language::Hindi, 0x900, 0x97F),
             (Language::Sanskrit, 0x900, 0x97F),

@@ -802,11 +802,11 @@ fn label(lang: Language, name: &str) -> String {
     }
 }
 
-/// Like [`label`] but for a list of changed parts, so it keeps the stored name as it is.
+/// Like [`label`] but for a list of changed parts, which are written in lower case.
 fn label_lower(lang: Language, name: &str) -> String {
     match name {
-        "username" => t(lang, Msg::FieldUsername).into(),
-        "password" => t(lang, Msg::FieldPassword).into(),
+        "username" => t(lang, Msg::FieldUsername).to_lowercase(),
+        "password" => t(lang, Msg::FieldPassword).to_lowercase(),
         _ => name.to_string(),
     }
 }
