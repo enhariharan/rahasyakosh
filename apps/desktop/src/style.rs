@@ -1,4 +1,4 @@
-//! The app's stylesheet. Colours are tokens on `:root`, with a dark variant that follows the system setting.
+//! The app's stylesheet. Colours are tokens on `:root`, with a dark variant that follows the system setting unless the user picks light or dark (`data-theme` on the root).
 pub const CSS: &str = r#"
 :root {
   --bg: #f6f7f9; --panel: #ffffff; --text: #14181f; --muted: #566070; --line: #d5dae2;
@@ -6,12 +6,20 @@ pub const CSS: &str = r#"
   --control: #7b8494; --focus: #1f5fbf; --row-on: #e3edfb; --toast: #14181f; --toast-text: #ffffff; --error-bg: #b3261e; --error-text: #ffffff;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --bg: #14171c; --panel: #1c2027; --text: #e8ebf0; --muted: #a2acba; --line: #333a45;
     --accent: #6ea4ff; --accent-text: #0b1220; --danger: #ff8a80; --ok: #7ddc9b; --warn-bg: #3a3118;
     --control: #7d8899; --focus: #8bb6ff; --row-on: #26334a; --toast: #e8ebf0; --toast-text: #14171c; --error-bg: #9c1c14; --error-text: #ffffff;
   }
 }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #14171c; --panel: #1c2027; --text: #e8ebf0; --muted: #a2acba; --line: #333a45;
+  --accent: #6ea4ff; --accent-text: #0b1220; --danger: #ff8a80; --ok: #7ddc9b; --warn-bg: #3a3118;
+  --control: #7d8899; --focus: #8bb6ff; --row-on: #26334a; --toast: #e8ebf0; --toast-text: #14171c; --error-bg: #9c1c14; --error-text: #ffffff;
+}
+:root[data-theme="light"] { color-scheme: light; }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
 body { background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, "Segoe UI", Roboto, sans-serif; }

@@ -8,7 +8,7 @@ mod style;
 use dioxus::desktop::{Config, LogicalSize, WindowBuilder};
 use dioxus::prelude::*;
 use model::{Model, NoticeKind, SystemClipboard, View};
-use rahasyakosh_app::{Session, Settings, ToolbarStyle};
+use rahasyakosh_app::{Session, Settings, ThemeMode, ToolbarStyle};
 use rahasyakosh_store::{SqliteStore, Uuid};
 use std::cell::Cell;
 use std::path::{Path, PathBuf};
@@ -250,6 +250,20 @@ fn app() -> Element {
         ctx.last_input.clone(),
         ctx.last_input.clone(),
     );
+    let theme = model
+        .read()
+        .as_ref()
+        .map_or(ThemeMode::System, |m| m.session.settings().theme);
+    use_effect(use_reactive!(|theme| {
+        let name = match theme {
+            ThemeMode::Light => "light",
+            ThemeMode::Dark => "dark",
+            ThemeMode::System => "system",
+        };
+        spawn(async move {
+            let _ = dioxus::document::eval(&format!("document.documentElement.dataset.theme='{name}'")).await;
+        });
+    }));
     rsx! {
         style { "{style::CSS}" }
         div {
@@ -935,6 +949,17 @@ fn SettingsView() -> Element {
                     option { value: "both", selected: s.read().toolbar_style == ToolbarStyle::IconAndText, "Icons and text" }
                     option { value: "text", selected: s.read().toolbar_style == ToolbarStyle::TextOnly, "Text only" }
                     option { value: "icons", selected: s.read().toolbar_style == ToolbarStyle::IconOnly, "Icons only" }
+                }
+                label { r#for: "s-theme", "Colour scheme" }
+                select { id: "s-theme",
+                    onchange: move |e| s.write().theme = match e.value().as_str() {
+                        "light" => ThemeMode::Light,
+                        "dark" => ThemeMode::Dark,
+                        _ => ThemeMode::System,
+                    },
+                    option { value: "system", selected: s.read().theme == ThemeMode::System, "Same as the system" }
+                    option { value: "light", selected: s.read().theme == ThemeMode::Light, "Light" }
+                    option { value: "dark", selected: s.read().theme == ThemeMode::Dark, "Dark" }
                 }
                 h3 { "Protection against password guessing" }
                 p { class: "muted small",

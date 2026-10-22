@@ -55,6 +55,7 @@ Type the master password and press Enter. After three wrong passwords in a row t
   | New item | **Ctrl+N** |
 
   The buttons show an icon and text by default. **Settings → Top-bar buttons show** switches them to text only or icons only (the name stays available to screen readers either way).
+  **Settings → Colour scheme** chooses light, dark, or "Same as the system" (the default); the change shows as soon as you save.
 
 ![A password and notes revealed on request](images/desktop-revealed.png)
 
@@ -82,7 +83,7 @@ The details, and what they cannot do, are in [Sessions: locking, hiding and clea
 ## Settings
 
 Under **Settings**: auto-lock minutes, lock on focus loss, how long a copied password stays on the clipboard, how long a shown password stays visible,
-how long deleted items are kept, history length, whether the top-bar buttons show icons and text, text only or icons only, and the cost of the password-guessing protection (applied when a vault is created or its master password is changed).
+how long deleted items are kept, history length, whether the top-bar buttons show icons and text, text only or icons only, whether the app is light, dark or follows the system, and the cost of the password-guessing protection (applied when a vault is created or its master password is changed).
 You can also **change the master password** there (the new one must pass the strength check).
 
 ## What it does not do yet
