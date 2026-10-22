@@ -325,15 +325,15 @@ fn Setup() -> Element {
         main { class: "centre",
             Logo {}
             h1 { "Welcome to Rahasyakosh" }
-            p { "Your passwords are kept in one encrypted file on this computer. A single master passphrase opens it." }
-            p { class: "warn", "This master passphrase below will be shown only once. Note it down. Keep it somewhere safe." }
+            p { "Your passwords live in one encrypted file on this computer, opened by a single master passphrase." }
+            p { class: "warn", "This passphrase is shown only once. Write it down and keep it safe." }
             if !own() {
                 section { aria_label: "Generated passphrase",
                     p { class: "label", "Your new master passphrase" }
                     p { class: "passphrase", "{passphrase}" }
                     div { class: "row",
                         button { onclick: move |_| passphrase.set(new_passphrase()), "Generate another" }
-                        button { class: "link", onclick: move |_| own.set(true), "I would rather choose my own" }
+                        button { class: "link", onclick: move |_| own.set(true), "Choose my own instead" }
                     }
                     label { class: "check",
                         input { r#type: "checkbox", checked: saved(), onchange: move |e| saved.set(e.checked()) }
@@ -355,7 +355,7 @@ fn Setup() -> Element {
             }
             if let Some(e) = error() { p { class: "error", role: "alert", "{e}" } }
             button { class: "primary", onclick: create, "Create vault" }
-            p { class: "small", "The vault will be stored in {vault_path().display()}" }
+            p { class: "small", "Vault location: {vault_path().display()}" }
         }
     }
 }
