@@ -391,10 +391,10 @@ fn Unlock() -> Element {
         pw.set(String::new());
     };
     rsx! {
-        main { class: "centre",
+        main { class: "centre landing",
             Logo {}
             h1 { "Rahasyakosh" }
-            p { class: "muted", "Vault locked." }
+            p { class: "muted tagline", "Vault locked." }
             form {
                 onsubmit: move |e| { e.prevent_default(); submit(); },
                 label { r#for: "master", "Master password" }
