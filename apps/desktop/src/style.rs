@@ -106,6 +106,7 @@ dl { margin: 0; }
 .history li { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .35rem 0; border-bottom: 1px solid var(--line); }
 
 .form { max-width: 40rem; margin: 0 auto; padding: 1.2rem 1.5rem 3rem; overflow: auto; height: calc(100vh - 3.5rem); }
+.form form > button[type=submit] { margin: 1.2rem 0; }
 @media (max-width: 820px) { .split { grid-template-columns: 1fr; } .field { grid-template-columns: 1fr; } }
 "#;
 

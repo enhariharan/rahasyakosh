@@ -964,7 +964,7 @@ fn SettingsView() -> Element {
                 label { r#for: "p2", "Repeat it" }
                 input { id: "p2", r#type: "password", autocomplete: "off", value: "{new_pw2}", oninput: move |e| new_pw2.set(e.value()) }
                 if let Some((ok, text)) = pw_msg() { p { class: if ok { "ok" } else { "error" }, role: "status", "{text}" } }
-                button { r#type: "submit", "Change master password" }
+                button { class: "primary", r#type: "submit", "Change master password" }
             }
         }
     }
