@@ -588,3 +588,32 @@ fn messages_follow_the_language_setting() {
             .contains("கடவுச்சொற்றொடரை")
     );
 }
+
+#[test]
+fn toggle_reveal_shows_then_hides_and_item_shortcuts_need_an_open_item() {
+    let (mut m, _) = model(Settings::default());
+    assert!(!m.has_open_item(), "nothing is open yet");
+    m.toggle_reveal("password", 20);
+    m.select(gh(), 20);
+    assert!(m.has_open_item());
+    let shown = |m: &Model<MemoryStore, Fake>, t| {
+        m.detail(t)
+            .unwrap()
+            .fields
+            .iter()
+            .find(|f| f.name == "password")
+            .unwrap()
+            .value
+            .clone()
+    };
+    assert_eq!(shown(&m, 21), None);
+    m.toggle_reveal("password", 21);
+    assert_eq!(shown(&m, 22).as_deref(), Some("gh-pw"));
+    m.toggle_reveal("password", 22);
+    assert_eq!(shown(&m, 23), None, "the second press hides it again");
+    m.show(View::Trash, 24);
+    assert!(
+        !m.has_open_item(),
+        "item shortcuts do nothing in the trash view"
+    );
+}

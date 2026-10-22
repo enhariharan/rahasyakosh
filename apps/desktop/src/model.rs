@@ -521,6 +521,22 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         }
     }
 
+    /// Show a hidden field, or hide it again if it is showing.
+    pub fn toggle_reveal(&mut self, field: &str, now: i64) {
+        if let Some(id) = self.selected {
+            if self.session.is_revealed(id, field, now) {
+                self.hide(field, now);
+            } else {
+                self.reveal(field, now);
+            }
+        }
+    }
+
+    /// Whether an item is open in the detail pane (so item shortcuts such as Edit make sense).
+    pub fn has_open_item(&self) -> bool {
+        self.view == View::Items && self.selected.is_some()
+    }
+
     /// Copy a field (or `"totp"` for the current code) to the clipboard and schedule it to be cleared.
     pub fn copy(&mut self, field: &str, now: i64) {
         self.activity(now);

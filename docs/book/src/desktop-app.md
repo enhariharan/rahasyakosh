@@ -42,6 +42,20 @@ Type the master password and press Enter. After three wrong passwords in a row t
 - **Left:** your items. Pinned favourites (★) come first. **Ctrl+K** jumps to the search box; searching looks in titles, usernames, websites and tags, never in passwords or notes. A **New item** bar floats at the bottom of the list, so it stays in reach however long the list is; hover over it to see its shortcut, **Ctrl+N**.
 - **Right:** the selected item. Passwords and notes show as dots until you press **Show**, then hide again after 10 seconds (or press **Hide**).
   **Copy** puts a value on the clipboard and clears it after 20 seconds, if you have not copied something else meanwhile.
+  The buttons on the right have icons and shortcuts too; hover over one to see its shortcut. They work while an item is open:
+
+  | Button | Shortcut |
+  |---|---|
+  | Pin / Unpin | **Ctrl+P** |
+  | Edit | **Ctrl+E** |
+  | Move to trash | **Ctrl+D** |
+  | Copy password | **Ctrl+Shift+C** |
+  | Copy username | **Ctrl+Shift+U** |
+  | Copy website | **Ctrl+Shift+W** |
+  | Copy two-factor code | **Ctrl+Shift+T** |
+  | Show / Hide password | **Ctrl+Shift+S** |
+
+  The copy and show shortcuts use Shift so that plain **Ctrl+C** keeps copying selected text as usual. Notes have no shortcut; use their buttons.
 - **Two-factor code:** if the item has a two-factor secret, the current six-digit code is shown with its countdown. The secret itself is never displayed.
 - **Earlier versions:** each time you change an item, the old version is kept. **Go back to this** restores one (the present content is kept too).
 - **Top bar:** **Items**, **Trash** (deleted items, restorable, emptied after 30 days), **Settings**, a countdown to the automatic lock, and **Lock** to lock right now. Each button has an icon and a keyboard shortcut, shown when you hover over it:

@@ -303,10 +303,13 @@ fn app() -> Element {
                 if e.modifiers().ctrl() && !e.modifiers().alt() {
                     if let Key::Character(c) = e.key() {
                         let unlocked = model.read().as_ref().is_some_and(|m| m.is_unlocked());
-                        if let Some(shortcut) = Shortcut::from_key(&c).filter(|_| unlocked) {
-                            e.prevent_default();
+                        let shift = e.modifiers().shift();
+                        if let Some(shortcut) = Shortcut::from_key(&c, shift).filter(|_| unlocked) {
                             if let Some(m) = model.write().as_mut() {
-                                shortcut.run(m, now());
+                                if !shortcut.needs_item() || m.has_open_item() {
+                                    e.prevent_default();
+                                    shortcut.run(m, now());
+                                }
                             }
                         }
                     }
@@ -657,18 +660,58 @@ enum Shortcut {
     Settings,
     Lock,
     NewItem,
+    // The next ones act on the item open in the detail pane.
+    Pin,
+    Edit,
+    MoveToTrash,
+    CopyUsername,
+    CopyPassword,
+    CopyWebsite,
+    CopyTotp,
+    ShowPassword,
 }
 
+/// The "hide" version of the eye icon, for the Hide button.
+const EYE_OFF_ICON: &str = "M3 3l18 18M10.6 6.1A9 9 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3 3.7M6.6 6.6A17 17 0 0 0 2 12s4 7 10 7a9 9 0 0 0 4-1";
+
 impl Shortcut {
-    fn from_key(c: &str) -> Option<Self> {
-        match c {
-            "1" => Some(Self::Items),
-            "2" => Some(Self::Trash),
-            "3" => Some(Self::Settings),
-            "l" | "L" => Some(Self::Lock),
-            "n" | "N" => Some(Self::NewItem),
+    /// The shortcut for Ctrl + `c` (with Shift if `shift`).
+    fn from_key(c: &str, shift: bool) -> Option<Self> {
+        match (c, shift) {
+            ("1", _) => Some(Self::Items),
+            ("2", _) => Some(Self::Trash),
+            ("3", _) => Some(Self::Settings),
+            ("l" | "L", _) => Some(Self::Lock),
+            ("n" | "N", _) => Some(Self::NewItem),
+            ("p" | "P", false) => Some(Self::Pin),
+            ("e" | "E", false) => Some(Self::Edit),
+            ("d" | "D", false) => Some(Self::MoveToTrash),
+            ("u" | "U", true) => Some(Self::CopyUsername),
+            ("c" | "C", true) => Some(Self::CopyPassword),
+            ("w" | "W", true) => Some(Self::CopyWebsite),
+            ("t" | "T", true) => Some(Self::CopyTotp),
+            ("s" | "S", true) => Some(Self::ShowPassword),
             _ => None,
         }
+    }
+
+    /// The shortcut that copies the field called `name`, if it has one.
+    fn copy_for(name: &str) -> Option<Self> {
+        match name {
+            "username" => Some(Self::CopyUsername),
+            "password" => Some(Self::CopyPassword),
+            "url" => Some(Self::CopyWebsite),
+            "totp" => Some(Self::CopyTotp),
+            _ => None,
+        }
+    }
+
+    /// Whether it needs an item to be open in the detail pane.
+    fn needs_item(self) -> bool {
+        !matches!(
+            self,
+            Self::Items | Self::Trash | Self::Settings | Self::Lock | Self::NewItem
+        )
     }
 
     fn hint(self) -> &'static str {
@@ -678,6 +721,14 @@ impl Shortcut {
             Self::Settings => "Ctrl+3",
             Self::Lock => "Ctrl+L",
             Self::NewItem => "Ctrl+N",
+            Self::Pin => "Ctrl+P",
+            Self::Edit => "Ctrl+E",
+            Self::MoveToTrash => "Ctrl+D",
+            Self::CopyUsername => "Ctrl+Shift+U",
+            Self::CopyPassword => "Ctrl+Shift+C",
+            Self::CopyWebsite => "Ctrl+Shift+W",
+            Self::CopyTotp => "Ctrl+Shift+T",
+            Self::ShowPassword => "Ctrl+Shift+S",
         }
     }
 
@@ -688,6 +739,14 @@ impl Shortcut {
             Self::Settings => "Control+3",
             Self::Lock => "Control+L",
             Self::NewItem => "Control+N",
+            Self::Pin => "Control+P",
+            Self::Edit => "Control+E",
+            Self::MoveToTrash => "Control+D",
+            Self::CopyUsername => "Control+Shift+U",
+            Self::CopyPassword => "Control+Shift+C",
+            Self::CopyWebsite => "Control+Shift+W",
+            Self::CopyTotp => "Control+Shift+T",
+            Self::ShowPassword => "Control+Shift+S",
         }
     }
 
@@ -698,6 +757,15 @@ impl Shortcut {
             Self::Settings => "M4 7h10M18 7h2M4 17h2M10 17h10M16 4v6M8 14v6",
             Self::Lock => "M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z",
             Self::NewItem => "M12 5v14M5 12h14",
+            Self::Pin => "M12 17v5M9 3h6l-1 7 3 3v2H7v-2l3-3z",
+            Self::Edit => "M4 20h4L19 9l-4-4L4 16zM13 7l4 4",
+            Self::MoveToTrash => "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
+            Self::CopyUsername | Self::CopyPassword | Self::CopyWebsite | Self::CopyTotp => {
+                "M9 9h11v11H9zM5 15V5h10"
+            }
+            Self::ShowPassword => {
+                "M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"
+            }
         }
     }
 
@@ -708,6 +776,14 @@ impl Shortcut {
             Self::Settings => m.show(View::Settings, now),
             Self::Lock => m.lock(),
             Self::NewItem => m.start_new(now),
+            Self::Pin => m.toggle_favourite(now),
+            Self::Edit => m.start_edit(now),
+            Self::MoveToTrash => m.trash_selected(now),
+            Self::CopyUsername => m.copy("username", now),
+            Self::CopyPassword => m.copy("password", now),
+            Self::CopyWebsite => m.copy("url", now),
+            Self::CopyTotp => m.copy("totp", now),
+            Self::ShowPassword => m.toggle_reveal("password", now),
         }
     }
 }
@@ -814,6 +890,12 @@ fn detail_pane(ctx: Ctx) -> Element {
             }
         }};
     }
+    // Hover text "Copy (Ctrl+Shift+C)" for a button that has a shortcut.
+    let hint = |label: &str, sc: Option<Shortcut>| sc.map(|s| format!("{label} ({})", s.hint()));
+    let copy_label = tr(lang, Msg::Copy);
+    let item_btn = |sc: Shortcut, label: &'static str| {
+        rsx! { NavContent { icon: sc.icon(), label: label.to_string(), style: ToolbarStyle::IconAndText } }
+    };
     rsx! {
         div { class: "pad",
             div { class: "head",
@@ -823,9 +905,27 @@ fn detail_pane(ctx: Ctx) -> Element {
                         button { class: "primary", onclick: act!(m, now => m.restore_selected(now)), {tr(lang, Msg::Restore)} }
                         button { class: "danger", onclick: act!(m, now => m.purge_selected(now)), {tr(lang, Msg::DeleteForGood)} }
                     } else {
-                        button { onclick: act!(m, now => m.toggle_favourite(now)), if d.favourite { {tr(lang, Msg::Unpin)} } else { {tr(lang, Msg::Pin)} } }
-                        button { onclick: act!(m, now => m.start_edit(now)), {tr(lang, Msg::Edit)} }
-                        button { class: "danger", onclick: act!(m, now => m.trash_selected(now)), {tr(lang, Msg::MoveToTrash)} }
+                        {
+                            let label = if d.favourite { tr(lang, Msg::Unpin) } else { tr(lang, Msg::Pin) };
+                            rsx! {
+                                button {
+                                    title: hint(label, Some(Shortcut::Pin)), aria_keyshortcuts: Shortcut::Pin.aria(),
+                                    onclick: act!(m, now => m.toggle_favourite(now)),
+                                    { item_btn(Shortcut::Pin, label) }
+                                }
+                            }
+                        }
+                        button {
+                            title: hint(tr(lang, Msg::Edit), Some(Shortcut::Edit)), aria_keyshortcuts: Shortcut::Edit.aria(),
+                            onclick: act!(m, now => m.start_edit(now)),
+                            { item_btn(Shortcut::Edit, tr(lang, Msg::Edit)) }
+                        }
+                        button {
+                            class: "danger",
+                            title: hint(tr(lang, Msg::MoveToTrash), Some(Shortcut::MoveToTrash)), aria_keyshortcuts: Shortcut::MoveToTrash.aria(),
+                            onclick: act!(m, now => m.trash_selected(now)),
+                            { item_btn(Shortcut::MoveToTrash, tr(lang, Msg::MoveToTrash)) }
+                        }
                     }
                 }
             }
@@ -834,6 +934,8 @@ fn detail_pane(ctx: Ctx) -> Element {
                     {
                         let name = f.name.clone();
                         let (n1, n2, n3) = (name.clone(), name.clone(), name.clone());
+                        let copy_sc = Shortcut::copy_for(&f.name);
+                        let show_sc = (f.name == "password").then_some(Shortcut::ShowPassword);
                         rsx! {
                             div { class: "field", key: "{f.name}",
                                 dt { "{f.label}" }
@@ -844,12 +946,27 @@ fn detail_pane(ctx: Ctx) -> Element {
                                     span { class: "row tight",
                                         if f.secret {
                                             if f.value.is_none() {
-                                                button { aria_label: "{trf(lang, Msg::ShowField, &[&f.label])}", onclick: act!(m, now => m.reveal(&n1, now)), {tr(lang, Msg::Show)} }
+                                                button {
+                                                    aria_label: "{trf(lang, Msg::ShowField, &[&f.label])}",
+                                                    title: hint(tr(lang, Msg::Show), show_sc), aria_keyshortcuts: show_sc.map(Shortcut::aria),
+                                                    onclick: act!(m, now => m.reveal(&n1, now)),
+                                                    { item_btn(Shortcut::ShowPassword, tr(lang, Msg::Show)) }
+                                                }
                                             } else {
-                                                button { aria_label: "{trf(lang, Msg::HideField, &[&f.label])}", onclick: act!(m, now => m.hide(&n2, now)), {tr(lang, Msg::Hide)} }
+                                                button {
+                                                    aria_label: "{trf(lang, Msg::HideField, &[&f.label])}",
+                                                    title: hint(tr(lang, Msg::Hide), show_sc), aria_keyshortcuts: show_sc.map(Shortcut::aria),
+                                                    onclick: act!(m, now => m.hide(&n2, now)),
+                                                    NavContent { icon: EYE_OFF_ICON, label: tr(lang, Msg::Hide).to_string(), style: ToolbarStyle::IconAndText }
+                                                }
                                             }
                                         }
-                                        button { aria_label: "{trf(lang, Msg::CopyField, &[&f.label])}", onclick: act!(m, now => m.copy(&n3, now)), {tr(lang, Msg::Copy)} }
+                                        button {
+                                            aria_label: "{trf(lang, Msg::CopyField, &[&f.label])}",
+                                            title: hint(copy_label, copy_sc), aria_keyshortcuts: copy_sc.map(Shortcut::aria),
+                                            onclick: act!(m, now => m.copy(&n3, now)),
+                                            { item_btn(Shortcut::CopyPassword, copy_label) }
+                                        }
                                     }
                                 }
                             }
@@ -862,14 +979,28 @@ fn detail_pane(ctx: Ctx) -> Element {
                         dd {
                             span { class: "mono big", dir: "ltr", "{t.code}" }
                             span { class: "muted small", " {t.seconds_left} s" }
-                            span { class: "row tight", button { aria_label: tr(lang, Msg::CopyTwoFactor), onclick: act!(m, now => m.copy("totp", now)), {tr(lang, Msg::Copy)} } }
+                            span { class: "row tight",
+                                button {
+                                    aria_label: tr(lang, Msg::CopyTwoFactor),
+                                    title: hint(copy_label, Some(Shortcut::CopyTotp)), aria_keyshortcuts: Shortcut::CopyTotp.aria(),
+                                    onclick: act!(m, now => m.copy("totp", now)),
+                                    { item_btn(Shortcut::CopyTotp, copy_label) }
+                                }
+                            }
                         }
                     }
                 }
                 for u in d.urls.clone() {
                     div { class: "field", key: "{u}",
                         dt { {tr(lang, Msg::Website)} }
-                        dd { span { dir: "ltr", "{u}" } span { class: "row tight", button { aria_label: "{trf(lang, Msg::CopyWebsite, &[&u])}", onclick: act!(m, now => m.copy("url", now)), {tr(lang, Msg::Copy)} } } }
+                        dd { span { dir: "ltr", "{u}" } span { class: "row tight",
+                            button {
+                                aria_label: "{trf(lang, Msg::CopyWebsite, &[&u])}",
+                                title: hint(copy_label, Some(Shortcut::CopyWebsite)), aria_keyshortcuts: Shortcut::CopyWebsite.aria(),
+                                onclick: act!(m, now => m.copy("url", now)),
+                                { item_btn(Shortcut::CopyWebsite, copy_label) }
+                            }
+                        } }
                     }
                 }
                 if !d.tags.is_empty() {
@@ -1070,5 +1201,41 @@ fn SettingsView() -> Element {
                 button { class: "primary", r#type: "submit", {tr(lang, Msg::ChangeMasterButton)} }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod shortcut_tests {
+    use super::Shortcut;
+
+    #[test]
+    fn keys_map_to_shortcuts_and_the_hint_matches() {
+        let cases = [
+            ("p", false, Shortcut::Pin, "Ctrl+P"),
+            ("E", false, Shortcut::Edit, "Ctrl+E"),
+            ("d", false, Shortcut::MoveToTrash, "Ctrl+D"),
+            ("C", true, Shortcut::CopyPassword, "Ctrl+Shift+C"),
+            ("U", true, Shortcut::CopyUsername, "Ctrl+Shift+U"),
+            ("W", true, Shortcut::CopyWebsite, "Ctrl+Shift+W"),
+            ("T", true, Shortcut::CopyTotp, "Ctrl+Shift+T"),
+            ("S", true, Shortcut::ShowPassword, "Ctrl+Shift+S"),
+        ];
+        for (key, shift, shortcut, hint) in cases {
+            assert!(Shortcut::from_key(key, shift) == Some(shortcut), "{key}");
+            assert_eq!(shortcut.hint(), hint);
+            assert!(shortcut.needs_item());
+            assert_eq!(shortcut.aria(), hint.replace("Ctrl", "Control"));
+        }
+        // The plain letters need Shift for the copy and show shortcuts, so Ctrl+C stays "copy text".
+        assert!(Shortcut::from_key("c", false).is_none());
+        assert!(Shortcut::from_key("s", false).is_none());
+        assert!(!Shortcut::NewItem.needs_item());
+    }
+
+    #[test]
+    fn fields_have_their_copy_shortcut() {
+        assert!(Shortcut::copy_for("password") == Some(Shortcut::CopyPassword));
+        assert!(Shortcut::copy_for("totp") == Some(Shortcut::CopyTotp));
+        assert!(Shortcut::copy_for("notes").is_none());
     }
 }

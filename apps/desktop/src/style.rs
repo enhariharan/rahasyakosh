@@ -96,6 +96,7 @@ button.icon { position: absolute; top: .5rem; inset-inline-end: .5rem; padding: 
 button.fab { position: absolute; left: 1rem; right: 1rem; bottom: 1rem; display: flex; align-items: center; justify-content: center;
   gap: .5rem; padding: .7rem 1rem; border-radius: 999px; box-shadow: 0 4px 14px #0006; }
 .detail { overflow: auto; }
+.detail button { display: inline-flex; align-items: center; gap: .4rem; }
 .list { list-style: none; margin: 0; padding: 0; }
 .row { }
 button.row { display: flex; flex-direction: column; align-items: flex-start; width: 100%; border: none; border-radius: 0;
