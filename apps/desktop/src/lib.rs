@@ -328,7 +328,7 @@ fn Setup() -> Element {
                 Logo {}
                 h1 { "Welcome to Rahasyakosh" }
                 p { class: "tagline", "A secure store for your passwords." }
-                p { "Your passwords live in one encrypted file on this computer, protected by a Master Passphrase." }
+                p { class: "tagline", "Stored in an encrypted file on this computer." br {} "Protected by a master passphrase." }
                 button { class: "primary", onclick: move |_| started.set(true), "Create master passphrase" }
             }
         };
