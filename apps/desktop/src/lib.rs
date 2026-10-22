@@ -287,6 +287,7 @@ fn screen(ctx: Ctx) -> Element {
 fn Setup() -> Element {
     let mut ctx = use_context::<Ctx>();
     let mut passphrase = use_signal(new_passphrase);
+    let mut started = use_signal(|| false);
     let mut own = use_signal(|| false);
     let mut pw = use_signal(String::new);
     let mut pw2 = use_signal(String::new);
@@ -321,12 +322,21 @@ fn Setup() -> Element {
         }
     };
 
+    if !started() {
+        return rsx! {
+            main { class: "centre landing",
+                Logo {}
+                h1 { "Welcome to Rahasyakosh" }
+                p { class: "tagline", "A secure store for your passwords." }
+                p { "Your passwords live in one encrypted file on this computer, protected by a Master Passphrase." }
+                button { class: "primary", onclick: move |_| started.set(true), "Create master passphrase" }
+            }
+        };
+    }
+
     rsx! {
         main { class: "centre landing",
-            Logo {}
-            h1 { "Welcome to Rahasyakosh" }
-            p { class: "tagline", "A secure store for your passwords." }
-            p { "Your passwords live in one encrypted file on this computer, protected by a single master passphrase." }
+            h1 { "Create a master passphrase" }
             p { class: "warn", "This master passphrase is shown only once. Keep it safe." }
             if !own() {
                 section { aria_label: "Generated passphrase",

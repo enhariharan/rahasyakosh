@@ -20,10 +20,14 @@ It puts `rahasyakosh-desktop` in `~/.local/bin`, a launcher entry in your app gr
 
 ## First run
 
-If there is no vault yet, the app offers to create one. It generates a six-word **master passphrase** and shows it once, with the note "This master passphrase is shown only once. Keep it safe." Write it down (on paper is best), then tick the box. You can
+If there is no vault yet, the app opens on a short welcome page. Click **Create master passphrase** to go on.
+
+![The welcome page: the app icon, a one-line description and one button](images/desktop-welcome.png)
+
+The next page, **Create a master passphrase**, generates a six-word **master passphrase** and shows it once, with the note "This master passphrase is shown only once. Keep it safe." Write it down (on paper is best), then tick the box. You can
 instead type your own password, and the app rates its strength and refuses weak ones. **There is no way to recover a lost master passphrase.**
 
-![First run: a generated passphrase, a warning, and a confirmation box](images/desktop-setup.png)
+![Create a master passphrase: a generated passphrase, a warning, and a confirmation box](images/desktop-setup.png)
 
 ## Unlocking
 
