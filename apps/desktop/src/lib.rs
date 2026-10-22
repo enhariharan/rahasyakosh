@@ -134,11 +134,45 @@ pub fn launch_with(initial: Option<AppModel>) {
     INITIAL.with(|c| *c.borrow_mut() = initial);
     let window = WindowBuilder::new()
         .with_title("Rahasyakosh")
+        .with_window_icon(window_icon())
         .with_inner_size(LogicalSize::new(1080.0, 720.0))
         .with_min_inner_size(LogicalSize::new(760.0, 520.0));
     dioxus::LaunchBuilder::desktop()
         .with_cfg(Config::new().with_window(window).with_menu(None))
         .launch(app);
+}
+
+/// The taskbar / title-bar icon: the chest, pre-rendered to raw 64x64 RGBA (see `packaging/`).
+fn window_icon() -> Option<dioxus::desktop::tao::window::Icon> {
+    dioxus::desktop::tao::window::Icon::from_rgba(include_bytes!("../packaging/window-icon-64.rgba").to_vec(), 64, 64).ok()
+}
+
+/// The app icon (same drawing as `packaging/rahasyakosh-chest.svg`), shown above the title on the first-run and unlock screens.
+#[component]
+fn Logo() -> Element {
+    rsx! {
+        svg { class: "logo", view_box: "0 0 128 128", width: "72", height: "72", role: "img", "aria-label": "Rahasyakosh",
+            defs {
+                linearGradient { id: "logo-bg", x1: "0", y1: "0", x2: "0", y2: "1",
+                    stop { offset: "0", stop_color: "#2f3a8f" }
+                    stop { offset: "1", stop_color: "#171a45" }
+                }
+                linearGradient { id: "logo-lid", x1: "0", y1: "0", x2: "0", y2: "1",
+                    stop { offset: "0", stop_color: "#ffd36b" }
+                    stop { offset: "1", stop_color: "#f2a900" }
+                }
+            }
+            rect { width: "128", height: "128", rx: "26", fill: "url(#logo-bg)" }
+            rect { x: "22", y: "62", width: "84", height: "44", rx: "7", fill: "#e08e0b" }
+            path { d: "M22 66V56C22 40 40 28 64 28s42 12 42 28v10z", fill: "url(#logo-lid)" }
+            rect { x: "36", y: "31", width: "7", height: "75", fill: "#a86400", opacity: ".55" }
+            rect { x: "85", y: "31", width: "7", height: "75", fill: "#a86400", opacity: ".55" }
+            rect { x: "22", y: "62", width: "84", height: "5", fill: "#a86400" }
+            circle { cx: "64", cy: "70", r: "13", fill: "#171a45" }
+            circle { cx: "64", cy: "67.5", r: "4.5", fill: "#ffd36b" }
+            path { d: "M61.5 70h5l2 9h-9z", fill: "#ffd36b" }
+        }
+    }
 }
 
 fn app() -> Element {
@@ -289,6 +323,7 @@ fn Setup() -> Element {
 
     rsx! {
         main { class: "centre",
+            Logo {}
             h1 { "Welcome to Rahasyakosh" }
             p { "Your passwords are kept in one encrypted file on this computer. A single master passphrase opens it." }
             p { class: "warn", "This master passphrase below will be shown only once. Note it down. Keep it somewhere safe." }
@@ -356,6 +391,7 @@ fn Unlock() -> Element {
     };
     rsx! {
         main { class: "centre",
+            Logo {}
             h1 { "Rahasyakosh" }
             p { class: "muted", "The vault is locked." }
             form {

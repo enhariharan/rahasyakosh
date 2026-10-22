@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Rahasyakosh">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f3a8f"/>
+      <stop offset="1" stop-color="#171a45"/>
+    </linearGradient>
+    <linearGradient id="lid" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd36b"/>
+      <stop offset="1" stop-color="#f2a900"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="26" fill="url(#bg)"/>
+  <!-- chest body -->
+  <rect x="22" y="62" width="84" height="44" rx="7" fill="#e08e0b"/>
+  <!-- arched lid -->
+  <path d="M22 66V56C22 40 40 28 64 28s42 12 42 28v10z" fill="url(#lid)"/>
+  <!-- straps -->
+  <rect x="36" y="31" width="7" height="75" fill="#a86400" opacity=".55"/>
+  <rect x="85" y="31" width="7" height="75" fill="#a86400" opacity=".55"/>
+  <!-- seam -->
+  <rect x="22" y="62" width="84" height="5" fill="#a86400"/>
+  <!-- lock plate and keyhole -->
+  <circle cx="64" cy="70" r="13" fill="#171a45"/>
+  <circle cx="64" cy="67.5" r="4.5" fill="#ffd36b"/>
+  <path d="M61.5 70h5l2 9h-9z" fill="#ffd36b"/>
+</svg>

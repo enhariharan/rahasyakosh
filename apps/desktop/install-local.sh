@@ -19,7 +19,7 @@ fi
 cargo build --release --locked
 mkdir -p "$(dirname "$bin")" "$(dirname "$desktop")" "$(dirname "$icon")"
 install -m 755 target/release/rahasyakosh-desktop "$bin"
-install -m 644 packaging/rahasyakosh.svg "$icon"
+install -m 644 packaging/rahasyakosh-chest.svg "$icon"
 sed "s|@EXEC@|$bin|" packaging/rahasyakosh.desktop > "$desktop"
 chmod 644 "$desktop"
 command -v update-desktop-database >/dev/null && update-desktop-database "$HOME/.local/share/applications" || true
