@@ -581,7 +581,9 @@ fn Unlock() -> Element {
         pw.set(String::new());
         spawn(async move {
             let _ = dioxus::document::eval(
-                "const e=document.getElementById('master');if(e){e.value='';e.focus()}",
+                // Leave and re-enter the box: a screen reader started after the app only notices the field
+                // when focus really moves, and Enter alone leaves focus where it was.
+                "const e=document.getElementById('master');if(e){e.value='';e.blur();setTimeout(()=>e.focus(),50)}",
             )
             .await;
         });
