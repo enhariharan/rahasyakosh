@@ -10,7 +10,7 @@ mod style;
 use dioxus::desktop::{Config, LogicalSize, WindowBuilder};
 use dioxus::prelude::*;
 use i18n::{t as tr, trf, Msg};
-use model::{Model, NoticeKind, SystemClipboard, View};
+use model::{Model, NoticeKind, ReaderNotice, SystemClipboard, View};
 use rahasyakosh_app::{Language, Session, Settings, ThemeMode, ToolbarStyle};
 use rahasyakosh_store::{SqliteStore, Uuid};
 use std::cell::Cell;
@@ -122,6 +122,8 @@ struct Ctx {
     broken: Signal<Option<String>>,
     /// The language chosen on the first-run screens, before there is a vault with settings.
     setup_lang: Signal<Language>,
+    /// Set while the "screen reader started or stopped" dialog is showing.
+    reader_notice: Signal<Option<ReaderNotice>>,
 }
 
 thread_local! {
@@ -148,26 +150,61 @@ pub fn launch_with(initial: Option<AppModel>) {
         .launch(app);
 }
 
-/// A screen reader started while the app was open. It only notices the window once keyboard focus moves, so move it:
-/// leave the focused control and come back to it.
-///
-/// The reader says it has started well before it is ready to listen (Orca takes a few seconds), so one nudge can
-/// come too early. Nudge a few times over the next ten seconds; each is harmless, though the reader may repeat the
-/// name of the control.
-///
-/// While the vault is open, a text box is left alone: the short gap could swallow a key someone is typing.
-async fn nudge_focus(locked: bool) {
-    for wait in [1, 2, 3, 4] {
-        tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
-        // On the unlock screen, copy what a mouse click on Unlock does (focus goes to the button, then back to the
-        // box), because that is known to make a late screen reader pick the box up. Elsewhere, blur and refocus.
-        let _ = dioxus::document::eval(&format!(
-            "const a=document.activeElement;\
-             const b=document.querySelector('form button[type=submit]:not([disabled])');\
-             if({locked}&&a&&a.id==='master'&&b){{b.focus();setTimeout(()=>a.focus(),100)}}\
-             else if(a&&a!==document.body&&({locked}||!/^(INPUT|TEXTAREA)$/.test(a.tagName))){{a.blur();setTimeout(()=>a.focus(),50)}}"
-        ))
-        .await;
+/// Seconds since 1970, for lining debug messages up with other logs.
+fn debug_time() -> f64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0.0, |d| d.as_secs_f64())
+}
+
+/// OK on the "screen reader started or stopped" dialog: close it, and lock the vault if the dialog said it would.
+/// Going back to the unlock screen is what makes a screen reader started late pick the window up.
+fn acknowledge_reader_notice(
+    mut model: Signal<Option<AppModel>>,
+    mut notice: Signal<Option<ReaderNotice>>,
+) {
+    let Some(n) = *notice.peek() else { return };
+    if let Some(m) = model.write().as_mut() {
+        m.acknowledge_reader_notice(n);
+    }
+    notice.set(None);
+    if !n.lock_first {
+        // Already on the unlock screen: put the cursor back in the password box.
+        spawn(async {
+            let _ = dioxus::document::eval("document.getElementById('master')?.focus()").await;
+        });
+    }
+}
+
+/// The dialog shown when a screen reader starts or stops while the app is open.
+#[component]
+fn ReaderDialog() -> Element {
+    let ctx = use_context::<Ctx>();
+    let lang = lang_of(&ctx);
+    let Some(n) = (ctx.reader_notice)() else {
+        return rsx! {};
+    };
+    let (model, notice) = (ctx.model, ctx.reader_notice);
+    rsx! {
+        div { class: "modal-backdrop",
+            div {
+                class: "modal", role: "alertdialog", aria_modal: "true",
+                aria_labelledby: "reader-title", aria_describedby: "reader-text",
+                h2 { id: "reader-title", {tr(lang, Msg::ReaderNoticeTitle)} }
+                p { id: "reader-text", {tr(lang, n.message())} }
+                button {
+                    id: "reader-ok", class: "primary", r#type: "button", autofocus: true,
+                    // `autofocus` only works when the page loads; the dialog appears later.
+                    onmounted: move |_| {
+                        spawn(async {
+                            let _ = dioxus::document::eval("document.getElementById('reader-ok')?.focus()").await;
+                        });
+                    },
+                    onclick: move |_| acknowledge_reader_notice(model, notice),
+                    {tr(lang, Msg::Ok)}
+                }
+            }
+        }
     }
 }
 
@@ -235,18 +272,21 @@ fn app() -> Element {
         };
     });
     let setup_lang = use_signal(|| load_settings().language);
+    let reader_notice: Signal<Option<ReaderNotice>> = use_signal(|| None);
     let ctx = use_context_provider(|| Ctx {
         model,
         clock,
         last_input: last_input.clone(),
         broken,
         setup_lang,
+        reader_notice,
     });
 
     // Once a second: pass on user input, apply the inactivity lock, clear the clipboard when due, and redraw.
     {
         let last_input = last_input.clone();
         let mut clock = clock;
+        let mut reader_notice = reader_notice;
         use_future(move || {
             let last_input = last_input.clone();
             async move {
@@ -260,23 +300,59 @@ fn app() -> Element {
                         m.tick(t);
                     }
                     clock.set(t);
-                    if platform::screen_reader_started() {
-                        let locked = model.read().as_ref().is_none_or(|m| !m.is_unlocked());
-                        spawn(nudge_focus(locked));
+                    if let Some(enabled) = platform::screen_reader_change() {
+                        // Only once there is a vault screen to go back to; the first-run pages have nothing to lock.
+                        let next = model
+                            .read()
+                            .as_ref()
+                            .map(|m| m.screen_reader_changed(enabled, *reader_notice.peek()));
+                        if next.is_some() {
+                            reader_notice.set(next);
+                        }
                     }
                 }
             }
         });
     }
 
-    // Lock when the window loses focus (if enabled), and wipe the clipboard secret when it is closed.
+    // When the window gets focus back (Alt+Tab) while a screen reader runs, the web view may not tell the reader which
+    // control has focus, and the reader then speaks every key, even in the password box. The platform code knows
+    // what to do about it, if anything.
+    let mut focus_gain = use_signal(|| 0u32);
+    use_effect(move || {
+        if focus_gain() == 0 || !platform::screen_reader_active() {
+            return;
+        }
+        if let Some(script) = platform::script_after_window_focus() {
+            spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+                let _ = dioxus::document::eval(script).await;
+            });
+        }
+    });
+
+    // Lock when the window loses focus (if enabled or a screen reader runs), and wipe the clipboard secret when it is closed.
     dioxus::desktop::use_wry_event_handler(move |event, _| {
         use dioxus::desktop::tao::event::{Event, WindowEvent};
         if let Event::WindowEvent { event, .. } = event {
             match event {
+                WindowEvent::Focused(true) => {
+                    if platform::debug() {
+                        eprintln!("{:.3} window focus gained", debug_time());
+                    }
+                    focus_gain += 1;
+                }
                 WindowEvent::Focused(false) => {
+                    // While a screen reader runs, leaving the window (Alt+Tab) locks the vault.
+                    let reader = platform::screen_reader_active();
+                    if platform::debug() {
+                        eprintln!(
+                            "{:.3} window focus lost (screen reader running: {reader})",
+                            debug_time()
+                        );
+                    }
                     if let Some(m) = model.write().as_mut() {
-                        m.window_blurred();
+                        m.window_blurred(reader);
                     }
                 }
                 WindowEvent::CloseRequested => {
@@ -332,6 +408,7 @@ fn app() -> Element {
         // Always on the page, so a screen reader is already listening when the text changes.
         div { class: "sr-only", role: "status", aria_live: "polite", aria_atomic: "true", "{polite}" }
         div { class: "sr-only", role: "alert", aria_live: "assertive", aria_atomic: "true", "{urgent}" }
+        if reader_notice().is_some() { ReaderDialog {} }
         div {
             class: "app",
             dir: "{dir}",
@@ -340,6 +417,15 @@ fn app() -> Element {
             onpointerdown: move |_| input_down.set(now()),
             onkeydown: move |e| {
                 input_key.set(now());
+                if reader_notice.peek().is_some() {
+                    // The dialog is modal: Esc is OK, Tab stays on its one button, and no shortcut reaches the page.
+                    match e.key() {
+                        Key::Escape => acknowledge_reader_notice(model, reader_notice),
+                        Key::Tab => e.prevent_default(),
+                        _ => {}
+                    }
+                    return;
+                }
                 if e.key() == Key::Escape {
                     // Esc backs out of the form, settings or trash page, as Cancel / Items would.
                     if let Some(m) = model.write().as_mut() {

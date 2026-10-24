@@ -24,9 +24,14 @@ Open the app first, then turn Orca on, then unlock.
 
 **What the experiments found (2026-10-24):** a reload does not help. What helps is a real change of keyboard focus *from one control to another*: a mouse click on Unlock moves focus to the button and back to the password box, and after that Orca reads the box correctly. Blurring and refocusing the same box was not enough. Pressing Enter does not move focus, so Orca kept echoing.
 
-The app now listens for the desktop's "screen reader started" message (`apps/desktop/src/platform/linux.rs`). When it arrives, the app prints "Screen reader enabled" to the console and, over the next ten seconds, moves focus to the Unlock button and back four times (the unlock screen seems to refresh a few times; Orca may repeat "Enter master password"). With this, a first attempt after starting Orca late was read correctly (one tester, one run).
+The app now listens for the desktop's "screen reader started or stopped" message (`apps/desktop/src/platform/linux.rs`) and shows a dialog (see below). Nudging the focus a few times worked once but was replaced by this.
 
-To test: run `RAHASYAKOSH_DEBUG=1 rahasyakosh-desktop` from a terminal with Orca off, start Orca, and watch for "Screen reader enabled". Wait 15 seconds, then type a wrong passphrase and press Enter. Expected: no echo, and the alert is spoken. Repeat once without clicking the window after starting Orca, and once from the app-grid launcher. Quit Orca and look for "Screen reader disabled".
+- [ ] **On the unlock screen:** with Orca off, start the app, then start Orca. A dialog "Screen reader was enabled. Unlock the app to continue using it." appears with OK focused. Press Enter (or OK, or Esc): the dialog closes and the cursor is in the password box. Type a wrong passphrase: no echo, and the alert is spoken.
+- [ ] **With the vault open:** unlock first, then start Orca. The dialog says the app will go back to the lock screen. OK locks the vault and shows the unlock screen; unlock and check the item list is read correctly.
+- [ ] Quit Orca: the dialog appears again, worded "disabled".
+- [ ] While the dialog is up, Tab stays on OK and shortcuts such as Ctrl+N do nothing.
+- [ ] Run once as `RAHASYAKOSH_DEBUG=1 rahasyakosh-desktop` and check "Screen reader enabled" / "disabled" appear in the terminal.
+- [ ] Open the app from the app-grid launcher with Orca off, then start Orca: note whether the dialog still appears (it should, because the launcher only switches on the general accessibility flag).
 
 ## 1. Welcome and create-passphrase pages
 
@@ -42,6 +47,10 @@ To test: run `RAHASYAKOSH_DEBUG=1 rahasyakosh-desktop` from a terminal with Orca
 
 - [ ] The password field is announced as "Enter master password" (or the translated text) plus "password edit", and typed characters are NOT read back.
 - [ ] A wrong password is announced (error text read, or focus returned with the message).
+- [ ] **After Alt+Tab (bug found 2026-10-24):** with Orca running, type a wrong passphrase but do NOT press Enter, Alt+Tab to another app and back, then type more. Expected: Orca says "Enter master password, password text" again when you come back, **typing works**, the characters are not echoed, and a wrong-password alert is spoken after Enter. The half-typed text stays in the box.
+  *Cause, recorded with an AT-SPI event listener:* when the window comes back, WebKitGTK reports focus only for the web view as a whole, not for the password box, so Orca treated the web view as focused and echoed every key. The app now takes focus off the focused control and gives it straight back (in one step) 0.15 s after the window returns, while a screen reader runs; that makes WebKitGTK report the password box. An earlier attempt that moved focus to the Unlock button and back stopped typing working (it can leave Orca in browse mode, where letter keys are navigation commands): always check you can type after returning.
+- [ ] **Alt+Tab with the vault open and Orca running:** the app locks when you leave it, even if "lock when the window loses focus" is off. Come back, unlock, and check the item list is read correctly.
+- [ ] **Alt+Tab with Orca off:** nothing changes (the half-typed passphrase is still there, and the vault stays open unless the setting is on).
 - [ ] The backoff countdown is not announced every second (it should be read once, or not spam).
 - [ ] After unlock, focus lands on the item list or the search box, not on nothing.
 

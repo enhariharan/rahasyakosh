@@ -1,3 +1,4 @@
+use crate::i18n::Msg;
 use crate::model::*;
 use rahasyakosh_app::{Language, Scope, Session, Settings};
 use rahasyakosh_core::crypto::KdfParams;
@@ -299,7 +300,7 @@ fn lock_on_blur_only_when_enabled() {
         lock_on_blur: false,
         ..Settings::default()
     });
-    m.window_blurred();
+    m.window_blurred(false);
     assert!(m.is_unlocked());
     m.apply_settings(
         Settings {
@@ -308,8 +309,23 @@ fn lock_on_blur_only_when_enabled() {
         },
         30,
     );
-    m.window_blurred();
+    m.window_blurred(false);
     assert!(!m.is_unlocked());
+}
+
+#[test]
+fn a_running_screen_reader_locks_on_blur_whatever_the_setting() {
+    let (mut m, _) = model(Settings {
+        lock_on_blur: false,
+        ..Settings::default()
+    });
+    m.window_blurred(false);
+    assert!(
+        m.is_unlocked(),
+        "no screen reader and the setting off: stays open"
+    );
+    m.window_blurred(true);
+    assert!(!m.is_unlocked(), "a screen reader is running: locks");
 }
 
 #[test]
@@ -685,4 +701,38 @@ fn a_failed_save_names_the_box_that_is_wrong() {
     m.form.as_mut().unwrap().totp = String::new();
     m.save_form(23);
     assert!(m.form_error.is_none());
+}
+
+#[test]
+fn a_screen_reader_starting_or_stopping_asks_to_go_back_to_the_unlock_screen() {
+    let (mut m, _) = model(Settings {
+        idle_lock_secs: 0,
+        ..Settings::default()
+    });
+    // Vault open: OK locks it.
+    let n = m.screen_reader_changed(true, None);
+    assert_eq!(
+        n,
+        ReaderNotice {
+            enabled: true,
+            lock_first: true
+        }
+    );
+    assert_eq!(n.message(), Msg::ReaderEnabledLock);
+    // Stopping while the dialog is already up changes the wording, not what OK does.
+    let n = m.screen_reader_changed(false, Some(n));
+    assert_eq!(n.message(), Msg::ReaderDisabledLock);
+    m.acknowledge_reader_notice(n);
+    assert!(!m.is_unlocked(), "OK went back to the unlock screen");
+
+    // Already on the unlock screen: OK only closes the dialog.
+    let n = m.screen_reader_changed(true, None);
+    assert!(!n.lock_first);
+    assert_eq!(n.message(), Msg::ReaderEnabledUnlock);
+    assert_eq!(
+        m.screen_reader_changed(false, None).message(),
+        Msg::ReaderDisabledUnlock
+    );
+    m.acknowledge_reader_notice(n);
+    assert!(!m.is_unlocked());
 }

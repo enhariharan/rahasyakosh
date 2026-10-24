@@ -68,6 +68,28 @@ impl Announcement {
     }
 }
 
+/// The notice shown when a screen reader starts or stops while the app is open (see `platform`). The window is only
+/// picked up by a screen reader that was started late once the app has gone back to the unlock screen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReaderNotice {
+    /// A screen reader started (true) or stopped (false).
+    pub enabled: bool,
+    /// The vault was open, so pressing OK locks it. If it was already on the unlock screen, OK just closes the notice.
+    pub lock_first: bool,
+}
+
+impl ReaderNotice {
+    /// The wording of the notice.
+    pub fn message(self) -> Msg {
+        match (self.enabled, self.lock_first) {
+            (true, true) => Msg::ReaderEnabledLock,
+            (false, true) => Msg::ReaderDisabledLock,
+            (true, false) => Msg::ReaderEnabledUnlock,
+            (false, false) => Msg::ReaderDisabledUnlock,
+        }
+    }
+}
+
 /// Why a form cannot be saved: which box is wrong and what to tell the user.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FormError {
@@ -401,6 +423,28 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         self.say(text, false);
     }
 
+    // ---- screen reader started or stopped -------------------------------------------------------------
+
+    /// What to show now that a screen reader started or stopped. `current` is the notice already on screen, if any:
+    /// a second change only updates its wording and keeps what OK will do.
+    pub fn screen_reader_changed(
+        &self,
+        enabled: bool,
+        current: Option<ReaderNotice>,
+    ) -> ReaderNotice {
+        ReaderNotice {
+            enabled,
+            lock_first: current.map_or_else(|| self.is_unlocked(), |c| c.lock_first),
+        }
+    }
+
+    /// The user pressed OK: lock the vault if the notice said it would, which returns to the unlock screen.
+    pub fn acknowledge_reader_notice(&mut self, notice: ReaderNotice) {
+        if notice.lock_first {
+            self.lock();
+        }
+    }
+
     // ---- locking --------------------------------------------------------------------------------------
 
     pub fn unlock(&mut self, password: &str, now: i64) {
@@ -458,9 +502,11 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         self.session.touch(now);
     }
 
-    /// The window lost focus.
-    pub fn window_blurred(&mut self) {
-        if self.session.settings().lock_on_blur && self.is_unlocked() {
+    /// The window lost focus. The vault locks if the setting says so, and always while a screen reader is running:
+    /// a screen reader can lose track of the window when it comes back (Alt+Tab), and the unlock screen drawn
+    /// afresh is what it reads correctly.
+    pub fn window_blurred(&mut self, screen_reader: bool) {
+        if (self.session.settings().lock_on_blur || screen_reader) && self.is_unlocked() {
             self.lock();
         }
     }

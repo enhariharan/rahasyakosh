@@ -87,6 +87,11 @@ button.icon { position: absolute; top: .5rem; inset-inline-end: .5rem; padding: 
 .tab.on { background: var(--row-on); border-color: var(--accent); }
 .toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background: var(--toast); color: var(--toast-text);
   padding: .6rem 1rem; border-radius: 8px; z-index: 5; box-shadow: 0 4px 16px #0004; }
+.modal-backdrop { position: fixed; inset: 0; background: #0009; display: flex; align-items: center; justify-content: center; z-index: 20; padding: 1rem; }
+.modal { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 1.5rem; max-width: 30rem;
+  width: 100%; box-shadow: 0 8px 32px #0008; }
+.modal p { margin: .8rem 0 1.2rem; }
+.modal .primary { display: block; margin-inline-start: auto; min-width: 6rem; }
 .toast { display: flex; align-items: center; gap: 1rem; }
 .toast .undo { background: none; border: 1px solid currentColor; color: inherit; padding: .15rem .6rem; }
 .toast.error { background: var(--error-bg); color: var(--error-text); }
