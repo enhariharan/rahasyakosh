@@ -300,6 +300,16 @@ fn app() -> Element {
             onpointerdown: move |_| input_down.set(now()),
             onkeydown: move |e| {
                 input_key.set(now());
+                if e.key() == Key::Escape {
+                    // Esc backs out of the form, settings or trash page, as Cancel / Items would.
+                    if let Some(m) = model.write().as_mut() {
+                        match (m.is_unlocked(), m.view.clone()) {
+                            (true, View::Form) => m.cancel_form(now()),
+                            (true, View::Settings | View::Trash) => m.show(View::Items, now()),
+                            _ => {}
+                        }
+                    }
+                }
                 if e.modifiers().ctrl() && !e.modifiers().alt() {
                     if let Key::Character(c) = e.key() {
                         let unlocked = model.read().as_ref().is_some_and(|m| m.is_unlocked());
@@ -548,6 +558,12 @@ fn Unlock() -> Element {
             m.unlock(&pw.read(), t);
         }
         pw.set(String::new());
+        spawn(async move {
+            let _ = dioxus::document::eval(
+                "const e=document.getElementById('master');if(e){e.value='';e.focus()}",
+            )
+            .await;
+        });
     };
     rsx! {
         main { class: "centre landing",
@@ -557,10 +573,22 @@ fn Unlock() -> Element {
             form {
                 onsubmit: move |e| { e.prevent_default(); submit(); },
                 label { class: "sr-only", r#for: "master", {tr(lang, Msg::MasterPassword)} }
+                // Not bound to `value`: re-writing the typed text into the field on every key makes the screen
+                // reader see new text and read it back. The box is emptied once, after a try, by `submit`.
                 input {
                     id: "master", class: "ltr", dir: "ltr", r#type: "password", autofocus: true, autocomplete: "off",
+                    aria_label: tr(lang, Msg::EnterMasterPassword),
                     placeholder: tr(lang, Msg::EnterMasterPassword),
-                    value: "{pw}", oninput: move |e| pw.set(e.value()),
+                    oninput: move |e| pw.set(e.value()),
+                    // The focus given by `autofocus` can happen before the screen reader is listening; do it again.
+                    onmounted: move |_| {
+                        spawn(async move {
+                            let _ = dioxus::document::eval(
+                                "setTimeout(()=>{const e=document.getElementById('master');if(e){e.blur();e.focus()}},250)",
+                            )
+                            .await;
+                        });
+                    },
                 }
                 if let Some(e) = err { p { class: "error", role: "alert", "{e}" } }
                 if wait > 0 { p { class: "muted", "{trf(lang, Msg::TryAgainIn, &[&wait])}" } }

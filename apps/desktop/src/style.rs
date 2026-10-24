@@ -79,8 +79,8 @@ button.icon { position: absolute; top: .5rem; inset-inline-end: .5rem; padding: 
 .meter { color: var(--muted); font-size: .85rem; margin: .3rem 0; }
 .hint { color: var(--muted); font-size: .85rem; margin: 0; }
 
-.bar { display: flex; gap: 1rem; align-items: center; padding: .55rem 1rem; background: var(--panel); border-bottom: 1px solid var(--line); }
-.bar input[type=search] { max-width: 22rem; }
+.bar { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; padding: .55rem 1rem; background: var(--panel); border-bottom: 1px solid var(--line); }
+.bar input[type=search] { flex: 1 1 12rem; min-width: 10rem; max-width: 22rem; }
 .bar nav { display: flex; gap: .25rem; margin-inline-start: auto; }
 .tab { border-color: transparent; background: none; }
 .bar nav button, .bar > button { display: inline-flex; align-items: center; gap: .4rem; }
@@ -91,7 +91,7 @@ button.icon { position: absolute; top: .5rem; inset-inline-end: .5rem; padding: 
 
 .split { flex: 1; display: grid; grid-template-columns: minmax(240px, 340px) 1fr; min-height: 0; }
 .pane { position: relative; min-height: 0; display: flex; flex-direction: column; }
-.split aside { flex: 1; border-inline-end: 1px solid var(--line); overflow: auto; background: var(--panel); padding-bottom: 5rem; }
+.split aside { flex: 1; border-inline-end: 1px solid var(--line); overflow: auto; background: var(--panel); padding-bottom: 7rem; }
 /* The "New item" bar floats over the bottom of the list, so it stays in reach however long the list is. */
 button.fab { position: absolute; left: 1rem; right: 1rem; bottom: 1rem; display: flex; align-items: center; justify-content: center;
   gap: .5rem; padding: .7rem 1rem; border-radius: 999px; box-shadow: 0 4px 14px #0006; }
