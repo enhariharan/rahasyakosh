@@ -89,7 +89,7 @@ IDs are stable; reference them in commits and tests (e.g. `US-VLT-02`).
 | ID | Story | Acceptance criteria |
 |----|-------|---------------------|
 | US-SET-01 | Theme (light/dark/system), density, auto-lock, clipboard timeout, KDF strength. | |
-| US-A11Y-01 | Full keyboard navigation, screen-reader labels, WCAG 2.2 AA contrast. | Partly done in the Linux desktop app (labels, contrast test); screen-reader and zoom testing open |
+| US-A11Y-01 | Full keyboard navigation, screen-reader labels, WCAG 2.2 AA contrast. | Linux desktop app: labels, contrast test, Orca pass and 200% zoom pass (2026-10-24, `docs/08-a11y-test-checklist.md`). Open: keyboard shortcut checklist (`docs/09`), macOS/Windows screen readers, an external audit |
 | US-I18N-01 | Localisation via Fluent; initial: English, हिन्दी, தமிழ். | Desktop app done with built-in string tables instead of Fluent: English, हिन्दी, संस्कृतम्, தமிழ், తెలుగు, മലയാളം, اردو (right to left). Translations need native review |
 
 ## E11 — Project Health (P0)

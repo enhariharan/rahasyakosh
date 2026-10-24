@@ -122,7 +122,7 @@ Choose one under **Settings → Language** and press **Save settings**; the whol
 - **Linux only.** macOS and Windows need their own clipboard handling and packaging.
 - **No import or export screen.** Use `rk import` and `rk export` (see [Importing and exporting](import-export.md)).
 - **No browser autofill and no syncing between devices.**
-- **It has had a desk review and a first Orca test pass for accessibility, with some items still open** (US-A11Y-01). See [Accessibility](#accessibility) below.
+- **It has had a desk review and an Orca test pass for accessibility; the keyboard-shortcut check is still open** (US-A11Y-01). See [Accessibility](#accessibility) below.
 
 ## Accessibility
 
@@ -136,9 +136,9 @@ Accessibility means people who cannot use a mouse, cannot see the screen, or nee
 
 **Starting or stopping your screen reader while the app is open.** A screen reader can only read a window it was started before, or one that has been redrawn since. So when Rahasyakosh notices a screen reader start or stop, it shows a short dialog with an OK button. If the vault was open, the dialog says the app will go back to the lock screen; pressing OK (or Esc) locks it, and unlocking again gives you a freshly drawn window that the screen reader reads. If you were already on the lock screen, the dialog just asks you to unlock and OK leaves you there. This was found with Orca on Ubuntu; other screen readers and desktops are untested. It does not appear on the very first set-up pages, which have nothing to lock; if your reader misbehaves there, quit and reopen the app. The app-grid launcher installed by `install-local.sh` also switches the desktop's accessibility service on before the app starts. While a screen reader is running, when you come back to the window (for example after Alt+Tab) the app gently re-announces the control that has focus. Without that, the web view that draws the window tells the screen reader only that "the window" has focus, not which box, and the screen reader then reads out every key you type, even in the password box. With `RAHASYAKOSH_DEBUG=1` the app prints "Screen reader enabled" and "Screen reader disabled" to the terminal as the reader starts and stops.
 
-**Done so far:** an Orca test pass found and fixed several problems (the unlock box, Esc, announcements of errors, locking and show/hide, errors in forms, and a layout problem at 200% zoom). The test lists are in `docs/08-a11y-test-checklist.md` and `docs/09-shortcuts-test-checklist.md`; some items are still open, so this is not yet a full pass.
+**Tested:** an Orca test pass and a 200% zoom check on Ubuntu (October 2026) found and fixed several problems (the unlock box, Esc, announcements of errors, locking and show/hide, errors in forms, the Alt+Tab echo, and a layout problem at 200% zoom). All areas now pass. The test lists are in `docs/08-a11y-test-checklist.md` and `docs/09-shortcuts-test-checklist.md`.
 
-**Not done:** large text and 200% zoom have only been partly checked, and not everyone's setup has been tried. Only one tester has used the app with a real screen reader so far. If you rely on assistive software, your feedback is the most useful thing you can give.
+**Not done:** the keyboard shortcuts have not had a full test pass (`Ctrl+K`, `Ctrl+2` and `Ctrl+3` failed once and are not yet explained). Only one tester has used the app with a real screen reader, and only Orca; other screen readers, desktops and operating systems are untested. If you rely on assistive software, your feedback is the most useful thing you can give.
 
 ### Files the app creates besides your vault
 

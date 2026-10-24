@@ -140,3 +140,20 @@ Any failure becomes an issue labelled `a11y`. When every area passes on the curr
 | 7 Locking           | Fail        | Not announced.                                                                                                                                                                     |
 | 8 Focus / keyboard  | Fail        | 'Esc' does not work. 'Tab' works as expected.                                                                                                                                      |
 | 9 200% zoom         | Fail        | (1) Search bar is very very small in size. Even the cursor is also not visible; (2) "New Item" covers content;                                                                     |
+
+** Retest report - 2026-10-24, build f00c822 (Orca 50.2, Ubuntu, Wayland) **
+
+| Area                | Pass / fail | Notes                                                                 |
+| ------------------- | ----------- | --------------------------------------------------------------------- |
+| 0 Orca sees the app | Pass        | Passed at the first run                                               |
+| 1 Welcome / create  | Pass        | Passed at the first run                                               |
+| 2 Unlock            | Pass        | No echo, wrong password announced, also after Alt+Tab                 |
+| 3 List              | Pass        | Passed at the first run                                               |
+| 4 Item page         | Pass        | Show/hide, copy and trash with Undo announced                         |
+| 5 Forms             | Pass        | Errors announced, focus goes to the first error, Esc cancels          |
+| 6 Settings / RTL    | Pass        | Passed at the first run                                               |
+| 7 Locking           | Pass        | Lock announced                                                        |
+| 8 Focus / keyboard  | Pass        | Esc works, Tab order as expected                                      |
+| 9 200% zoom         | Pass        | Search box usable, "New item" no longer covers content                |
+
+Reported by the tester as "all pass". The keyboard shortcut checklist (`docs/09-shortcuts-test-checklist.md`) has not been run yet; `Ctrl+K`, `Ctrl+2` and `Ctrl+3` failed in an earlier report and are still unexplained.
