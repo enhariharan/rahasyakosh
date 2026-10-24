@@ -20,7 +20,7 @@ It takes about 20 minutes. Run it before each release and after big UI changes.
 ## 0b. Orca started after the app (known issue)
 Open the app first, then turn Orca on, then unlock.
 - [ ] Record what happens (typed characters echoed? alerts silent?). On 2026-10-24 this was reproduced: with Orca started *after* the app, typed passphrase characters were announced and the wrong-password alert was not. Starting Orca first works. Treat it as a limitation of how the app connects to the accessibility service until it is fixed, and say so in the release notes.
-- [ ] Check `gsettings get org.gnome.desktop.interface toolkit-accessibility`. If it says `false`, run `gsettings set org.gnome.desktop.interface toolkit-accessibility true`, log out and in, and repeat this section.
+- Already ruled out on the test machine: `gsettings get org.gnome.desktop.interface toolkit-accessibility` is `true`. `busctl --user get-property org.a11y.Bus /org/a11y/bus org.a11y.Status IsEnabled` is `false` with Orca off and `true` with Orca on. So the app starts while the accessibility service is off and does not attach when it comes on. No fix is known for the app itself; restart the app after starting Orca. `install-local.sh` now installs a launcher (`~/.local/bin/rahasyakosh`, used by the app-grid entry) that switches the service on before the app starts. Test that: with Orca off, open the app from the app grid, then turn Orca on, then unlock. Running `rahasyakosh-desktop` directly does not do this.
 
 ## 1. Welcome and create-passphrase pages
 

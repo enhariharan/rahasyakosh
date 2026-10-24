@@ -122,7 +122,7 @@ Choose one under **Settings → Language** and press **Save settings**; the whol
 - **Linux only.** macOS and Windows need their own clipboard handling and packaging.
 - **No import or export screen.** Use `rk import` and `rk export` (see [Importing and exporting](import-export.md)).
 - **No browser autofill and no syncing between devices.**
-- **It has had a desk review for accessibility, not testing with real assistive software** (US-A11Y-01). See [Accessibility](#accessibility) below.
+- **It has had a desk review and a first Orca test pass for accessibility, with some items still open** (US-A11Y-01). See [Accessibility](#accessibility) below.
 
 ## Accessibility
 
@@ -134,7 +134,11 @@ Accessibility means people who cannot use a mouse, cannot see the screen, or nee
 - **Contrast.** Text meets WCAG 2.2 level AA (at least 4.5 to 1), and the edges of fields and buttons and the focus outline meet 3 to 1, in both light and dark mode. A test (`cargo test` in `apps/desktop`) measures every colour pair, so a later colour change that breaks this fails the build.
 - **No colour-only meaning.** Errors and successes are written out in words; the pinned star is also spelled "Pinned" for screen readers.
 
-**Not done:** nobody has yet used the app with a real screen reader such as Orca, so the labels are reviewed but not heard. Large text and 200% zoom have not been checked either. If you rely on assistive software, your feedback is the most useful thing you can give.
+**Known limitation: start your screen reader before the app.** If you open the app first and turn Orca on afterwards, Orca may not connect to the window. The signs are that it reads out every key you type (including your master password characters) and stays silent about errors. Quit the app and open it again after Orca is running, and everything works. The cause is that the desktop's accessibility service is switched off until a screen reader starts, and the web view that draws the window only connects to it when it starts. The app-grid launcher installed by `install-local.sh` switches the service on first, which should avoid the problem; if you run `rahasyakosh-desktop` directly, start Orca first.
+
+**Done so far:** an Orca test pass found and fixed several problems (the unlock box, Esc, announcements of errors, locking and show/hide, errors in forms, and a layout problem at 200% zoom). The test lists are in `docs/08-a11y-test-checklist.md` and `docs/09-shortcuts-test-checklist.md`; some items are still open, so this is not yet a full pass.
+
+**Not done:** large text and 200% zoom have only been partly checked, and not everyone's setup has been tried. Only one tester has used the app with a real screen reader so far. If you rely on assistive software, your feedback is the most useful thing you can give.
 
 ### Files the app creates besides your vault
 
