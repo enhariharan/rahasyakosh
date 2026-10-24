@@ -20,6 +20,11 @@ the main table below is run from **three starting points**. Mark each cell:
 
 `✔` works · `✘` does nothing · `?` does something else (say what).
 
+**Cause of the first failures (2026-10-24):** keys pressed while nothing in the window has focus go to the page itself, outside the app's own key handler. That happens right after unlocking (the password box disappears with focus in it) and after clicking a list row (the list is redrawn). Clicking a top-bar tab put focus back inside, so shortcuts started working. The app now also catches keys sent to the page itself. The "Blank" column is the case that failed; also check:
+- [ ] Right after unlocking, with no click: `Ctrl+2`, `Ctrl+3`, `Ctrl+K`, `Ctrl+N` work.
+- [ ] Click an item in the list, then press `Ctrl+3`: it works without clicking a tab first.
+- [ ] After pressing a shortcut that redraws the screen (for example `Ctrl+D`), the next shortcut still works.
+
 ## 1. Moving around (unlocked, no item needed)
 
 | Shortcut | Expected | List | Search | Blank | Notes |
@@ -83,3 +88,17 @@ session type, layout, Orca on or off).
 Every `✘` or `?` becomes an issue labelled `a11y` (or `desktop`). For each one note: the focus
 starting point, whether Orca was on, and anything that appeared on screen. When every row passes on
 the current build, update US-DSK-01 and US-A11Y-01 in `docs/02-epics-and-user-stories.md`.
+
+** Test report - 2026-10-24 (Linux desktop app, Ubuntu, Wayland) **
+
+| Section                               | Pass / fail | Notes                                                       |
+| ------------------------------------- | ----------- | ----------------------------------------------------------- |
+| 1 Moving around                       | Pass        | From a list row, the search box and with nothing focused    |
+| 2 Acting on the open item             | Pass        | All three starting points                                   |
+| 3 Shortcuts that must do nothing      | Pass        |                                                             |
+| 4 Conflicts and side effects          | Pass        |                                                             |
+| 5 The hints in the app                | Pass        |                                                             |
+| 6 Other keyboard layouts (optional)   | Pass        |                                                             |
+
+Earlier failures (`Ctrl+K`, `Ctrl+2`, `Ctrl+3` doing nothing) came from keys pressed with nothing focused not reaching the app's key handler; fixed by catching keys sent to the page itself.
+

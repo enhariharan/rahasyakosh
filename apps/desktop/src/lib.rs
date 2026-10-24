@@ -157,6 +157,107 @@ fn debug_time() -> f64 {
         .map_or(0.0, |d| d.as_secs_f64())
 }
 
+/// The keys the app acts on, for both ways they arrive (see `forward_page_keys`). Returns true if the key was used,
+/// so the caller can stop the browser from also acting on it.
+fn handle_key(
+    key: &Key,
+    mods: Modifiers,
+    model: Signal<Option<AppModel>>,
+    reader_notice: Signal<Option<ReaderNotice>>,
+) -> bool {
+    let mut model = model;
+    if reader_notice.peek().is_some() {
+        // The dialog is modal: Esc is OK, Tab stays on its one button, and no shortcut reaches the page.
+        match key {
+            Key::Escape => acknowledge_reader_notice(model, reader_notice),
+            Key::Tab => return true,
+            _ => {}
+        }
+        return false;
+    }
+    let mut used = false;
+    if *key == Key::Escape {
+        // Esc backs out of the form, settings or trash page, as Cancel / Items would.
+        if let Some(m) = model.write().as_mut() {
+            match (m.is_unlocked(), m.view.clone()) {
+                (true, View::Form) => m.cancel_form(now()),
+                (true, View::Settings | View::Trash) => m.show(View::Items, now()),
+                _ => {}
+            }
+        }
+    }
+    if mods.ctrl() && !mods.alt() {
+        if let Key::Character(c) = key {
+            // Ctrl+Z only means "undo moving to the trash" while that offer is showing.
+            if c.eq_ignore_ascii_case("z") && !mods.shift() {
+                if let Some(m) = model.write().as_mut() {
+                    if m.notice.as_ref().is_some_and(|n| n.undo.is_some()) {
+                        used = true;
+                        m.undo_trash(now());
+                    }
+                }
+            }
+            let unlocked = model.read().as_ref().is_some_and(|m| m.is_unlocked());
+            if let Some(shortcut) = Shortcut::from_key(c, mods.shift()).filter(|_| unlocked) {
+                if let Some(m) = model.write().as_mut() {
+                    if !shortcut.needs_item() || m.has_open_item() {
+                        used = true;
+                        shortcut.run(m, now());
+                    }
+                }
+            }
+        }
+    }
+    if mods.ctrl() && *key == Key::Character("k".into()) {
+        used = true;
+        spawn(async move {
+            let _ = dioxus::document::eval("document.getElementById('search')?.focus()").await;
+        });
+    }
+    used
+}
+
+/// Keys pressed while nothing in the window has focus (right after unlocking, or after the focused control was
+/// removed, for example by clicking a list row) go to the page itself, which the window's own key handler cannot see.
+/// This script catches those and the app handles them with `handle_key`, so shortcuts work whatever has focus.
+/// The keys it stops the browser acting on (`preventDefault`) must match `Shortcut::from_key`.
+const PAGE_KEYS_SCRIPT: &str = r#"
+if (!window.__rkPageKeys) {
+  window.__rkPageKeys = true;
+  document.addEventListener('keydown', (e) => {
+    if (e.target !== document.body && e.target !== document.documentElement) return;
+    if (e.key !== 'Escape' && !e.ctrlKey) return;
+    dioxus.send([e.key, e.ctrlKey, e.altKey, e.shiftKey]);
+    const k = e.key.toLowerCase();
+    if (e.ctrlKey && !e.altKey && (e.shiftKey ? 'ucwts' : '123klnpedz').includes(k) && k.length === 1) e.preventDefault();
+  });
+}
+"#;
+
+/// The key and modifiers described by a message from `PAGE_KEYS_SCRIPT`.
+fn page_key(key: &str, ctrl: bool, alt: bool, shift: bool) -> Option<(Key, Modifiers)> {
+    let mut mods = Modifiers::empty();
+    mods.set(Modifiers::CONTROL, ctrl);
+    mods.set(Modifiers::ALT, alt);
+    mods.set(Modifiers::SHIFT, shift);
+    Some((key.parse::<Key>().ok()?, mods))
+}
+
+/// Pass keys pressed with nothing focused to `handle_key`, for as long as the window lives.
+async fn forward_page_keys(
+    model: Signal<Option<AppModel>>,
+    reader_notice: Signal<Option<ReaderNotice>>,
+    last_input: Rc<Cell<i64>>,
+) {
+    let mut events = dioxus::document::eval(PAGE_KEYS_SCRIPT);
+    while let Ok((key, ctrl, alt, shift)) = events.recv::<(String, bool, bool, bool)>().await {
+        last_input.set(now());
+        if let Some((key, mods)) = page_key(&key, ctrl, alt, shift) {
+            handle_key(&key, mods, model, reader_notice);
+        }
+    }
+}
+
 /// OK on the "screen reader started or stopped" dialog: close it, and lock the vault if the dialog said it would.
 /// Going back to the unlock screen is what makes a screen reader started late pick the window up.
 fn acknowledge_reader_notice(
@@ -281,6 +382,11 @@ fn app() -> Element {
         setup_lang,
         reader_notice,
     });
+
+    {
+        let last_input = last_input.clone();
+        use_future(move || forward_page_keys(model, reader_notice, last_input.clone()));
+    }
 
     // Once a second: pass on user input, apply the inactivity lock, clear the clipboard when due, and redraw.
     {
@@ -412,53 +518,8 @@ fn app() -> Element {
             onpointerdown: move |_| input_down.set(now()),
             onkeydown: move |e| {
                 input_key.set(now());
-                if reader_notice.peek().is_some() {
-                    // The dialog is modal: Esc is OK, Tab stays on its one button, and no shortcut reaches the page.
-                    match e.key() {
-                        Key::Escape => acknowledge_reader_notice(model, reader_notice),
-                        Key::Tab => e.prevent_default(),
-                        _ => {}
-                    }
-                    return;
-                }
-                if e.key() == Key::Escape {
-                    // Esc backs out of the form, settings or trash page, as Cancel / Items would.
-                    if let Some(m) = model.write().as_mut() {
-                        match (m.is_unlocked(), m.view.clone()) {
-                            (true, View::Form) => m.cancel_form(now()),
-                            (true, View::Settings | View::Trash) => m.show(View::Items, now()),
-                            _ => {}
-                        }
-                    }
-                }
-                if e.modifiers().ctrl() && !e.modifiers().alt() {
-                    if let Key::Character(c) = e.key() {
-                        // Ctrl+Z only means "undo moving to the trash" while that offer is showing.
-                        if c.eq_ignore_ascii_case("z") && !e.modifiers().shift() {
-                            if let Some(m) = model.write().as_mut() {
-                                if m.notice.as_ref().is_some_and(|n| n.undo.is_some()) {
-                                    e.prevent_default();
-                                    m.undo_trash(now());
-                                }
-                            }
-                        }
-                        let unlocked = model.read().as_ref().is_some_and(|m| m.is_unlocked());
-                        let shift = e.modifiers().shift();
-                        if let Some(shortcut) = Shortcut::from_key(&c, shift).filter(|_| unlocked) {
-                            if let Some(m) = model.write().as_mut() {
-                                if !shortcut.needs_item() || m.has_open_item() {
-                                    e.prevent_default();
-                                    shortcut.run(m, now());
-                                }
-                            }
-                        }
-                    }
-                }
-                if e.modifiers().ctrl() && e.key() == Key::Character("k".into()) {
+                if handle_key(&e.key(), e.modifiers(), model, reader_notice) {
                     e.prevent_default();
-                    spawn(async move {
-                        let _ = dioxus::document::eval("document.getElementById('search')?.focus()").await;
-                    });
                 }
             },
             { screen(ctx.clone()) }
@@ -1402,7 +1463,31 @@ fn SettingsView() -> Element {
 
 #[cfg(test)]
 mod shortcut_tests {
-    use super::Shortcut;
+    #[test]
+    fn keys_sent_by_the_page_script_become_the_same_keys_as_real_events() {
+        use dioxus::prelude::{Key, Modifiers};
+        let (key, mods) = page_key("2", true, false, false).unwrap();
+        assert_eq!(key, Key::Character("2".into()));
+        assert!(mods.ctrl() && !mods.alt() && !mods.shift());
+        let (key, mods) = page_key("S", true, false, true).unwrap();
+        assert_eq!(key, Key::Character("S".into()));
+        assert!(mods.ctrl() && mods.shift());
+        assert_eq!(
+            page_key("Escape", false, false, false).unwrap().0,
+            Key::Escape
+        );
+        assert_eq!(
+            Modifiers::empty(),
+            page_key("Tab", false, false, false).unwrap().1
+        );
+        // The shortcut table accepts what the script forwards.
+        assert!(
+            matches!(Shortcut::from_key("2", false), Some(Shortcut::Trash)),
+            "Ctrl+2 opens the trash"
+        );
+    }
+
+    use super::{page_key, Shortcut};
 
     #[test]
     fn keys_map_to_shortcuts_and_the_hint_matches() {
