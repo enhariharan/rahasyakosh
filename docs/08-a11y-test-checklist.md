@@ -1,0 +1,122 @@
+# 08 — Screen-reader and zoom test checklist (US-A11Y-01)
+
+A manual pass for the Linux desktop app with the Orca screen reader, plus a 200% zoom check.
+It takes about 20 minutes. Run it before each release and after big UI changes.
+
+## Setup
+
+- [ ] Use a throwaway vault with a few items (one with a TOTP secret, one pinned, one in the trash). Never test with a real vault.
+- [ ] Install the current build (`install-local.sh`) and quit any older copy.
+- [ ] Turn Orca on with `Super+Alt+S` (or Settings → Accessibility → Screen Reader). Turn the speech rate up if it is slow.
+- [ ] Note the session type (Wayland or X11; run `echo $XDG_SESSION_TYPE`), the Orca version (`orca --version`) and the app commit.
+- [ ] Use the keyboard only. Do not touch the mouse. Keys: `Tab` / `Shift+Tab` move, `Enter` / `Space` activate, `Esc` closes.
+
+## 0. Does Orca see the app at all?
+
+- [ ] Orca announces the window title when the app opens or gains focus.
+- [ ] Tabbing announces something for every stop. Silence means the accessibility tree is not exposed (record it as a blocker, then repeat once under X11).
+
+## 1. Welcome and create-passphrase pages
+
+- [ ] The logo is read as the app name, once (not "image" or a file name).
+- [ ] The tagline and description are read in order when you read the page (`Orca+Down` arrow, or flat review).
+- [ ] The generated passphrase is readable word by word, and the one-time warning is read before or with it.
+- [ ] The "I have written this down" tick box is announced as a check box with its state (checked / not checked).
+- [ ] "Create vault" is announced as disabled until the tick is set, and nothing is lost when you tab past it.
+- [ ] The copy button has a name ("Copy" or similar), not just "button".
+- [ ] Focus starts on a sensible control, and moving to the second page puts focus at its top.
+
+## 2. Unlock screen
+
+- [ ] The password field is announced as "Enter master password" (or the translated text) plus "password edit", and typed characters are NOT read back.
+- [ ] A wrong password is announced (error text read, or focus returned with the message).
+- [ ] The backoff countdown is not announced every second (it should be read once, or not spam).
+- [ ] After unlock, focus lands on the item list or the search box, not on nothing.
+
+## 3. Item list
+
+- [ ] Search: the field has a name; as you type, the number of results (or the change) is reachable without a flood of speech.
+- [ ] Each row reads as: title, username, and flags such as pinned / favourite. No "unlabelled" rows.
+- [ ] `Up` / `Down` or `Tab` reaches every row. `Enter` opens the item.
+- [ ] The floating "New item" bar is reachable by `Tab`, is announced with its shortcut (`Ctrl+N`), and does not cover the last row in a way that hides it from the reader.
+- [ ] `Ctrl+N` works from the list.
+
+## 4. Item page
+
+- [ ] Each icon button is read by its name, with its shortcut where one exists: pin, edit, trash, copy, show.
+- [ ] Nothing extra is read for the icons themselves. *What this means:* the small pictures inside the buttons (pin, edit, trash, copy, show) are decoration, because each button already has a text name. We mark them `aria-hidden` so Orca skips them. You should hear only the button name ("Copy password, button"), never "image", "graphic" or "svg". There is nothing to look at: just listen while tabbing through the buttons.
+- [ ] **Reveal**: pressing Show reads "shown" / the state change, and the password is NOT read aloud on its own. Reading it is the user's choice.
+- [ ] Hide again: the state change is announced and the password is no longer exposed.
+- [ ] **Copy**: something confirms the copy ("Copied" or equivalent) without exposing the secret.
+- [ ] The TOTP code: reachable, not re-announced every 30 seconds by itself, and the time left is available on demand.
+- [ ] History and trash actions have names. Moving to trash asks for confirmation that the reader can hear.
+
+## 5. Forms (new / edit item)
+
+- [ ] Every field has a label read before its type ("Title, edit", "Password, password edit").
+- [ ] Required fields and errors are announced, and focus goes to the first error.
+- [ ] The password generator: *How to test:* in the new-item form, tab to the Generate button (it is next to the Password field) and press it. The button has a name ("Generate random password" or similar). The field then holds a new 20-character password. Orca should tell you the field changed, or you should be able to move back to the field and hear (or, with Show, read) that it now has a value. It is a single button: there are no length, word or symbol controls to test yet.
+- [ ] The strength meter: *How to test:* type `abc` in the Password field (new-item form, or the create-passphrase page on first run). A line such as "Strength: Very weak, cracked in …" appears below the field. Orca should read it, or you should reach it with the review keys, without looking at the screen. Then type a long random password and check that the wording changes ("Strong"). If the meter is only a coloured bar with no words, or is not announced when it changes, this item fails.
+- [ ] Save and Cancel are reachable at the end of the tab order. `Esc` cancels.
+
+## 6. Settings
+
+- [ ] Each setting (auto-lock time, colour scheme, icons or text, language) has a name and its current value is read.
+- [ ] Changing the language: the app name, headings and window title change, and Orca keeps working (set the Orca language voice to match if you test Hindi, Tamil, etc.).
+- [ ] **Urdu (right-to-left)**: the tab order follows the visual order, and `Left` / `Right` hints (if any) are not reversed wrongly.
+- [ ] Colour scheme: light, dark and system all keep the focus ring visible.
+
+## 7. Locking
+
+- [ ] Manual lock and auto-lock: the user is told the vault locked (announcement or focus moved to the unlock screen).
+- [ ] Nothing from the vault is still readable in review mode after locking.
+
+## 8. Focus and keyboard (no screen reader needed)
+
+- [ ] A visible focus ring is on every control, in both light and dark.
+- [ ] No keyboard trap: you can always leave a dialog or field with `Tab` or `Esc`.
+- [ ] The tab order matches the visual order on every page.
+
+## 9. 200% zoom
+
+Set the webview zoom to 200% (`Ctrl` + `+` until it reads 200%, or set Settings → Accessibility → Large Text and a 2× display scale). Check each page: welcome, create-passphrase, unlock, list, item, forms, settings.
+
+- [ ] No text is cut off or overlaps.
+- [ ] No horizontal scrolling is needed to use a page.
+- [ ] Buttons and the floating "New item" bar stay reachable and do not cover content.
+- [ ] Dialogs fit the window, or scroll inside it.
+- [ ] Repeat once with the window at its smallest allowed size.
+
+## Recording results
+
+Copy the table below into the pull request or the release notes.
+
+| Area                | Pass / fail | Notes (what Orca said, what you expected) |
+| ------------------- | ----------- | ----------------------------------------- |
+| 0 Orca sees the app |             |                                           |
+| 1 Welcome / create  |             |                                           |
+| 2 Unlock            |             |                                           |
+| 3 List              |             |                                           |
+| 4 Item page         |             |                                           |
+| 5 Forms             |             |                                           |
+| 6 Settings / RTL    |             |                                           |
+| 7 Locking           |             |                                           |
+| 8 Focus / keyboard  |             |                                           |
+| 9 200% zoom         |             |                                           |
+
+Any failure becomes an issue labelled `a11y`. When every area passes on the current build, update US-A11Y-01 in `docs/02-epics-and-user-stories.md` and the roadmap row for M3.
+
+** Test report - 2026-10-24 09:31 **
+
+| Area                | Pass / fail | Notes (what Orca said, what you expected)                                                                                                                                          |
+| ------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 Orca sees the app | Pass        |                                                                                                                                                                                    |
+| 1 Welcome / create  | Pass        |                                                                                                                                                                                    |
+| 2 Unlock            | Fail        | (1) "Enter master password" is not announced; (2) "Password edit" is not announced; (3) CRITICAL - Typed passphrase characters are read back; (4) Wrong password is not announced; |
+| 3 List              | Pass        |                                                                                                                                                                                    |
+| 4 Item page         | Fail        | (1) State change is not announced; (2) What are the decorative icons? (3) No confirmation is asked by the app before thrashing. It is also not announced.                          |
+| 5 Forms             | Fail        | (1) Required fields and errors are not announced, and focus does not go to the first error. (2) How to test password generator controls? (3) How to test strength meter?           |
+| 6 Settings / RTL    | Pass        |                                                                                                                                                                                    |
+| 7 Locking           | Fail        | Not announced.                                                                                                                                                                     |
+| 8 Focus / keyboard  | Fail        | 'Esc' does not work. 'Tab' works as expected.                                                                                                                                      |
+| 9 200% zoom         | Fail        | (1) Search bar is very very small in size. Even the cursor is also not visible; (2) "New Item" covers content;                                                                     |
