@@ -172,7 +172,7 @@ enum Cmd {
         #[arg(short, long)]
         yes: bool,
     },
-    /// Export the vault. csv and json are PLAINTEXT and ask for the master password again.
+    /// Export the vault. csv, json and txt are PLAINTEXT and ask for the master password again.
     Export {
         #[arg(short, long, value_enum, default_value_t = ExportFormat::Csv)]
         format: ExportFormat,
@@ -191,6 +191,8 @@ enum ExportFormat {
     Csv,
     /// Plaintext JSON (complete)
     Json,
+    /// Plaintext, readable text file (every field of every login)
+    Txt,
     /// Encrypted copy of the vault file (safe to store; needs your master password to open)
     Vault,
 }
@@ -900,6 +902,7 @@ fn main() -> Result<()> {
             let items: Vec<Item> = vault.items(Scope::Any).into_iter().cloned().collect();
             let text = match format {
                 ExportFormat::Csv => transfer::export_csv(&items)?,
+                ExportFormat::Txt => transfer::export_txt(&items),
                 _ => transfer::export_json(&items)?,
             };
             match output {

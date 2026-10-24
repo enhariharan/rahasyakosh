@@ -721,3 +721,97 @@ fn a_screen_reader_starting_or_stopping_asks_to_go_back_to_the_unlock_screen() {
     m.acknowledge_reader_notice(n);
     assert!(!m.is_unlocked());
 }
+
+/// A new empty folder for a test to write into.
+fn scratch_dir(name: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("rk-export-{name}-{}", Uuid::now_v7()));
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+#[test]
+fn export_writes_a_private_text_file_after_checking_the_password() {
+    let (mut m, _) = model(Settings {
+        idle_lock_secs: 0,
+        ..Settings::default()
+    });
+    let dir = scratch_dir("ok");
+    let file = dir.join("out.txt");
+
+    // Wrong master password: nothing is written.
+    let e = m
+        .export_text("not the password", file.to_str().unwrap(), 20)
+        .unwrap_err();
+    assert_eq!(e, "Wrong password.");
+    assert!(!file.exists());
+    assert!(m.announcement.urgent, "the failure is announced");
+
+    let (count, written) = m.export_text(PW, file.to_str().unwrap(), 21).unwrap();
+    assert_eq!((count, written.as_path()), (2, file.as_path()));
+    let text = std::fs::read_to_string(&file).unwrap();
+    for needle in [
+        "RAHASYAKOSH EXPORT (PLAIN TEXT)",
+        "Title: Bank",
+        "Password: bank-pw",
+        "Title: GitHub",
+        "Password: gh-pw",
+        "Two-factor secret: JBSWY3DPEHPK3PXP",
+        "Notes: recovery: abc-123",
+    ] {
+        assert!(text.contains(needle), "missing {needle:?}");
+    }
+    assert!(m
+        .notice
+        .as_ref()
+        .unwrap()
+        .text
+        .contains("Exported 2 login(s)"));
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(&file).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "only the owner can read the export");
+    }
+
+    // A second export to the same name is refused and leaves the first file alone.
+    let e = m.export_text(PW, file.to_str().unwrap(), 22).unwrap_err();
+    assert!(e.contains("already exists"), "{e}");
+    assert_eq!(std::fs::read_to_string(&file).unwrap(), text);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn export_refuses_a_missing_folder_an_empty_name_and_a_locked_vault() {
+    let (mut m, _) = model(Settings {
+        idle_lock_secs: 0,
+        ..Settings::default()
+    });
+    let dir = scratch_dir("bad");
+    let missing = dir.join("no-such-folder").join("out.txt");
+    let e = m
+        .export_text(PW, missing.to_str().unwrap(), 20)
+        .unwrap_err();
+    assert!(e.contains("folder does not exist"), "{e}");
+    assert!(m
+        .export_text(PW, "   ", 21)
+        .unwrap_err()
+        .contains("where to save"));
+    m.lock();
+    let file = dir.join("out.txt");
+    assert!(m.export_text(PW, file.to_str().unwrap(), 22).is_err());
+    assert!(!file.exists(), "a locked vault writes nothing");
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn export_names_the_file_for_the_day() {
+    // 2026-10-24 12:38:55 UTC
+    let path = default_export_path(1_792_833_535);
+    assert!(
+        path.ends_with("/rahasyakosh-export-2026-10-24.txt"),
+        "{path}"
+    );
+    assert!(default_export_path(0).ends_with("rahasyakosh-export-1970-01-01.txt"));
+    // A leap day.
+    assert!(default_export_path(1_709_164_800).ends_with("2024-02-29.txt"));
+}

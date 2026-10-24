@@ -98,3 +98,31 @@ IDs are stable; reference them in commits and tests (e.g. `US-VLT-02`).
 | US-OSS-01 | MIT licence, CONTRIBUTING, SECURITY.md (disclosure), CODE_OF_CONDUCT. | |
 | US-OSS-02 | CI: fmt, clippy, tests, cargo-deny, cargo-audit, WASM size gate. | |
 | US-OSS-03 | Published test vectors & format spec for third-party implementations. | |
+
+## E12 — Export to a Text File (P0)
+| ID | Story | Acceptance criteria |
+|----|-------|---------------------|
+| US-EXP-01 | I export my saved logins to a plain text file I can read. (P0) | Desktop **Settings → Export passwords to a text file** and `rk export -f txt`. Warning shown first; master password asked again; every live login with all its fields, sorted by title; trashed items left out; file created owner-only (`0600`); an existing file is never replaced; the result is announced to screen readers. **Done** for the Linux desktop app and the CLI (2026-10-24). |
+
+## E13 — User Profiles (P1)
+A **user profile** groups the passwords of one particular user, so one installation can hold the passwords of several users. A profile has a **unique user ID**, a **full name** and a **unique username**; more attributes are expected later, so the profile is a record that can grow, not three loose settings.
+
+| ID | Story | Acceptance criteria |
+|----|-------|---------------------|
+| US-PRF-01 | The app stores user profiles, each with a unique user ID, a full name and a unique username. (P1) | The ID is generated and never changes. Usernames are unique across profiles (compared ignoring case); a duplicate is refused with a clear message. The profile format allows new attributes later without breaking old data (versioned, as items are). |
+| US-PRF-02 | At first startup there is a default profile, and I can change its name and username (optional). (P1) | Created with full name **"Default user"** and username **"defaultuser"**. The first-run flow offers both values for editing, pre-filled; leaving them unchanged is allowed and loses nothing. They can be changed later. |
+| US-PRF-03 | I add more profiles. (P1) | A new profile starts with no passwords. Full name and username are required; the user ID is generated. |
+| US-PRF-04 | Every password belongs to exactly one profile, and I switch between profiles. (P1) | The list, search, trash, export and generator health checks only show the active profile. Switching is an explicit action and locks or hides the other profile's secrets. |
+| US-PRF-05 | I edit or delete a profile. (P1) | Editing the name or username keeps the user ID. Deleting a profile asks for confirmation, states how many passwords go with it, and moves them to the trash. The last remaining profile cannot be deleted. |
+
+**Decision (2026-10-24, from the product owner):** every profile has **its own master password**. At startup the user **selects a profile and types that profile's master password**. So a profile is a separate vault with its own key: one user cannot read another's passwords, and this overlaps US-VLT-06 (multiple vaults). Consequences:
+- Each profile's passwords live in their own encrypted vault file; the profile's ID, full name and username are kept in a small **profile list** beside them. The list is not secret, because the picker must show it before anything is unlocked.
+- The unlock screen gains a profile picker; "switching profile" means locking and picking another one (US-PRF-04).
+- Deleting a profile deletes its vault, so it needs a typed confirmation, not only a click (US-PRF-05).
+- A forgotten master password for one profile loses only that profile's data (see the recovery key, US-VLT-04).
+
+**Still open (proposed answers, to confirm before building):**
+1. **Existing vault:** it becomes the default profile in place (same file, same master password, ID generated on first run). Nothing is re-encrypted.
+2. **Does the username sign in?** No. The user picks a profile from the list; the username is its unique label, shown in the picker and used by `rk --profile <username>`.
+3. **Where do the first-run fields go?** On the create-master-password page, above the password boxes, pre-filled with "Default user" and "defaultuser" and marked optional.
+4. **Name edits for the default profile later:** Settings → Profile.

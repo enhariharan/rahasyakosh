@@ -344,6 +344,60 @@ pub fn export_json(items: &[Item]) -> Result<Zeroizing<String>> {
         .map_err(|e| Error::Export(e.to_string()))
 }
 
+/// Export live (not trashed) items as a plain text file a person can read: one block per item, sorted by title, with
+/// every field written out.
+///
+/// The text starts with a warning, because the file holds every password unprotected. Values that run over several
+/// lines (notes) are indented so a block stays easy to scan.
+pub fn export_txt(items: &[Item]) -> Zeroizing<String> {
+    fn put(out: &mut String, label: &str, value: &str) {
+        let mut lines = value.lines();
+        out.push_str(label);
+        out.push_str(": ");
+        out.push_str(lines.next().unwrap_or(""));
+        for line in lines {
+            out.push_str("\n    ");
+            out.push_str(line);
+        }
+        out.push('\n');
+    }
+    let mut live: Vec<&Item> = items.iter().filter(|i| i.deleted_at.is_none()).collect();
+    live.sort_by_cached_key(|i| i.title.to_lowercase());
+    let mut out = String::from(
+        "RAHASYAKOSH EXPORT (PLAIN TEXT)\n\
+         Anyone who can read this file can read every password in it.\n\
+         Keep it somewhere safe and delete it when you no longer need it.\n",
+    );
+    out.push_str(&format!("\n{} login(s)\n", live.len()));
+    for i in live {
+        out.push_str("\n------------------------------------------------------------\n");
+        put(&mut out, "Title", &i.title);
+        let named = |n: &str| i.field(n).map(|f| f.value.as_str());
+        put(&mut out, "Username", named("username").unwrap_or(""));
+        put(&mut out, "Password", named("password").unwrap_or(""));
+        for url in &i.urls {
+            put(&mut out, "Website", url);
+        }
+        if let Some(totp) = named("totp") {
+            put(&mut out, "Two-factor secret", totp);
+        }
+        for f in i
+            .fields
+            .iter()
+            .filter(|f| !matches!(f.name.as_str(), "username" | "password" | "totp"))
+        {
+            put(&mut out, &f.name, &f.value);
+        }
+        if !i.tags.is_empty() {
+            put(&mut out, "Tags", &i.tags.join(", "));
+        }
+        if !i.notes.is_empty() {
+            put(&mut out, "Notes", &i.notes);
+        }
+    }
+    Zeroizing::new(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -530,5 +584,44 @@ mod tests {
         assert_eq!(host_of("https://www.example.com/login?x=1"), "example.com");
         assert_eq!(host_of("http://user@host.test:8080/p"), "host.test:8080");
         assert_eq!(host_of(""), "(untitled)");
+    }
+
+    #[test]
+    fn txt_export_lists_live_logins_sorted_with_every_field() {
+        let mut b = Item::login("beta", "bob", "pw-b", 1, Uuid::from_u128(2));
+        b.urls.push("https://beta.example".into());
+        b.tags.push("work".into());
+        b.notes = "line one\nline two".into();
+        b.set_field("totp", "JBSWY3DPEHPK3PXP", true);
+        b.set_field("pin", "4321", true);
+        let a = Item::login("Alpha", "al", "pw-a", 2, Uuid::from_u128(1));
+        let mut gone = Item::login("Trashed", "t", "pw-t", 3, Uuid::from_u128(3));
+        gone.deleted_at = Some(10);
+        let text = export_txt(&[b, gone, a]);
+        assert!(text.starts_with("RAHASYAKOSH EXPORT (PLAIN TEXT)\n"));
+        assert!(text.contains("2 login(s)"));
+        assert!(!text.contains("Trashed") && !text.contains("pw-t"));
+        assert!(
+            text.find("Title: Alpha").unwrap() < text.find("Title: beta").unwrap(),
+            "sorted by title, ignoring case"
+        );
+        for needle in [
+            "Username: bob",
+            "Password: pw-b",
+            "Website: https://beta.example",
+            "Two-factor secret: JBSWY3DPEHPK3PXP",
+            "pin: 4321",
+            "Tags: work",
+            "Notes: line one\n    line two",
+        ] {
+            assert!(text.contains(needle), "missing {needle:?} in\n{}", *text);
+        }
+    }
+
+    #[test]
+    fn txt_export_of_nothing_still_has_the_warning() {
+        let text = export_txt(&[]);
+        assert!(text.contains("Anyone who can read this file"));
+        assert!(text.contains("0 login(s)"));
     }
 }

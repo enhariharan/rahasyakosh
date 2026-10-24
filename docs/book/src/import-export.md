@@ -49,6 +49,7 @@ instead of failing the whole import; files over 50 MiB are refused.
 ```
 rk export -o backup.csv                   # plaintext CSV
 rk export -f json -o backup.json          # plaintext JSON, includes every field
+rk export -f txt -o passwords.txt         # plaintext, readable by a person, includes every field
 rk export -f vault -o backup.rkv          # encrypted copy of the vault
 ```
 
@@ -70,10 +71,20 @@ Trashed items are not exported.
 | Format | Contains | Use it for |
 |---|---|---|
 | `json` | Everything (all fields, tags, timestamps) | A complete backup you can read |
+| `txt` | Every field of every login, written out as readable text, sorted by title | Reading or printing your passwords yourself. The desktop app's **Settings → Export** writes this format |
 | `csv` | Logins only: title, URL, username, password, notes, TOTP, tags | Moving to another manager |
 | `vault` | An **encrypted** copy of the vault file | Backups. Safe to store anywhere; unlocks only with your master password |
 
 For ordinary backups, prefer `vault`. It is still encrypted, so it needs none of the safety rules above.
+
+### The text export (US-EXP-01)
+
+`txt` is for people, not programs: a short warning at the top, then one block per login (title, username,
+password, websites, two-factor secret, any other fields, tags, notes), sorted by title and separated by lines.
+It follows the same three safety rules. The desktop app's **Settings → Export passwords to a text file**
+asks for the master password again, suggests `~/rahasyakosh-export-<date>.txt`, refuses to replace an existing
+file and creates the file readable by you only. `export_txt` in `crates/transfer` makes the text and does no
+file work.
 
 ### A trap: spreadsheets
 

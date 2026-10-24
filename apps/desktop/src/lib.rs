@@ -1368,6 +1368,9 @@ fn SettingsView() -> Element {
     let mut new_pw = use_signal(String::new);
     let mut new_pw2 = use_signal(String::new);
     let mut pw_msg = use_signal(|| Option::<(bool, String)>::None);
+    let mut export_pw = use_signal(String::new);
+    let mut export_path = use_signal(|| model::default_export_path(now()));
+    let mut export_msg = use_signal(|| Option::<(bool, String)>::None);
     macro_rules! num {
         ($name:ident, $ty:ty) => {
             move |e: FormEvent| {
@@ -1456,6 +1459,30 @@ fn SettingsView() -> Element {
                 input { id: "p2", class: "ltr", dir: "ltr", r#type: "password", autocomplete: "off", value: "{new_pw2}", oninput: move |e| new_pw2.set(e.value()) }
                 if let Some((ok, text)) = pw_msg() { p { class: if ok { "ok" } else { "error" }, role: "status", "{text}" } }
                 button { class: "primary", r#type: "submit", {tr(lang, Msg::ChangeMasterButton)} }
+            }
+            h3 { {tr(lang, Msg::ExportTitle)} }
+            p { class: "muted small", id: "export-warning", {tr(lang, Msg::ExportWarning)} }
+            form {
+                onsubmit: move |e| {
+                    e.prevent_default();
+                    let (pw, path) = (export_pw.read().clone(), export_path.read().clone());
+                    let r = ctx.model.write().as_mut().map(|m| m.export_text(&pw, &path, now()));
+                    export_pw.set(String::new());
+                    match r {
+                        Some(Ok((n, file))) => export_msg.set(Some((true, trf(lang, Msg::ExportDone, &[&n, &file.display()])))),
+                        Some(Err(e)) => export_msg.set(Some((false, e))),
+                        None => {}
+                    }
+                },
+                label { r#for: "x-path", {tr(lang, Msg::ExportPath)} }
+                input { id: "x-path", class: "ltr mono", dir: "ltr", autocomplete: "off", value: "{export_path}", oninput: move |e| export_path.set(e.value()) }
+                label { r#for: "x-pw", {tr(lang, Msg::ExportMasterPassword)} }
+                input {
+                    id: "x-pw", class: "ltr", dir: "ltr", r#type: "password", autocomplete: "off", value: "{export_pw}",
+                    aria_describedby: "export-warning", oninput: move |e| export_pw.set(e.value()),
+                }
+                if let Some((ok, text)) = export_msg() { p { class: if ok { "ok" } else { "error" }, "{text}" } }
+                button { class: "primary", r#type: "submit", {tr(lang, Msg::ExportButton)} }
             }
         }
     }
