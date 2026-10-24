@@ -4,6 +4,7 @@ pub mod i18n;
 pub mod model;
 #[cfg(test)]
 mod model_tests;
+mod platform;
 mod style;
 
 use dioxus::desktop::{Config, LogicalSize, WindowBuilder};
@@ -136,6 +137,7 @@ pub fn launch() {
 /// Open the window, starting from `initial` if given (for the development gallery), else from the vault file.
 pub fn launch_with(initial: Option<AppModel>) {
     INITIAL.with(|c| *c.borrow_mut() = initial);
+    platform::init();
     let window = WindowBuilder::new()
         .with_title(tr(load_settings().language, Msg::AppName))
         .with_window_icon(window_icon())
@@ -144,6 +146,29 @@ pub fn launch_with(initial: Option<AppModel>) {
     dioxus::LaunchBuilder::desktop()
         .with_cfg(Config::new().with_window(window).with_menu(None))
         .launch(app);
+}
+
+/// A screen reader started while the app was open. It only notices the window once keyboard focus moves, so move it:
+/// leave the focused control and come back to it.
+///
+/// The reader says it has started well before it is ready to listen (Orca takes a few seconds), so one nudge can
+/// come too early. Nudge a few times over the next ten seconds; each is harmless, though the reader may repeat the
+/// name of the control.
+///
+/// While the vault is open, a text box is left alone: the short gap could swallow a key someone is typing.
+async fn nudge_focus(locked: bool) {
+    for wait in [1, 2, 3, 4] {
+        tokio::time::sleep(std::time::Duration::from_secs(wait)).await;
+        // On the unlock screen, copy what a mouse click on Unlock does (focus goes to the button, then back to the
+        // box), because that is known to make a late screen reader pick the box up. Elsewhere, blur and refocus.
+        let _ = dioxus::document::eval(&format!(
+            "const a=document.activeElement;\
+             const b=document.querySelector('form button[type=submit]:not([disabled])');\
+             if({locked}&&a&&a.id==='master'&&b){{b.focus();setTimeout(()=>a.focus(),100)}}\
+             else if(a&&a!==document.body&&({locked}||!/^(INPUT|TEXTAREA)$/.test(a.tagName))){{a.blur();setTimeout(()=>a.focus(),50)}}"
+        ))
+        .await;
+    }
 }
 
 /// The taskbar / title-bar icon: the chest, pre-rendered to raw 64x64 RGBA (see `packaging/`).
@@ -235,6 +260,10 @@ fn app() -> Element {
                         m.tick(t);
                     }
                     clock.set(t);
+                    if platform::screen_reader_started() {
+                        let locked = model.read().as_ref().is_none_or(|m| !m.is_unlocked());
+                        spawn(nudge_focus(locked));
+                    }
                 }
             }
         });

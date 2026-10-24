@@ -3581,6 +3581,7 @@ name = "rahasyakosh-desktop"
 version = "0.1.0"
 dependencies = [
  "dioxus",
+ "gio",
  "rahasyakosh-app",
  "rahasyakosh-clipboard",
  "rahasyakosh-core",
