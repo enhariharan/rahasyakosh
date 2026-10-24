@@ -49,8 +49,7 @@ The app now listens for the desktop's "screen reader started or stopped" message
 - [ ] A wrong password is announced (error text read, or focus returned with the message).
 - [ ] **After Alt+Tab (bug found 2026-10-24):** with Orca running, type a wrong passphrase but do NOT press Enter, Alt+Tab to another app and back, then type more. Expected: Orca says "Enter master password, password text" again when you come back, **typing works**, the characters are not echoed, and a wrong-password alert is spoken after Enter. The half-typed text stays in the box.
   *Cause, recorded with an AT-SPI event listener:* when the window comes back, WebKitGTK reports focus only for the web view as a whole, not for the password box, so Orca treated the web view as focused and echoed every key. The app now takes focus off the focused control and gives it straight back (in one step) 0.15 s after the window returns, while a screen reader runs; that makes WebKitGTK report the password box. An earlier attempt that moved focus to the Unlock button and back stopped typing working (it can leave Orca in browse mode, where letter keys are navigation commands): always check you can type after returning.
-- [ ] **Alt+Tab with the vault open and Orca running:** the app locks when you leave it, even if "lock when the window loses focus" is off. Come back, unlock, and check the item list is read correctly.
-- [ ] **Alt+Tab with Orca off:** nothing changes (the half-typed passphrase is still there, and the vault stays open unless the setting is on).
+- [ ] **Alt+Tab with the vault open and Orca running:** the vault stays open (it locks only if "lock when the window loses focus" is on). Come back and check the item list and the focused control are read correctly.
 - [ ] The backoff countdown is not announced every second (it should be read once, or not spam).
 - [ ] After unlock, focus lands on the item list or the search box, not on nothing.
 

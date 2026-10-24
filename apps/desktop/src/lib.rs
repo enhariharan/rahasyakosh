@@ -331,7 +331,7 @@ fn app() -> Element {
         }
     });
 
-    // Lock when the window loses focus (if enabled or a screen reader runs), and wipe the clipboard secret when it is closed.
+    // Lock when the window loses focus (if enabled), and wipe the clipboard secret when it is closed.
     dioxus::desktop::use_wry_event_handler(move |event, _| {
         use dioxus::desktop::tao::event::{Event, WindowEvent};
         if let Event::WindowEvent { event, .. } = event {
@@ -343,16 +343,11 @@ fn app() -> Element {
                     focus_gain += 1;
                 }
                 WindowEvent::Focused(false) => {
-                    // While a screen reader runs, leaving the window (Alt+Tab) locks the vault.
-                    let reader = platform::screen_reader_active();
                     if platform::debug() {
-                        eprintln!(
-                            "{:.3} window focus lost (screen reader running: {reader})",
-                            debug_time()
-                        );
+                        eprintln!("{:.3} window focus lost", debug_time());
                     }
                     if let Some(m) = model.write().as_mut() {
-                        m.window_blurred(reader);
+                        m.window_blurred();
                     }
                 }
                 WindowEvent::CloseRequested => {

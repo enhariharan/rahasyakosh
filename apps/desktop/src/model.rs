@@ -502,11 +502,9 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         self.session.touch(now);
     }
 
-    /// The window lost focus. The vault locks if the setting says so, and always while a screen reader is running:
-    /// a screen reader can lose track of the window when it comes back (Alt+Tab), and the unlock screen drawn
-    /// afresh is what it reads correctly.
-    pub fn window_blurred(&mut self, screen_reader: bool) {
-        if (self.session.settings().lock_on_blur || screen_reader) && self.is_unlocked() {
+    /// The window lost focus.
+    pub fn window_blurred(&mut self) {
+        if self.session.settings().lock_on_blur && self.is_unlocked() {
             self.lock();
         }
     }

@@ -300,7 +300,7 @@ fn lock_on_blur_only_when_enabled() {
         lock_on_blur: false,
         ..Settings::default()
     });
-    m.window_blurred(false);
+    m.window_blurred();
     assert!(m.is_unlocked());
     m.apply_settings(
         Settings {
@@ -309,23 +309,8 @@ fn lock_on_blur_only_when_enabled() {
         },
         30,
     );
-    m.window_blurred(false);
+    m.window_blurred();
     assert!(!m.is_unlocked());
-}
-
-#[test]
-fn a_running_screen_reader_locks_on_blur_whatever_the_setting() {
-    let (mut m, _) = model(Settings {
-        lock_on_blur: false,
-        ..Settings::default()
-    });
-    m.window_blurred(false);
-    assert!(
-        m.is_unlocked(),
-        "no screen reader and the setting off: stays open"
-    );
-    m.window_blurred(true);
-    assert!(!m.is_unlocked(), "a screen reader is running: locks");
 }
 
 #[test]
