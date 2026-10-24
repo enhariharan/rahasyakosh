@@ -617,3 +617,72 @@ fn toggle_reveal_shows_then_hides_and_item_shortcuts_need_an_open_item() {
         "item shortcuts do nothing in the trash view"
     );
 }
+
+#[test]
+fn state_changes_are_announced_for_a_screen_reader() {
+    let (mut m, _) = model(Settings {
+        idle_lock_secs: 0,
+        ..Settings::default()
+    });
+    m.select(gh(), 10);
+    m.reveal("password", 11);
+    assert_eq!(m.announcement.text, "Password is shown");
+    m.hide("password", 12);
+    assert_eq!(m.announcement.text, "Password is hidden");
+    assert!(!m.announcement.urgent);
+    let first = m.announcement.spoken();
+    m.hide("password", 13); // the same message again, straight after
+    assert_eq!(m.announcement.text, "Password is hidden");
+    assert_ne!(
+        m.announcement.spoken(),
+        first,
+        "a repeat must still change the text, or it is not read"
+    );
+    m.lock();
+    assert_eq!(m.announcement.text, "The vault is locked.");
+}
+
+#[test]
+fn trash_offers_undo_and_a_wrong_password_is_an_urgent_announcement() {
+    let (mut m, _) = model(Settings {
+        idle_lock_secs: 0,
+        ..Settings::default()
+    });
+    m.select(gh(), 10);
+    m.trash_selected(11);
+    let n = m.notice.clone().unwrap();
+    assert_eq!(n.undo, Some(gh()));
+    assert!(m.announcement.text.contains("Ctrl+Z"));
+    m.undo_trash(12);
+    assert_eq!(m.selected, Some(gh()));
+    assert_eq!(m.announcement.text, "Restored.");
+    m.undo_trash(13); // nothing to undo any more: no change
+    assert_eq!(m.announcement.text, "Restored.");
+
+    m.lock();
+    m.unlock("wrong password", 20);
+    assert!(m.announcement.urgent);
+    assert_eq!(m.announcement.text, "Wrong password.");
+}
+
+#[test]
+fn a_failed_save_names_the_box_that_is_wrong() {
+    let (mut m, _) = model(Settings {
+        idle_lock_secs: 0,
+        ..Settings::default()
+    });
+    m.start_new(20);
+    m.save_form(21);
+    assert_eq!(m.form_error.as_ref().unwrap().field_id, "f-title");
+    {
+        let f = m.form.as_mut().unwrap();
+        f.title = "Mail".into();
+        f.totp = "not base32!".into();
+    }
+    m.save_form(22);
+    assert_eq!(m.form_error.as_ref().unwrap().field_id, "f-totp");
+    assert!(m.announcement.urgent);
+    m.form.as_mut().unwrap().totp = String::new();
+    m.save_form(23);
+    assert!(m.form_error.is_none());
+}

@@ -7,6 +7,7 @@ It takes about 20 minutes. Run it before each release and after big UI changes.
 
 - [ ] Use a throwaway vault with a few items (one with a TOTP secret, one pinned, one in the trash). Never test with a real vault.
 - [ ] Install the current build (`install-local.sh`) and quit any older copy.
+- [ ] **Start Orca before the app.** An app started before Orca may not be connected to it (typed characters are echoed, alerts are silent). Section 0b covers the other order.
 - [ ] Turn Orca on with `Super+Alt+S` (or Settings → Accessibility → Screen Reader). Turn the speech rate up if it is slow.
 - [ ] Note the session type (Wayland or X11; run `echo $XDG_SESSION_TYPE`), the Orca version (`orca --version`) and the app commit.
 - [ ] Use the keyboard only. Do not touch the mouse. Keys: `Tab` / `Shift+Tab` move, `Enter` / `Space` activate, `Esc` closes.
@@ -15,6 +16,11 @@ It takes about 20 minutes. Run it before each release and after big UI changes.
 
 - [ ] Orca announces the window title when the app opens or gains focus.
 - [ ] Tabbing announces something for every stop. Silence means the accessibility tree is not exposed (record it as a blocker, then repeat once under X11).
+
+## 0b. Orca started after the app (known issue)
+Open the app first, then turn Orca on, then unlock.
+- [ ] Record what happens (typed characters echoed? alerts silent?). On 2026-10-24 this was reproduced: with Orca started *after* the app, typed passphrase characters were announced and the wrong-password alert was not. Starting Orca first works. Treat it as a limitation of how the app connects to the accessibility service until it is fixed, and say so in the release notes.
+- [ ] Check `gsettings get org.gnome.desktop.interface toolkit-accessibility`. If it says `false`, run `gsettings set org.gnome.desktop.interface toolkit-accessibility true`, log out and in, and repeat this section.
 
 ## 1. Welcome and create-passphrase pages
 
@@ -49,7 +55,7 @@ It takes about 20 minutes. Run it before each release and after big UI changes.
 - [ ] Hide again: the state change is announced and the password is no longer exposed.
 - [ ] **Copy**: something confirms the copy ("Copied" or equivalent) without exposing the secret.
 - [ ] The TOTP code: reachable, not re-announced every 30 seconds by itself, and the time left is available on demand.
-- [ ] History and trash actions have names. Moving to trash asks for confirmation that the reader can hear.
+- [ ] History and trash actions have names. Moving to trash is announced ("Moved to the trash. Press Ctrl+Z to undo.") and `Ctrl+Z` within 8 seconds brings the item back ("Restored."). There is no confirmation dialog by design.
 
 ## 5. Forms (new / edit item)
 

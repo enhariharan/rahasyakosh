@@ -41,7 +41,39 @@ pub enum NoticeKind {
 pub struct Notice {
     pub text: String,
     pub kind: NoticeKind,
+    /// The item that "Undo" brings back from the trash, when this notice offers it.
+    pub undo: Option<Uuid>,
     until: i64,
+}
+
+/// What a screen reader should say next. It lives in a region that is always on the page, because
+/// a region added at the moment of the message is often not read.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Announcement {
+    pub text: String,
+    /// Errors interrupt (an alert); everything else waits its turn.
+    pub urgent: bool,
+    count: u32,
+}
+
+impl Announcement {
+    /// The text for the region. Every message changes it, even a repeat of the last one,
+    /// so the reader speaks it again.
+    pub fn spoken(&self) -> String {
+        if self.count % 2 == 1 {
+            format!("{}\u{200b}", self.text)
+        } else {
+            self.text.clone()
+        }
+    }
+}
+
+/// Why a form cannot be saved: which box is wrong and what to tell the user.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FormError {
+    /// The `id` of the input to mark and focus.
+    pub field_id: &'static str,
+    pub text: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -135,6 +167,15 @@ impl Form {
             notes: item.notes.clone(),
             tags: item.tags.join(", "),
             favourite: item.favourite,
+        }
+    }
+
+    /// The `id` of the input `problem` is about.
+    pub fn problem_field(&self) -> &'static str {
+        if self.title.trim().is_empty() {
+            "f-title"
+        } else {
+            "f-totp"
         }
     }
 
@@ -285,6 +326,9 @@ pub struct Model<S: Store, C: Clipboard> {
     pub selected: Option<Uuid>,
     pub form: Option<Form>,
     pub notice: Option<Notice>,
+    pub announcement: Announcement,
+    /// Set when saving the form failed; shown next to the box that is wrong.
+    pub form_error: Option<FormError>,
     /// Shown on the unlock screen after a wrong password.
     pub unlock_error: Option<String>,
 }
@@ -300,6 +344,8 @@ impl<S: Store, C: Clipboard> Model<S, C> {
             selected: None,
             form: None,
             notice: None,
+            announcement: Announcement::default(),
+            form_error: None,
             unlock_error: None,
         }
     }
@@ -313,18 +359,33 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         self.session.is_unlocked()
     }
 
-    fn info(&mut self, text: impl Into<String>, now: i64) {
-        self.notice = Some(Notice {
+    /// Have a screen reader say `text`.
+    fn say(&mut self, text: impl Into<String>, urgent: bool) {
+        self.announcement = Announcement {
             text: text.into(),
+            urgent,
+            count: self.announcement.count + 1,
+        };
+    }
+
+    fn info(&mut self, text: impl Into<String>, now: i64) {
+        let text = text.into();
+        self.say(text.clone(), false);
+        self.notice = Some(Notice {
+            text,
             kind: NoticeKind::Info,
+            undo: None,
             until: now + 4,
         });
     }
 
     fn error(&mut self, text: impl Into<String>, now: i64) {
+        let text = text.into();
+        self.say(text.clone(), true);
         self.notice = Some(Notice {
-            text: text.into(),
+            text,
             kind: NoticeKind::Error,
+            undo: None,
             until: now + 8,
         });
     }
@@ -335,6 +396,9 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         self.query.clear();
         self.selected = None;
         self.form = None;
+        self.form_error = None;
+        let text = t(self.lang(), Msg::VaultIsLocked);
+        self.say(text, false);
     }
 
     // ---- locking --------------------------------------------------------------------------------------
@@ -356,6 +420,9 @@ impl<S: Store, C: Clipboard> Model<S, C> {
                 self.unlock_error = Some(t(lang, Msg::TooManyWrong).into());
             }
             Err(e) => self.unlock_error = Some(e.to_string()),
+        }
+        if let Some(e) = self.unlock_error.clone() {
+            self.say(e, true);
         }
     }
 
@@ -511,6 +578,8 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         self.activity(now);
         if let Some(id) = self.selected {
             let _ = self.session.reveal(id, field, now);
+            let text = trf(self.lang(), Msg::IsShown, &[&self.field_label(field)]);
+            self.say(text, false);
         }
     }
 
@@ -518,6 +587,18 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         self.activity(now);
         if let Some(id) = self.selected {
             self.session.hide(id, field);
+            let text = trf(self.lang(), Msg::IsHidden, &[&self.field_label(field)]);
+            self.say(text, false);
+        }
+    }
+
+    /// The name of a field as the screen shows it.
+    fn field_label(&self, name: &str) -> String {
+        let lang = self.lang();
+        if name == "notes" {
+            t(lang, Msg::Notes).into()
+        } else {
+            label(lang, name)
         }
     }
 
@@ -598,6 +679,7 @@ impl<S: Store, C: Clipboard> Model<S, C> {
     pub fn cancel_form(&mut self, now: i64) {
         self.activity(now);
         self.form = None;
+        self.form_error = None;
         self.view = View::Items;
     }
 
@@ -620,9 +702,15 @@ impl<S: Store, C: Clipboard> Model<S, C> {
             return;
         };
         if let Some(problem) = form.problem(self.lang()) {
+            let field_id = form.problem_field();
+            self.form_error = Some(FormError {
+                field_id,
+                text: problem.clone(),
+            });
             self.error(problem, now);
             return;
         }
+        self.form_error = None;
         let mut rng = rand::rng();
         let lang = self.lang();
         let result: Result<Uuid, String> = (|| {
@@ -702,7 +790,31 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         {
             Ok(Ok(())) => {
                 self.selected = None;
-                self.info(t(self.lang(), Msg::MovedToTrash), now);
+                self.info(t(self.lang(), Msg::MovedToTrashUndo), now);
+                if let Some(n) = &mut self.notice {
+                    n.undo = Some(id);
+                    n.until = now + 8;
+                }
+            }
+            Ok(Err(e)) => self.error(e.to_string(), now),
+            Err(Locked) => self.forget_screen(),
+        }
+    }
+
+    /// Bring back the item that was just moved to the trash (the "Undo" offered by that notice).
+    pub fn undo_trash(&mut self, now: i64) {
+        self.activity(now);
+        let Some(id) = self.notice.as_ref().and_then(|n| n.undo) else {
+            return;
+        };
+        match self
+            .session
+            .vault(now)
+            .map(|v| v.restore(id, now, &mut rand::rng()))
+        {
+            Ok(Ok(())) => {
+                self.selected = Some(id);
+                self.info(t(self.lang(), Msg::Restored), now);
             }
             Ok(Err(e)) => self.error(e.to_string(), now),
             Err(Locked) => self.forget_screen(),

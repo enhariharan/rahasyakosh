@@ -87,6 +87,8 @@ button.icon { position: absolute; top: .5rem; inset-inline-end: .5rem; padding: 
 .tab.on { background: var(--row-on); border-color: var(--accent); }
 .toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background: var(--toast); color: var(--toast-text);
   padding: .6rem 1rem; border-radius: 8px; z-index: 5; box-shadow: 0 4px 16px #0004; }
+.toast { display: flex; align-items: center; gap: 1rem; }
+.toast .undo { background: none; border: 1px solid currentColor; color: inherit; padding: .15rem .6rem; }
 .toast.error { background: var(--error-bg); color: var(--error-text); }
 
 .split { flex: 1; display: grid; grid-template-columns: minmax(240px, 340px) 1fr; min-height: 0; }

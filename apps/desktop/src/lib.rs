@@ -290,8 +290,19 @@ fn app() -> Element {
             .await;
         });
     }));
+    let (polite, urgent) = model.read().as_ref().map_or_else(Default::default, |m| {
+        let a = &m.announcement;
+        if a.urgent {
+            (String::new(), a.spoken())
+        } else {
+            (a.spoken(), String::new())
+        }
+    });
     rsx! {
         style { "{style::CSS}" }
+        // Always on the page, so a screen reader is already listening when the text changes.
+        div { class: "sr-only", role: "status", aria_live: "polite", aria_atomic: "true", "{polite}" }
+        div { class: "sr-only", role: "alert", aria_live: "assertive", aria_atomic: "true", "{urgent}" }
         div {
             class: "app",
             dir: "{dir}",
@@ -312,6 +323,15 @@ fn app() -> Element {
                 }
                 if e.modifiers().ctrl() && !e.modifiers().alt() {
                     if let Key::Character(c) = e.key() {
+                        // Ctrl+Z only means "undo moving to the trash" while that offer is showing.
+                        if c.eq_ignore_ascii_case("z") && !e.modifiers().shift() {
+                            if let Some(m) = model.write().as_mut() {
+                                if m.notice.as_ref().is_some_and(|n| n.undo.is_some()) {
+                                    e.prevent_default();
+                                    m.undo_trash(now());
+                                }
+                            }
+                        }
                         let unlocked = model.read().as_ref().is_some_and(|m| m.is_unlocked());
                         let shift = e.modifiers().shift();
                         if let Some(shortcut) = Shortcut::from_key(&c, shift).filter(|_| unlocked) {
@@ -552,6 +572,7 @@ fn Unlock() -> Element {
             m.map_or(0, |m| m.session.retry_in(t)),
         )
     };
+    let has_err = err.is_some();
     let mut submit = move || {
         let t = now();
         if let Some(m) = ctx.model.write().as_mut() {
@@ -578,6 +599,7 @@ fn Unlock() -> Element {
                 input {
                     id: "master", class: "ltr", dir: "ltr", r#type: "password", autofocus: true, autocomplete: "off",
                     aria_label: tr(lang, Msg::EnterMasterPassword),
+                    aria_invalid: has_err, aria_describedby: if has_err { "unlock-error" } else { "" },
                     placeholder: tr(lang, Msg::EnterMasterPassword),
                     oninput: move |e| pw.set(e.value()),
                     // The focus given by `autofocus` can happen before the screen reader is listening; do it again.
@@ -590,7 +612,7 @@ fn Unlock() -> Element {
                         });
                     },
                 }
-                if let Some(e) = err { p { class: "error", role: "alert", "{e}" } }
+                if let Some(e) = err { p { id: "unlock-error", class: "error", "{e}" } }
                 if wait > 0 { p { class: "muted", "{trf(lang, Msg::TryAgainIn, &[&wait])}" } }
                 button { class: "primary", r#type: "submit", disabled: wait > 0, {tr(lang, Msg::Unlock)} }
             }
@@ -666,10 +688,18 @@ fn Main() -> Element {
             }
         }
         if let Some(n) = notice {
+            // The text is spoken by the always-present regions at the top of the window, so it is hidden here.
             div {
                 class: if n.kind == NoticeKind::Error { "toast error" } else { "toast" },
-                role: if n.kind == NoticeKind::Error { "alert" } else { "status" },
-                "{n.text}"
+                span { aria_hidden: "true", "{n.text}" }
+                if n.undo.is_some() {
+                    button {
+                        class: "undo", r#type: "button",
+                        aria_keyshortcuts: "Control+Z",
+                        onclick: move |_| { if let Some(m) = ctx.model.write().as_mut() { m.undo_trash(now()); } },
+                        {tr(lang, Msg::Undo)}
+                    }
+                }
             }
         }
         match view {
@@ -1067,6 +1097,11 @@ fn FormView() -> Element {
     let Some(f) = form else { return rsx! {} };
     let editing = f.id.is_some();
     let strength = rahasyakosh_strength::estimate(&f.password, &[&f.title, &f.username]);
+    let form_error = ctx.model.read().as_ref().and_then(|m| m.form_error.clone());
+    // `Some("true")` marks the box a form error is about; `describedby` ties the message to it.
+    let invalid = |id: &str| form_error.as_ref().is_some_and(|e| e.field_id == id);
+    let describedby = |id: &str| if invalid(id) { "f-error" } else { "" };
+    let error_text = form_error.as_ref().map(|e| e.text.clone());
     macro_rules! field {
         ($name:ident) => {{
             let mut ctx = ctx.clone();
@@ -1084,9 +1119,26 @@ fn FormView() -> Element {
         main { class: "form",
             h2 { if editing { {tr(lang, Msg::EditItem)} } else { {tr(lang, Msg::NewItem)} } }
             form {
-                onsubmit: move |e| { e.prevent_default(); if let Some(m) = ctx.model.write().as_mut() { m.save_form(now()); } },
+                onsubmit: move |e| {
+                    e.prevent_default();
+                    // After a failed save, move focus to the box that is wrong so a screen reader reads it with its message.
+                    let mut bad = None;
+                    if let Some(m) = ctx.model.write().as_mut() {
+                        m.save_form(now());
+                        bad = m.form_error.as_ref().map(|e| e.field_id);
+                    }
+                    if let Some(id) = bad {
+                        spawn(async move {
+                            let _ = dioxus::document::eval(&format!("document.getElementById('{id}')?.focus()")).await;
+                        });
+                    }
+                },
                 label { r#for: "f-title", {tr(lang, Msg::FieldTitle)} }
-                input { id: "f-title", autofocus: true, value: "{f.title}", oninput: field!(title) }
+                input {
+                    id: "f-title", autofocus: true, value: "{f.title}", oninput: field!(title),
+                    aria_invalid: invalid("f-title"), aria_describedby: describedby("f-title"), aria_required: "true",
+                }
+                if invalid("f-title") { if let Some(t) = &error_text { p { id: "f-error", class: "error", "{t}" } } }
                 label { r#for: "f-user", {tr(lang, Msg::UsernameOrEmail)} }
                 input { id: "f-user", dir: "auto", autocomplete: "off", value: "{f.username}", oninput: field!(username) }
                 label { r#for: "f-pw", {tr(lang, Msg::FieldPassword)} }
@@ -1105,7 +1157,11 @@ fn FormView() -> Element {
                 label { r#for: "f-url", {tr(lang, Msg::Website)} }
                 input { id: "f-url", class: "ltr", dir: "ltr", value: "{f.url}", oninput: field!(url) }
                 label { r#for: "f-totp", {tr(lang, Msg::TwoFactorSecret)} }
-                input { id: "f-totp", class: "ltr", dir: "ltr", autocomplete: "off", value: "{f.totp}", oninput: field!(totp) }
+                input {
+                    id: "f-totp", class: "ltr", dir: "ltr", autocomplete: "off", value: "{f.totp}", oninput: field!(totp),
+                    aria_invalid: invalid("f-totp"), aria_describedby: describedby("f-totp"),
+                }
+                if invalid("f-totp") { if let Some(t) = &error_text { p { id: "f-error", class: "error", "{t}" } } }
                 label { r#for: "f-tags", {tr(lang, Msg::TagsCommas)} }
                 input { id: "f-tags", dir: "auto", value: "{f.tags}", oninput: field!(tags) }
                 label { r#for: "f-notes", {tr(lang, Msg::Notes)} }
