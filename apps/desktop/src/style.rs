@@ -35,9 +35,14 @@ button:hover:not(:disabled) { border-color: var(--accent); }
 button:disabled { opacity: .5; cursor: default; }
 button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
 button.danger { color: var(--danger); }
-.profile-pick { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px; }
-.profile-pick select { max-width: 100%; }
+.profile-pick { margin-bottom: 12px; }
+/* Same width and position as the password form below it, so their left edges line up. */
+.landing .profile-pick { width: 20rem; max-width: 100%; margin: 0 auto 12px; }
 button.link { border: none; background: none; color: var(--accent); text-decoration: underline; padding: .2rem; }
+/* "Add a profile": floats over the bottom corner of the window, like the "New item" button in the main window. */
+.profile-fab { position: fixed; inset-inline-end: 1.5rem; bottom: 1.5rem; width: 3.25rem; height: 3.25rem;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center; padding: 0;
+  background: var(--accent); color: var(--accent-text); border-color: var(--accent); box-shadow: 0 4px 14px #0006; z-index: 4; }
 button.wide { width: calc(100% - 1.2rem); margin: .6rem; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 input, textarea, select {

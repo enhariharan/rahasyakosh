@@ -193,6 +193,7 @@ fn handle_key(
     mods: Modifiers,
     model: Signal<Option<AppModel>>,
     reader_notice: Signal<Option<ReaderNotice>>,
+    mut adding: Signal<bool>,
 ) -> bool {
     let mut model = model;
     if reader_notice.peek().is_some() {
@@ -243,6 +244,18 @@ fn handle_key(
             let _ = dioxus::document::eval("document.getElementById('search')?.focus()").await;
         });
     }
+    // Ctrl+Shift+N: "Add a profile", only while the unlock screen is showing (a locked vault, not already adding).
+    if mods.ctrl() && mods.shift() && !mods.alt() {
+        if let Key::Character(c) = key {
+            if c.eq_ignore_ascii_case("n") {
+                let on_unlock = model.read().as_ref().is_some_and(|m| !m.is_unlocked());
+                if on_unlock && !adding() {
+                    used = true;
+                    adding.set(true);
+                }
+            }
+        }
+    }
     used
 }
 
@@ -258,7 +271,7 @@ if (!window.__rkPageKeys) {
     if (e.key !== 'Escape' && !e.ctrlKey) return;
     dioxus.send([e.key, e.ctrlKey, e.altKey, e.shiftKey]);
     const k = e.key.toLowerCase();
-    if (e.ctrlKey && !e.altKey && (e.shiftKey ? 'ucwts' : '123klnpedz').includes(k) && k.length === 1) e.preventDefault();
+    if (e.ctrlKey && !e.altKey && (e.shiftKey ? 'ucwtsn' : '123klnpedz').includes(k) && k.length === 1) e.preventDefault();
   });
 }
 "#;
@@ -276,13 +289,14 @@ fn page_key(key: &str, ctrl: bool, alt: bool, shift: bool) -> Option<(Key, Modif
 async fn forward_page_keys(
     model: Signal<Option<AppModel>>,
     reader_notice: Signal<Option<ReaderNotice>>,
+    adding: Signal<bool>,
     last_input: Rc<Cell<i64>>,
 ) {
     let mut events = dioxus::document::eval(PAGE_KEYS_SCRIPT);
     while let Ok((key, ctrl, alt, shift)) = events.recv::<(String, bool, bool, bool)>().await {
         last_input.set(now());
         if let Some((key, mods)) = page_key(&key, ctrl, alt, shift) {
-            handle_key(&key, mods, model, reader_notice);
+            handle_key(&key, mods, model, reader_notice, adding);
         }
     }
 }
@@ -429,7 +443,7 @@ fn app() -> Element {
 
     {
         let last_input = last_input.clone();
-        use_future(move || forward_page_keys(model, reader_notice, last_input.clone()));
+        use_future(move || forward_page_keys(model, reader_notice, adding, last_input.clone()));
     }
 
     // Once a second: pass on user input, apply the inactivity lock, clear the clipboard when due, and redraw.
@@ -562,7 +576,7 @@ fn app() -> Element {
             onpointerdown: move |_| input_down.set(now()),
             onkeydown: move |e| {
                 input_key.set(now());
-                if handle_key(&e.key(), e.modifiers(), model, reader_notice) {
+                if handle_key(&e.key(), e.modifiers(), model, reader_notice, adding) {
                     e.prevent_default();
                 }
             },
@@ -837,6 +851,19 @@ fn CheckIcon() -> Element {
     }
 }
 
+/// A person with a "+": the "Add a profile" floating button.
+#[component]
+fn AddProfileIcon() -> Element {
+    rsx! {
+        svg { view_box: "0 0 24 24", width: "22", height: "22", fill: "none", stroke: "currentColor", stroke_width: "2",
+            stroke_linecap: "round", stroke_linejoin: "round", "aria-hidden": "true",
+            circle { cx: "9", cy: "7", r: "4" }
+            path { d: "M2 21a7 7 0 0 1 14 0" }
+            path { d: "M19 8v6M16 11h6" }
+        }
+    }
+}
+
 fn new_passphrase() -> String {
     let words = rahasyakosh_core::wordlist::eff_large();
     rahasyakosh_core::generator::generate_passphrase(&words, 6, "-", false, &mut rand::rng())
@@ -898,10 +925,9 @@ fn Unlock() -> Element {
                             ctx.active.set(Some(p.id));
                         },
                         for p in profile_list.iter() {
-                            option { key: "{p.id}", value: "{p.id}", selected: Some(p.id) == active_id, "{p.full_name} ({p.username})" }
+                            option { key: "{p.id}", value: "{p.id}", selected: Some(p.id) == active_id, "{p.full_name}" }
                         }
                     }
-                    button { class: "link", r#type: "button", onclick: move |_| ctx.adding.set(true), {tr(lang, Msg::AddProfile)} }
                 }
             }
             form {
@@ -929,6 +955,14 @@ fn Unlock() -> Element {
                 if wait > 0 { p { class: "muted", "{trf(lang, Msg::TryAgainIn, &[&wait])}" } }
                 button { class: "primary", r#type: "submit", disabled: wait > 0, {tr(lang, Msg::Unlock)} }
             }
+        }
+        button {
+            class: "profile-fab", r#type: "button",
+            aria_keyshortcuts: "Control+Shift+N",
+            title: "{tr(lang, Msg::AddProfile)} (Ctrl+Shift+N)",
+            aria_label: tr(lang, Msg::AddProfile),
+            onclick: move |_| ctx.adding.set(true),
+            AddProfileIcon {}
         }
     }
 }
