@@ -1,4 +1,4 @@
-# 08 — Screen-reader and zoom test checklist (US-A11Y-01)
+# Screen-reader and zoom test checklist (US-A11Y-01)
 
 A manual pass for the Linux desktop app with the Orca screen reader, plus a 200% zoom check.
 It takes about 20 minutes. Run it before each release and after big UI changes.
@@ -156,4 +156,4 @@ Any failure becomes an issue labelled `a11y`. When every area passes on the curr
 | 8 Focus / keyboard  | Pass        | Esc works, Tab order as expected                                      |
 | 9 200% zoom         | Pass        | Search box usable, "New item" no longer covers content                |
 
-Reported by the tester as "all pass". The keyboard shortcut checklist (`docs/09-shortcuts-test-checklist.md`) has not been run yet; `Ctrl+K`, `Ctrl+2` and `Ctrl+3` failed in an earlier report and are still unexplained.
+Reported by the tester as "all pass". The keyboard shortcut checklist (`docs/tests/shortcuts-test-checklist.md`) has not been run yet; `Ctrl+K`, `Ctrl+2` and `Ctrl+3` failed in an earlier report and are still unexplained.

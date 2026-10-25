@@ -31,21 +31,23 @@ instead type your own password, and the app rates its strength and refuses weak 
 
 ## Profiles (US-PRF-01 to 05)
 
-A **profile** is one person's set of passwords. This computer can hold several, for example one for each person who shares it. Each profile has a **full name**, a **username** (both shown in the picker; the username must be different for every profile, upper or lower case) and a hidden, never-changing **user ID**.
+A **profile** is one person's set of passwords. This computer can hold several, for example one for each person who shares it. Each profile has a **full name**, a **username** (the picker shows the full name; the username must be different for every profile, upper or lower case) and a hidden, never-changing **user ID**.
 
 **Every profile has its own vault and its own master password.** Nobody can read another profile's passwords, and forgetting one profile's master password loses only that profile.
 
 - **First run.** The *Create a master passphrase* page also asks for a full name and username, already filled in with **Default user** and **defaultuser**. You do not have to change them (you can later, in Settings).
 - **If you used the app before profiles existed**, your vault simply became the default profile: same file, same master password, nothing changed or re-encrypted.
-- **Unlock screen.** Pick your profile in the **Profile** list, then type that profile's master password. **Add a profile** opens the same create-password page for a new, empty profile, which needs a full name and a username. After creating it you are signed in to it.
+- **Unlock screen.** Pick your profile in the **Profile** list, then type that profile's master password. A round **Add a profile** button floats over the corner of the screen (**Ctrl+Shift+N**, shown in its tooltip); it opens the same create-password page for a new, empty profile, which needs a full name and a username. After creating it you are signed in to it.
 - **Switching** means locking (Ctrl+L), then picking another profile on the unlock screen.
 - **Settings → Profile** changes the full name and username. **Delete this profile** removes the profile and its vault file for good after you type its master password. The last profile cannot be deleted. There is no trash for profiles, so export first if you might need the passwords.
 
-The list of profiles (names and usernames) is **not encrypted**, because it has to be shown before anything is unlocked. It is stored in `profiles.json` next to the vault files (`~/.local/share/rahasyakosh/`; new profiles' vaults go in its `profiles/` folder). The username does not sign in by itself; it is only a label. A step-by-step manual test for all of this is in `docs/10-profiles-test-checklist.md`.
+The list of profiles (names and usernames) is **not encrypted**, because it has to be shown before anything is unlocked. It is stored in `profiles.json` next to the vault files (`~/.local/share/rahasyakosh/`; new profiles' vaults go in its `profiles/` folder). The username does not sign in by itself; it is only a label. A step-by-step manual test for all of this is in `docs/tests/profiles-test-checklist.md`.
 
 ## Unlocking
 
 ![The unlock screen](images/desktop-unlock.png)
+
+A step-by-step manual test of this screen is in `docs/tests/unlock-screen-test-checklist.md`.
 
 Choose your profile if there is more than one, type its master password and press Enter. After three wrong passwords in a row the app makes you wait 1 s, then 2 s, 4 s and so on (see [Sessions](sessions.md)).
 
@@ -152,7 +154,7 @@ Accessibility means people who cannot use a mouse, cannot see the screen, or nee
 
 **Starting or stopping your screen reader while the app is open.** A screen reader can only read a window it was started before, or one that has been redrawn since. So when Rahasyakosh notices a screen reader start or stop, it shows a short dialog with an OK button. If the vault was open, the dialog says the app will go back to the lock screen; pressing OK (or Esc) locks it, and unlocking again gives you a freshly drawn window that the screen reader reads. If you were already on the lock screen, the dialog just asks you to unlock and OK leaves you there. This was found with Orca on Ubuntu; other screen readers and desktops are untested. It does not appear on the very first set-up pages, which have nothing to lock; if your reader misbehaves there, quit and reopen the app. The app-grid launcher installed by `install-local.sh` also switches the desktop's accessibility service on before the app starts. While a screen reader is running, when you come back to the window (for example after Alt+Tab) the app gently re-announces the control that has focus. Without that, the web view that draws the window tells the screen reader only that "the window" has focus, not which box, and the screen reader then reads out every key you type, even in the password box. With `RAHASYAKOSH_DEBUG=1` the app prints "Screen reader enabled" and "Screen reader disabled" to the terminal as the reader starts and stops.
 
-**Tested:** an Orca test pass and a 200% zoom check on Ubuntu (October 2026) found and fixed several problems (the unlock box, Esc, announcements of errors, locking and show/hide, errors in forms, the Alt+Tab echo, and a layout problem at 200% zoom). The keyboard shortcuts also had a full pass, after a fix so that they work when nothing in the window has focus (for example right after unlocking). All areas now pass. The test lists are in `docs/08-a11y-test-checklist.md` and `docs/09-shortcuts-test-checklist.md`.
+**Tested:** an Orca test pass and a 200% zoom check on Ubuntu (October 2026) found and fixed several problems (the unlock box, Esc, announcements of errors, locking and show/hide, errors in forms, the Alt+Tab echo, and a layout problem at 200% zoom). The keyboard shortcuts also had a full pass, after a fix so that they work when nothing in the window has focus (for example right after unlocking). All areas now pass. The test lists are in `docs/tests/a11y-test-checklist.md` and `docs/tests/shortcuts-test-checklist.md`.
 
 **Not done:** only one tester has used the app with a real screen reader, and only Orca; other screen readers, desktops and operating systems are untested. If you rely on assistive software, your feedback is the most useful thing you can give.
 

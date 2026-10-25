@@ -1,4 +1,4 @@
-# 09 — Keyboard shortcut test checklist (US-A11Y-01, US-DSK-01)
+# Keyboard shortcut test checklist (US-A11Y-01, US-DSK-01)
 
 A manual pass over every keyboard shortcut in the Linux desktop app. It takes about 15 minutes.
 Run it with the screen reader **off** first (so you know the shortcut itself works), then repeat the

@@ -1,4 +1,4 @@
-# 10 — User profiles test checklist (US-PRF-01 to 05)
+# User profiles test checklist (US-PRF-01 to 05)
 
 A manual pass over the profiles feature in the Linux desktop app. It takes about 20 minutes.
 Run it with the screen reader **off** first, then repeat sections 2, 3 and 6 with Orca **on**.
@@ -22,8 +22,8 @@ Start with an empty data folder.
 | Profile fields on that page | **Full name** shows "Default user", **Username** shows "defaultuser" | | |
 | A hint under the fields | Says you can keep them and change them later in Settings | | |
 | Leave both unchanged and create the vault | Works; the vault opens | | |
-| Lock (Ctrl+L) | Unlock screen shows a **Profile** list with "Default user (defaultuser)" | | |
-| Repeat with a fresh folder; change name to "Asha Rao", username to "asha" | The unlock screen shows "Asha Rao (asha)" | | |
+| Lock (Ctrl+L) | Unlock screen shows a **Profile** list with "Default user" | | |
+| Repeat with a fresh folder; change name to "Asha Rao", username to "asha" | The unlock screen shows "Asha Rao" | | |
 | Repeat with a fresh folder; clear the full name and try to create | Refused: "Enter a full name." No vault created | | |
 | Repeat; clear the username and try to create | Refused: "Enter a username." | | |
 | `profiles.json` exists next to `vault.db` | Has one profile with an `id`, the name and username | | |
@@ -33,7 +33,7 @@ Have at least two profiles (do section 3 first if you have one).
 
 | Check | Expected | Result | Notes |
 | ----- | -------- | :----: | ----- |
-| The **Profile** list | Shows every profile as "Full name (username)", the current one selected | | |
+| The **Profile** list | Shows every profile as "Full name" only (no username), the current one selected | | |
 | Choose another profile | The list shows it; the box below takes **that** profile's master password | | |
 | Type the other profile's master password | Unlocks that profile, not the first | | |
 | Type the **wrong** profile's password | "Wrong password." and the wait grows after three tries | | |
@@ -44,7 +44,10 @@ Have at least two profiles (do section 3 first if you have one).
 
 | Check | Expected | Result | Notes |
 | ----- | -------- | :----: | ----- |
-| **Add a profile** on the unlock screen | A page titled "Add a profile" with a note that it has its own vault and master password | | |
+| **Add a profile**: a round button floating over the bottom corner of the unlock screen (a person-with-a-plus icon) | Hovering shows "Add a profile (Ctrl+Shift+N)"; clicking it opens a page titled "Add a profile" with a note that it has its own vault and master password | | |
+| `Ctrl+Shift+N` on the unlock screen | Same page opens, without clicking | | |
+| `Ctrl+Shift+N` elsewhere (vault unlocked, or already on the add-profile page) | Does nothing | | |
+| With Orca on, focusing the floating button | Announces "Add a profile" and its shortcut | | |
 | The fields | **Full name** and **Username** are empty (not pre-filled) | | |
 | **Cancel** | Back to the unlock screen, nothing added | | |
 | Create with an empty name, then an empty username | "Enter a full name." / "Enter a username." | | |
@@ -93,7 +96,7 @@ Settings → **Delete this profile**. Use a profile you can lose.
 Needs a vault made by an older build (use the backup from Setup).
 
 - [ ] Put the old `vault.db` in a fresh data folder with **no** `profiles.json`, then start the app with `RK_VAULT` pointing at it.
-- [ ] The unlock screen shows one profile, "Default user (defaultuser)".
+- [ ] The unlock screen shows one profile, "Default user".
 - [ ] The **old master password** unlocks it, and every old item is there.
 - [ ] `profiles.json` now exists; `vault.db` was not renamed or changed (compare its size and date).
 - [ ] Rename the profile in Settings, restart: the new name is shown and the old password still works.
