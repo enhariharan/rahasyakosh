@@ -115,7 +115,7 @@ Under **Settings**: auto-lock minutes, lock on focus loss, how long a copied pas
 how long deleted items are kept, history length, whether the top-bar buttons show icons and text, text only or icons only, whether the app is light, dark or follows the system, the display language, and the cost of the password-guessing protection (applied when a vault is created or its master password is changed).
 You can also **change the master password** there (the new one must pass the strength check).
 
-**Export passwords to a text file** (US-EXP-01) is also under **Settings**. Pick where to save (it suggests `~/rahasyakosh-export-<today>.txt`), type your master password again to confirm, and press **Export**. The file holds **every password in plain text**: keep it somewhere safe and delete it when you no longer need it. The app will not replace a file that already exists, creates the file readable by you only, and leaves out items in the trash.
+**Export passwords** (US-EXP-01, US-EXP-02) is also under **Settings**. Choose a **Format** (text that is easy to read, CSV for spreadsheets and other password managers, or JSON for programs), pick where to save (it suggests `~/rahasyakosh-export-<today>.txt`, and the ending changes with the format unless you typed your own name), type your master password again to confirm, and press **Export**. The file holds **every password in plain text**: keep it somewhere safe and delete it when you no longer need it. The app will not replace a file that already exists, creates the file readable by you only, and leaves out items in the trash.
 
 ## Languages
 
@@ -136,7 +136,7 @@ Choose one under **Settings → Language** and press **Save settings**; the whol
 - **No system-tray icon and no global quick-search shortcut** (US-DSK-01). On Wayland, which is the default on current Ubuntu, programs are not allowed to listen for keys while another window has focus, so a global shortcut needs a desktop-specific
   portal. Inside the window, **Ctrl+K** works.
 - **Linux only.** macOS and Windows need their own clipboard handling and packaging.
-- **No import screen, and only one export format.** Settings can export to a text file; for everything else use `rk import` and `rk export` (see [Importing and exporting](import-export.md)).
+- **No import screen.** Settings can export (text, CSV or JSON); to import, or to export a vault bundle, use `rk import` and `rk export` (see [Importing and exporting](import-export.md)).
 - **No browser autofill and no syncing between devices.**
 - **It has had a desk review, an Orca test pass and a keyboard-shortcut test pass for accessibility** (US-A11Y-01); other screen readers and desktops are untested. See [Accessibility](#accessibility) below.
 

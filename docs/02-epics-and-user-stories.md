@@ -102,8 +102,8 @@ IDs are stable; reference them in commits and tests (e.g. `US-VLT-02`).
 ## E12 — Export to a Text File (P0)
 | ID | Story | Acceptance criteria |
 |----|-------|---------------------|
-| US-EXP-01 | I export my saved logins to a plain text file I can read. (P0) | Desktop **Settings → Export passwords to a text file** and `rk export -f txt`. Warning shown first; master password asked again; every live login with all its fields, sorted by title; trashed items left out; file created owner-only (`0600`); an existing file is never replaced; the result is announced to screen readers. **Done** for the Linux desktop app and the CLI (2026-10-24). |
-| US-EXP-02 | I export to CSV and JSON from Settings as well as plain text. (P1) | The Settings export section offers a format choice (text, CSV, JSON), reusing `transfer::export_csv` / `export_json`. Same safety rules as US-EXP-01 (warning, master password again, owner-only file, never overwrites). Planned; the CLI already supports both. |
+| US-EXP-01 | I export my saved logins to a plain text file I can read. (P0) | Desktop **Settings → Export passwords** (text) and `rk export -f txt`. Warning shown first; master password asked again; every live login with all its fields, sorted by title; trashed items left out; file created owner-only (`0600`); an existing file is never replaced; the result is announced to screen readers. **Done** for the Linux desktop app and the CLI (2026-10-24). |
+| US-EXP-02 | I export to CSV and JSON from Settings as well as plain text. (P1) | The Settings export section offers a format choice (text, CSV, JSON), reusing `transfer::export_csv` / `export_json`. Same safety rules as US-EXP-01 (warning, master password again, owner-only file, never overwrites). **Done** for the Linux desktop app (2026-10-25); the CLI already supported both. |
 
 ## E13 — User Profiles (P1)
 A **user profile** groups the passwords of one particular user, so one installation can hold the passwords of several users. A profile has a **unique user ID**, a **full name** and a **unique username**; more attributes are expected later, so the profile is a record that can grow, not three loose settings.

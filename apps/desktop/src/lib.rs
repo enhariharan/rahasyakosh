@@ -1509,7 +1509,9 @@ fn SettingsView() -> Element {
     let mut new_pw2 = use_signal(String::new);
     let mut pw_msg = use_signal(|| Option::<(bool, String)>::None);
     let mut export_pw = use_signal(String::new);
-    let mut export_path = use_signal(|| model::default_export_path(now()));
+    let mut export_format = use_signal(model::ExportFormat::default);
+    let mut export_path =
+        use_signal(|| model::default_export_path(now(), model::ExportFormat::default()));
     let mut export_msg = use_signal(|| Option::<(bool, String)>::None);
     let me = (ctx.active)().and_then(|id| ctx.profiles.read().get(id).cloned());
     let mut pf_name = use_signal(|| me.as_ref().map(|p| p.full_name.clone()).unwrap_or_default());
@@ -1613,7 +1615,7 @@ fn SettingsView() -> Element {
                 onsubmit: move |e| {
                     e.prevent_default();
                     let (pw, path) = (export_pw.read().clone(), export_path.read().clone());
-                    let r = ctx.model.write().as_mut().map(|m| m.export_text(&pw, &path, now()));
+                    let r = ctx.model.write().as_mut().map(|m| m.export(export_format(), &pw, &path, now()));
                     export_pw.set(String::new());
                     match r {
                         Some(Ok((n, file))) => export_msg.set(Some((true, trf(lang, Msg::ExportDone, &[&n, &file.display()])))),
@@ -1621,6 +1623,19 @@ fn SettingsView() -> Element {
                         None => {}
                     }
                 },
+                label { r#for: "x-format", {tr(lang, Msg::ExportFormatLabel)} }
+                select { id: "x-format",
+                    onchange: move |e| {
+                        if let Some(f) = model::ExportFormat::from_extension(&e.value()) {
+                            export_format.set(f);
+                            let renamed = model::with_export_extension(&export_path.read(), f);
+                            export_path.set(renamed);
+                        }
+                    },
+                    for f in model::ExportFormat::ALL {
+                        option { key: "{f.extension()}", value: "{f.extension()}", selected: f == export_format(), {tr(lang, f.label())} }
+                    }
+                }
                 label { r#for: "x-path", {tr(lang, Msg::ExportPath)} }
                 input { id: "x-path", class: "ltr mono", dir: "ltr", autocomplete: "off", value: "{export_path}", oninput: move |e| export_path.set(e.value()) }
                 label { r#for: "x-pw", {tr(lang, Msg::ExportMasterPassword)} }

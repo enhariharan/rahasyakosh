@@ -45,7 +45,7 @@ security-relevant changes reviewed by a second maintainer.
 - [x] M3 desktop app (Linux): `apps/desktop` (Dioxus + WebKitGTK), 19 model tests, gallery, `install-local.sh`, own supply-chain policy, CI job
 - [x] M3 accessibility desk review of the desktop app (US-A11Y-01 partly): screen-reader names, no live region over secrets, WCAG AA contrast enforced by a test. Then an Orca test pass and a 200% zoom check found and fixed several problems (announcements, forms, Esc, Alt+Tab echo, layout); all areas pass on build f00c822 (see `docs/08-a11y-test-checklist.md`). The keyboard shortcut checklist (`docs/09`) also passes (including other keyboard layouts) after a fix for keys pressed with nothing focused
 - [x] US-EXP-01 (E12): export to a plain text file, in Linux desktop Settings and as `rk export -f txt`; master password asked again, owner-only file, never replaces an existing file
-- [ ] US-EXP-02 (E12): Settings export also offers CSV and JSON (the CLI already does); planned
+- [x] US-EXP-02 (E12): Settings export offers text, CSV and JSON, with the same safety rules as the text export
 - [x] E13 user profiles (US-PRF-01 to 05) in the Linux desktop app: one vault and master password per profile, picker on the unlock screen, add/edit/delete. Still to do: `rk --profile <username>` in the CLI, and native review of the new translations
 - [ ] Next: macOS/Windows clipboard and packaging, tray + global shortcut (Wayland portal), then M4 sync. Fuzzing of header/record parsers and importers is still open (see Testing strategy)
 

@@ -68,11 +68,67 @@ impl Announcement {
     }
 }
 
+/// The file formats Settings can export to. All three hold every password in plain text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ExportFormat {
+    #[default]
+    Text,
+    Csv,
+    Json,
+}
+
+impl ExportFormat {
+    pub const ALL: [ExportFormat; 3] = [Self::Text, Self::Csv, Self::Json];
+
+    /// The value of the format list's option, and the file name extension.
+    pub fn extension(self) -> &'static str {
+        match self {
+            Self::Text => "txt",
+            Self::Csv => "csv",
+            Self::Json => "json",
+        }
+    }
+
+    pub fn from_extension(ext: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|f| f.extension() == ext)
+    }
+
+    pub fn label(self) -> Msg {
+        match self {
+            Self::Text => Msg::ExportFormatText,
+            Self::Csv => Msg::ExportFormatCsv,
+            Self::Json => Msg::ExportFormatJson,
+        }
+    }
+
+    fn render(self, items: &[Item]) -> Result<zeroize::Zeroizing<String>, String> {
+        match self {
+            Self::Text => Ok(rahasyakosh_transfer::export_txt(items)),
+            Self::Csv => rahasyakosh_transfer::export_csv(items).map_err(|e| e.to_string()),
+            Self::Json => rahasyakosh_transfer::export_json(items).map_err(|e| e.to_string()),
+        }
+    }
+}
+
+/// `path` with its extension changed to `format`'s, if it ends in one of the export extensions (so choosing another
+/// format changes the suggested name but leaves a name the user typed alone).
+pub fn with_export_extension(path: &str, format: ExportFormat) -> String {
+    match path.rsplit_once('.') {
+        Some((stem, ext)) if ExportFormat::from_extension(ext).is_some() => {
+            format!("{stem}.{}", format.extension())
+        }
+        _ => path.to_string(),
+    }
+}
+
 /// Where the export file is suggested to go: the home folder, named for the day.
-pub fn default_export_path(now: i64) -> String {
+pub fn default_export_path(now: i64, format: ExportFormat) -> String {
     let (y, m, d) = civil_date(now.div_euclid(86_400));
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    format!("{home}/rahasyakosh-export-{y:04}-{m:02}-{d:02}.txt")
+    format!(
+        "{home}/rahasyakosh-export-{y:04}-{m:02}-{d:02}.{}",
+        format.extension()
+    )
 }
 
 /// Year, month and day for a number of days since 1970-01-01 (proleptic Gregorian calendar).
@@ -457,19 +513,20 @@ impl<S: Store, C: Clipboard> Model<S, C> {
 
     // ---- export ---------------------------------------------------------------------------------------
 
-    /// Write every live login to a new plain text file at `path` (`~/` means the home folder), after checking the master
+    /// Write every live login to a new plain file in `format` at `path` (`~/` means the home folder), after checking the master
     /// password again. Returns how many logins were written and where.
     ///
     /// Refuses to replace a file that exists. The file is created readable by its owner only.
-    pub fn export_text(
+    pub fn export(
         &mut self,
+        format: ExportFormat,
         password: &str,
         path: &str,
         now: i64,
     ) -> Result<(usize, std::path::PathBuf), String> {
         self.activity(now);
         let lang = self.lang();
-        let result = self.try_export_text(password, path, now);
+        let result = self.try_export(format, password, path, now);
         match &result {
             Ok((count, file)) => {
                 let text = trf(lang, Msg::ExportDone, &[count, &file.display()]);
@@ -480,8 +537,9 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         result
     }
 
-    fn try_export_text(
+    fn try_export(
         &mut self,
+        format: ExportFormat,
         password: &str,
         path: &str,
         now: i64,
@@ -515,7 +573,7 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         if items.is_empty() {
             return Err(t(lang, Msg::ExportNothing).into());
         }
-        let text = rahasyakosh_transfer::export_txt(&items);
+        let text = format.render(&items)?;
         write_new_private_file(&file, text.as_bytes()).map_err(|e| {
             if e.kind() == std::io::ErrorKind::AlreadyExists {
                 t(lang, Msg::ExportFileExists).to_string()

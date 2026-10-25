@@ -740,13 +740,20 @@ fn export_writes_a_private_text_file_after_checking_the_password() {
 
     // Wrong master password: nothing is written.
     let e = m
-        .export_text("not the password", file.to_str().unwrap(), 20)
+        .export(
+            ExportFormat::Text,
+            "not the password",
+            file.to_str().unwrap(),
+            20,
+        )
         .unwrap_err();
     assert_eq!(e, "Wrong password.");
     assert!(!file.exists());
     assert!(m.announcement.urgent, "the failure is announced");
 
-    let (count, written) = m.export_text(PW, file.to_str().unwrap(), 21).unwrap();
+    let (count, written) = m
+        .export(ExportFormat::Text, PW, file.to_str().unwrap(), 21)
+        .unwrap();
     assert_eq!((count, written.as_path()), (2, file.as_path()));
     let text = std::fs::read_to_string(&file).unwrap();
     for needle in [
@@ -774,7 +781,9 @@ fn export_writes_a_private_text_file_after_checking_the_password() {
     }
 
     // A second export to the same name is refused and leaves the first file alone.
-    let e = m.export_text(PW, file.to_str().unwrap(), 22).unwrap_err();
+    let e = m
+        .export(ExportFormat::Text, PW, file.to_str().unwrap(), 22)
+        .unwrap_err();
     assert!(e.contains("already exists"), "{e}");
     assert_eq!(std::fs::read_to_string(&file).unwrap(), text);
     std::fs::remove_dir_all(dir).unwrap();
@@ -789,16 +798,18 @@ fn export_refuses_a_missing_folder_an_empty_name_and_a_locked_vault() {
     let dir = scratch_dir("bad");
     let missing = dir.join("no-such-folder").join("out.txt");
     let e = m
-        .export_text(PW, missing.to_str().unwrap(), 20)
+        .export(ExportFormat::Text, PW, missing.to_str().unwrap(), 20)
         .unwrap_err();
     assert!(e.contains("folder does not exist"), "{e}");
     assert!(m
-        .export_text(PW, "   ", 21)
+        .export(ExportFormat::Text, PW, "   ", 21)
         .unwrap_err()
         .contains("where to save"));
     m.lock();
     let file = dir.join("out.txt");
-    assert!(m.export_text(PW, file.to_str().unwrap(), 22).is_err());
+    assert!(m
+        .export(ExportFormat::Text, PW, file.to_str().unwrap(), 22)
+        .is_err());
     assert!(!file.exists(), "a locked vault writes nothing");
     std::fs::remove_dir_all(dir).unwrap();
 }
@@ -806,14 +817,16 @@ fn export_refuses_a_missing_folder_an_empty_name_and_a_locked_vault() {
 #[test]
 fn export_names_the_file_for_the_day() {
     // 2026-10-24 12:38:55 UTC
-    let path = default_export_path(1_792_833_535);
+    let path = default_export_path(1_792_833_535, ExportFormat::Text);
     assert!(
         path.ends_with("/rahasyakosh-export-2026-10-24.txt"),
         "{path}"
     );
-    assert!(default_export_path(0).ends_with("rahasyakosh-export-1970-01-01.txt"));
+    assert!(
+        default_export_path(0, ExportFormat::Text).ends_with("rahasyakosh-export-1970-01-01.txt")
+    );
     // A leap day.
-    assert!(default_export_path(1_709_164_800).ends_with("2024-02-29.txt"));
+    assert!(default_export_path(1_709_164_800, ExportFormat::Text).ends_with("2024-02-29.txt"));
 }
 
 #[test]
@@ -826,4 +839,72 @@ fn confirming_the_password_accepts_only_the_master_password_of_an_open_vault() {
     assert!(m.confirm_password("wrong", 20).is_err());
     m.lock();
     assert!(m.confirm_password(PW, 20).is_err());
+}
+
+#[test]
+fn export_can_write_csv_and_json_with_the_same_safety_rules() {
+    let (mut m, _) = model(Settings {
+        idle_lock_secs: 0,
+        ..Settings::default()
+    });
+    let dir = scratch_dir("formats");
+    let csv = dir.join("out.csv");
+    let json = dir.join("out.json");
+    let bad = m
+        .export(ExportFormat::Csv, "nope", csv.to_str().unwrap(), 20)
+        .unwrap_err();
+    assert_eq!(bad, "Wrong password.");
+    assert!(!csv.exists());
+
+    let (n, _) = m
+        .export(ExportFormat::Csv, PW, csv.to_str().unwrap(), 21)
+        .unwrap();
+    assert_eq!(n, 2);
+    let text = std::fs::read_to_string(&csv).unwrap();
+    assert!(text.contains("GitHub") && text.contains("gh-pw") && text.contains("bank-pw"));
+    assert!(
+        !text.contains("RAHASYAKOSH EXPORT"),
+        "CSV has no text-export header"
+    );
+
+    let (n, _) = m
+        .export(ExportFormat::Json, PW, json.to_str().unwrap(), 22)
+        .unwrap();
+    assert_eq!(n, 2);
+    let text = std::fs::read_to_string(&json).unwrap();
+    assert!(text.trim_start().starts_with('[') || text.trim_start().starts_with('{'));
+    assert!(text.contains("bank-pw") && text.contains("GitHub"));
+
+    // Neither format replaces an existing file.
+    assert!(m
+        .export(ExportFormat::Json, PW, json.to_str().unwrap(), 23)
+        .unwrap_err()
+        .contains("already exists"));
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        for f in [&csv, &json] {
+            assert_eq!(
+                std::fs::metadata(f).unwrap().permissions().mode() & 0o777,
+                0o600
+            );
+        }
+    }
+}
+
+#[test]
+fn choosing_another_format_changes_only_a_suggested_extension() {
+    let p = "/home/a/rahasyakosh-export-2026-10-24.txt";
+    assert_eq!(
+        with_export_extension(p, ExportFormat::Json),
+        "/home/a/rahasyakosh-export-2026-10-24.json"
+    );
+    assert_eq!(
+        with_export_extension("/home/a/my.notes", ExportFormat::Csv),
+        "/home/a/my.notes"
+    );
+    assert_eq!(
+        with_export_extension("/home/a/backup", ExportFormat::Csv),
+        "/home/a/backup"
+    );
 }

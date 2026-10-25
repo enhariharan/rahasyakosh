@@ -81,8 +81,8 @@ For ordinary backups, prefer `vault`. It is still encrypted, so it needs none of
 
 `txt` is for people, not programs: a short warning at the top, then one block per login (title, username,
 password, websites, two-factor secret, any other fields, tags, notes), sorted by title and separated by lines.
-It follows the same three safety rules. The desktop app's **Settings → Export passwords to a text file**
-asks for the master password again, suggests `~/rahasyakosh-export-<date>.txt`, refuses to replace an existing
+It follows the same three safety rules. The desktop app's **Settings → Export passwords**
+(US-EXP-01, US-EXP-02) offers three formats, **Text**, **CSV** and **JSON**, asks for the master password again, suggests `~/rahasyakosh-export-<date>.txt` (the ending follows the format), refuses to replace an existing
 file and creates the file readable by you only. `export_txt` in `crates/transfer` makes the text and does no
 file work.
 
