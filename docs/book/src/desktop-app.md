@@ -41,7 +41,7 @@ A **profile** is one person's set of passwords. This computer can hold several, 
 - **Switching** means locking (Ctrl+L), then picking another profile on the unlock screen.
 - **Settings → Profile** changes the full name and username. **Delete this profile** removes the profile and its vault file for good after you type its master password. The last profile cannot be deleted. There is no trash for profiles, so export first if you might need the passwords.
 
-The list of profiles (names and usernames) is **not encrypted**, because it has to be shown before anything is unlocked. It is stored in `profiles.json` next to the vault files (`~/.local/share/rahasyakosh/`; new profiles' vaults go in its `profiles/` folder). The username does not sign in by itself; it is only a label.
+The list of profiles (names and usernames) is **not encrypted**, because it has to be shown before anything is unlocked. It is stored in `profiles.json` next to the vault files (`~/.local/share/rahasyakosh/`; new profiles' vaults go in its `profiles/` folder). The username does not sign in by itself; it is only a label. A step-by-step manual test for all of this is in `docs/10-profiles-test-checklist.md`.
 
 ## Unlocking
 
