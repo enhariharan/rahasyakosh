@@ -35,6 +35,8 @@ button:hover:not(:disabled) { border-color: var(--accent); }
 button:disabled { opacity: .5; cursor: default; }
 button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
 button.danger { color: var(--danger); }
+.profile-pick { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px; }
+.profile-pick select { max-width: 100%; }
 button.link { border: none; background: none; color: var(--accent); text-decoration: underline; padding: .2rem; }
 button.wide { width: calc(100% - 1.2rem); margin: .6rem; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }

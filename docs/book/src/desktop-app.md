@@ -29,11 +29,25 @@ instead type your own password, and the app rates its strength and refuses weak 
 
 ![Create a master passphrase: a generated passphrase, a warning, and a confirmation box](images/desktop-setup.png)
 
+## Profiles (US-PRF-01 to 05)
+
+A **profile** is one person's set of passwords. This computer can hold several, for example one for each person who shares it. Each profile has a **full name**, a **username** (both shown in the picker; the username must be different for every profile, upper or lower case) and a hidden, never-changing **user ID**.
+
+**Every profile has its own vault and its own master password.** Nobody can read another profile's passwords, and forgetting one profile's master password loses only that profile.
+
+- **First run.** The *Create a master passphrase* page also asks for a full name and username, already filled in with **Default user** and **defaultuser**. You do not have to change them (you can later, in Settings).
+- **If you used the app before profiles existed**, your vault simply became the default profile: same file, same master password, nothing changed or re-encrypted.
+- **Unlock screen.** Pick your profile in the **Profile** list, then type that profile's master password. **Add a profile** opens the same create-password page for a new, empty profile, which needs a full name and a username. After creating it you are signed in to it.
+- **Switching** means locking (Ctrl+L), then picking another profile on the unlock screen.
+- **Settings → Profile** changes the full name and username. **Delete this profile** removes the profile and its vault file for good after you type its master password. The last profile cannot be deleted. There is no trash for profiles, so export first if you might need the passwords.
+
+The list of profiles (names and usernames) is **not encrypted**, because it has to be shown before anything is unlocked. It is stored in `profiles.json` next to the vault files (`~/.local/share/rahasyakosh/`; new profiles' vaults go in its `profiles/` folder). The username does not sign in by itself; it is only a label.
+
 ## Unlocking
 
 ![The unlock screen](images/desktop-unlock.png)
 
-Type the master password and press Enter. After three wrong passwords in a row the app makes you wait 1 s, then 2 s, 4 s and so on (see [Sessions](sessions.md)).
+Choose your profile if there is more than one, type its master password and press Enter. After three wrong passwords in a row the app makes you wait 1 s, then 2 s, 4 s and so on (see [Sessions](sessions.md)).
 
 ## The main window
 

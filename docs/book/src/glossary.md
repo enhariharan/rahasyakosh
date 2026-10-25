@@ -294,6 +294,8 @@ so an old password is not lost by accident, and you can go back to it.
 
 **UUID** — A long random identifier (like `0190…0001`) used to name each item.
 
+**Profile** — One person's set of passwords inside a shared installation. Each profile has its own vault and master password, plus a full name, a unique username and a user ID. See [Profiles](desktop-app.md#profiles-us-prf-01-to-05).
+
 **Vault** — The encrypted file that holds all your saved items. See the core ideas above.
 
 **Vault key (VK)** — The random key that protects your items. It is stored in the header, locked by the key made from your password.

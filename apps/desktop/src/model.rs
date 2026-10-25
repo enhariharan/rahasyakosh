@@ -510,13 +510,7 @@ impl<S: Store, C: Clipboard> Model<S, C> {
             .vault(now)
             .map_err(|Locked| t(lang, Msg::VaultIsLocked).to_string())?;
         // The vault is open, but exporting is what a person walking up to an unlocked screen would do: ask again.
-        vault
-            .store()
-            .header()
-            .map_err(|e| e.to_string())?
-            .unlock(password)
-            .map(drop)
-            .map_err(|_| t(lang, Msg::WrongPassword).to_string())?;
+        Self::check_password(vault, password, lang)?;
         let items: Vec<Item> = vault.items(Scope::Live).into_iter().cloned().collect();
         if items.is_empty() {
             return Err(t(lang, Msg::ExportNothing).into());
@@ -530,6 +524,32 @@ impl<S: Store, C: Clipboard> Model<S, C> {
             }
         })?;
         Ok((items.len(), file))
+    }
+
+    /// Checks the master password again against the open vault, for actions that must not be done by whoever
+    /// walks up to an unlocked screen (export, deleting a profile).
+    fn check_password(
+        vault: &rahasyakosh_app::Vault<S>,
+        password: &str,
+        lang: Language,
+    ) -> Result<(), String> {
+        vault
+            .store()
+            .header()
+            .map_err(|e| e.to_string())?
+            .unlock(password)
+            .map(drop)
+            .map_err(|_| t(lang, Msg::WrongPassword).to_string())
+    }
+
+    /// For deleting a profile: is `password` the master password of the open vault?
+    pub fn confirm_password(&mut self, password: &str, now: i64) -> Result<(), String> {
+        let lang = self.lang();
+        let vault = self
+            .session
+            .vault(now)
+            .map_err(|Locked| t(lang, Msg::VaultIsLocked).to_string())?;
+        Self::check_password(vault, password, lang)
     }
 
     // ---- screen reader started or stopped -------------------------------------------------------------

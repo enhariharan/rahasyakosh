@@ -8,9 +8,13 @@
 #![forbid(unsafe_code)]
 
 mod index;
+mod profiles;
 mod session;
 mod vault;
 
+pub use profiles::{
+    new_profile_id, Profile, ProfileError, ProfileList, DEFAULT_FULL_NAME, DEFAULT_USERNAME,
+};
 pub use session::{
     backoff_secs, should_clear, Language, Locked, Session, Settings, ThemeMode, Tick, ToolbarStyle,
     UnlockError, Unlocked,

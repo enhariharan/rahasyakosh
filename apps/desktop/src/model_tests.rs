@@ -815,3 +815,15 @@ fn export_names_the_file_for_the_day() {
     // A leap day.
     assert!(default_export_path(1_709_164_800).ends_with("2024-02-29.txt"));
 }
+
+#[test]
+fn confirming_the_password_accepts_only_the_master_password_of_an_open_vault() {
+    let (mut m, _) = model(Settings {
+        idle_lock_secs: 0,
+        ..Settings::default()
+    });
+    assert!(m.confirm_password(PW, 20).is_ok());
+    assert!(m.confirm_password("wrong", 20).is_err());
+    m.lock();
+    assert!(m.confirm_password(PW, 20).is_err());
+}

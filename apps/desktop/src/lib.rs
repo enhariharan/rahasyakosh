@@ -5,13 +5,17 @@ pub mod model;
 #[cfg(test)]
 mod model_tests;
 mod platform;
+mod profiles;
 mod style;
 
 use dioxus::desktop::{Config, LogicalSize, WindowBuilder};
 use dioxus::prelude::*;
 use i18n::{t as tr, trf, Msg};
 use model::{Model, NoticeKind, ReaderNotice, SystemClipboard, View};
-use rahasyakosh_app::{Language, Session, Settings, ThemeMode, ToolbarStyle};
+use rahasyakosh_app::{
+    new_profile_id, Language, Profile, ProfileError, ProfileList, Session, Settings, ThemeMode,
+    ToolbarStyle, DEFAULT_FULL_NAME, DEFAULT_USERNAME,
+};
 use rahasyakosh_store::{SqliteStore, Uuid};
 use std::cell::Cell;
 use std::path::{Path, PathBuf};
@@ -36,6 +40,14 @@ fn vault_path() -> PathBuf {
         .map(PathBuf::from)
         .unwrap_or_default();
     home.join(".local/share/rahasyakosh/vault.db")
+}
+
+/// The folder holding the profile list and the vault files.
+fn data_dir() -> PathBuf {
+    vault_path()
+        .parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_default()
 }
 
 fn settings_path() -> PathBuf {
@@ -109,6 +121,18 @@ fn startup(path: &Path) -> Startup {
     }
 }
 
+/// Opens the vault of `profile` (locked), ready for its master password.
+fn open_profile(profile: &Profile) -> Startup {
+    let lang = load_settings().language;
+    let Some(path) = profiles::vault_file(&data_dir(), profile) else {
+        return Startup::Broken(trf(lang, Msg::ProfileFileMissing, &[&profile.file]));
+    };
+    if !path.exists() {
+        return Startup::Broken(trf(lang, Msg::ProfileFileMissing, &[&path.display()]));
+    }
+    startup(&path)
+}
+
 // ---- shared state -----------------------------------------------------------------------------------------
 
 #[derive(Clone)]
@@ -122,6 +146,11 @@ struct Ctx {
     broken: Signal<Option<String>>,
     /// The language chosen on the first-run screens, before there is a vault with settings.
     setup_lang: Signal<Language>,
+    /// Everyone who has a vault here, and which of them is open or being unlocked.
+    profiles: Signal<ProfileList>,
+    active: Signal<Option<Uuid>>,
+    /// True while the "add a profile" page is showing.
+    adding: Signal<bool>,
     /// Set while the "screen reader started or stopped" dialog is showing.
     reader_notice: Signal<Option<ReaderNotice>>,
 }
@@ -360,16 +389,28 @@ fn app() -> Element {
     let mut model: Signal<Option<AppModel>> = use_signal(|| None);
     let mut broken: Signal<Option<String>> = use_signal(|| None);
     let clock = use_signal(now);
+    let mut profiles: Signal<ProfileList> = use_signal(ProfileList::new);
+    let mut active: Signal<Option<Uuid>> = use_signal(|| None);
+    let adding = use_signal(|| false);
     let last_input = use_hook(|| Rc::new(Cell::new(now())));
     use_hook(|| {
         if let Some(m) = INITIAL.with(|c| c.borrow_mut().take()) {
             model.set(Some(m));
             return;
         }
-        match startup(&vault_path()) {
-            Startup::Ready(m) => model.set(Some(*m)),
-            Startup::NeedsSetup => {}
-            Startup::Broken(msg) => broken.set(Some(msg)),
+        match profiles::load(&data_dir(), &vault_path()) {
+            Err(msg) => broken.set(Some(msg)),
+            Ok(list) => {
+                if let Some(first) = list.all().first() {
+                    match open_profile(first) {
+                        Startup::Ready(m) => model.set(Some(*m)),
+                        Startup::NeedsSetup => {}
+                        Startup::Broken(msg) => broken.set(Some(msg)),
+                    }
+                    active.set(Some(first.id));
+                }
+                profiles.set(list);
+            }
         };
     });
     let setup_lang = use_signal(|| load_settings().language);
@@ -380,6 +421,9 @@ fn app() -> Element {
         last_input: last_input.clone(),
         broken,
         setup_lang,
+        profiles,
+        active,
+        adding,
         reader_notice,
     });
 
@@ -532,6 +576,9 @@ fn screen(ctx: Ctx) -> Element {
     if let Some(msg) = (ctx.broken)() {
         return rsx! { main { class: "centre", h1 { {tr(lang_of(&ctx), Msg::AppName)} } p { class: "error", role: "alert", "{msg}" } } };
     }
+    if (ctx.adding)() {
+        return rsx! { Setup {} };
+    }
     let state = {
         let m = ctx.model.read();
         m.as_ref().map(|m| m.is_unlocked())
@@ -550,7 +597,23 @@ fn Setup() -> Element {
     let mut ctx = use_context::<Ctx>();
     let lang = lang_of(&ctx);
     let mut passphrase = use_signal(new_passphrase);
-    let mut started = use_signal(|| false);
+    // Adding a profile skips the welcome page; the first profile starts from the default name and username.
+    let adding = (ctx.adding)();
+    let mut started = use_signal(|| adding);
+    let mut full_name = use_signal(|| {
+        if adding {
+            String::new()
+        } else {
+            DEFAULT_FULL_NAME.to_string()
+        }
+    });
+    let mut username = use_signal(|| {
+        if adding {
+            String::new()
+        } else {
+            DEFAULT_USERNAME.to_string()
+        }
+    });
     let mut own = use_signal(|| false);
     let mut pw = use_signal(String::new);
     let mut pw2 = use_signal(String::new);
@@ -560,6 +623,26 @@ fn Setup() -> Element {
     let strength = rahasyakosh_strength::estimate(&pw.read(), &[]);
 
     let create = move |_| {
+        let dir = data_dir();
+        let mut list = ctx.profiles.read().clone();
+        let id = new_profile_id(&mut rand::rng());
+        // The first profile keeps the file name single-vault installations always used.
+        let legacy = vault_path();
+        let legacy_name = legacy
+            .file_name()
+            .and_then(|f| f.to_str())
+            .map(str::to_string);
+        let file = profiles::new_vault_file(
+            list.is_empty().then_some(legacy_name).flatten().as_deref(),
+            id,
+        );
+        let profile = match list.add(id, &full_name.read(), &username.read(), &file) {
+            Ok(p) => p.clone(),
+            Err(e) => {
+                error.set(Some(tr(lang, profile_error_msg(e)).into()));
+                return;
+            }
+        };
         let password = match model::new_master_password(
             lang,
             own(),
@@ -578,7 +661,10 @@ fn Setup() -> Element {
             language: lang,
             ..load_settings()
         };
-        let path = vault_path();
+        let Some(path) = profiles::vault_file(&dir, &profile) else {
+            return;
+        };
+        profiles::prepare_folder(&path);
         match SqliteStore::open(&path)
             .map_err(|e| e.to_string())
             .and_then(|store| {
@@ -586,7 +672,14 @@ fn Setup() -> Element {
                     .map_err(|e| e.to_string())
             }) {
             Ok(session) => {
+                if let Err(e) = profiles::save(&dir, &list) {
+                    error.set(Some(trf(lang, Msg::CouldNotCreateVault, &[&e])));
+                    return;
+                }
                 save_settings(session.settings());
+                ctx.profiles.set(list);
+                ctx.active.set(Some(id));
+                ctx.adding.set(false);
                 ctx.model.set(Some(make_model(session)));
             }
             Err(e) => error.set(Some(trf(lang, Msg::CouldNotCreateVault, &[&e]))),
@@ -633,7 +726,19 @@ fn Setup() -> Element {
 
     rsx! {
         main { class: "centre landing",
-            h1 { {tr(lang, Msg::CreatePassphraseTitle)} }
+            h1 { {tr(lang, if adding { Msg::AddProfileTitle } else { Msg::CreatePassphraseTitle })} }
+            if adding { p { class: "muted", {tr(lang, Msg::AddProfileHint)} } }
+            section { aria_label: tr(lang, Msg::ProfileSection),
+                label { r#for: "prf-name", {tr(lang, Msg::ProfileFullName)} }
+                input { id: "prf-name", autocomplete: "off", value: "{full_name}", oninput: move |e| full_name.set(e.value()) }
+                label { r#for: "prf-user", {tr(lang, Msg::ProfileUsername)} }
+                input {
+                    id: "prf-user", class: "ltr", dir: "ltr", autocomplete: "off", value: "{username}",
+                    aria_describedby: if adding { "" } else { "prf-hint" },
+                    oninput: move |e| username.set(e.value()),
+                }
+                if !adding { p { id: "prf-hint", class: "muted small", {tr(lang, Msg::ProfileKeepHint)} } }
+            }
             p { class: "warn", {tr(lang, Msg::ShownOnce)} }
             if !own() {
                 section { aria_label: tr(lang, Msg::GeneratedPassphrase),
@@ -672,8 +777,20 @@ fn Setup() -> Element {
             }
             if let Some(e) = error() { p { class: "error", role: "alert", "{e}" } }
             button { class: "primary", onclick: create, disabled: !own() && !saved(), {tr(lang, Msg::CreateVault)} }
-            p { class: "small", "{trf(lang, Msg::VaultLocation, &[&vault_path().display()])}" }
+            if adding { button { r#type: "button", onclick: move |_| ctx.adding.set(false), {tr(lang, Msg::CancelAdd)} } }
+            p { class: "small", "{trf(lang, Msg::VaultLocation, &[&data_dir().display()])}" }
         }
+    }
+}
+
+/// The message for a refused profile change.
+fn profile_error_msg(e: ProfileError) -> Msg {
+    match e {
+        ProfileError::EmptyName => Msg::ProfileNameEmpty,
+        ProfileError::EmptyUsername => Msg::ProfileUsernameEmpty,
+        ProfileError::UsernameTaken => Msg::ProfileUsernameTaken,
+        ProfileError::LastProfile => Msg::LastProfile,
+        ProfileError::Unknown => Msg::ProfileFileMissing,
     }
 }
 
@@ -744,6 +861,8 @@ fn Unlock() -> Element {
         )
     };
     let has_err = err.is_some();
+    let profile_list = ctx.profiles.read().all().to_vec();
+    let active_id = (ctx.active)();
     let mut submit = move || {
         let t = now();
         if let Some(m) = ctx.model.write().as_mut() {
@@ -764,6 +883,27 @@ fn Unlock() -> Element {
             Logo {}
             h1 { {tr(lang, Msg::AppName)} }
             p { class: "tagline spaced", {tr(lang, Msg::VaultLockedTag)} }
+            if !profile_list.is_empty() {
+                div { class: "profile-pick",
+                    label { r#for: "profile", {tr(lang, Msg::ProfilePick)} }
+                    select { id: "profile",
+                        onchange: move |e| {
+                            let chosen = profile_list.iter().find(|p| p.id.to_string() == e.value()).cloned();
+                            let Some(p) = chosen else { return };
+                            match open_profile(&p) {
+                                Startup::Ready(m) => ctx.model.set(Some(*m)),
+                                Startup::NeedsSetup => {}
+                                Startup::Broken(msg) => ctx.broken.set(Some(msg)),
+                            }
+                            ctx.active.set(Some(p.id));
+                        },
+                        for p in profile_list.iter() {
+                            option { key: "{p.id}", value: "{p.id}", selected: Some(p.id) == active_id, "{p.full_name} ({p.username})" }
+                        }
+                    }
+                    button { class: "link", r#type: "button", onclick: move |_| ctx.adding.set(true), {tr(lang, Msg::AddProfile)} }
+                }
+            }
             form {
                 onsubmit: move |e| { e.prevent_default(); submit(); },
                 label { class: "sr-only", r#for: "master", {tr(lang, Msg::MasterPassword)} }
@@ -1371,6 +1511,13 @@ fn SettingsView() -> Element {
     let mut export_pw = use_signal(String::new);
     let mut export_path = use_signal(|| model::default_export_path(now()));
     let mut export_msg = use_signal(|| Option::<(bool, String)>::None);
+    let me = (ctx.active)().and_then(|id| ctx.profiles.read().get(id).cloned());
+    let mut pf_name = use_signal(|| me.as_ref().map(|p| p.full_name.clone()).unwrap_or_default());
+    let mut pf_user = use_signal(|| me.as_ref().map(|p| p.username.clone()).unwrap_or_default());
+    let mut pf_msg = use_signal(|| Option::<(bool, String)>::None);
+    let mut del_pw = use_signal(String::new);
+    let mut del_msg = use_signal(|| Option::<String>::None);
+    let only_profile = ctx.profiles.read().len() < 2;
     macro_rules! num {
         ($name:ident, $ty:ty) => {
             move |e: FormEvent| {
@@ -1483,6 +1630,86 @@ fn SettingsView() -> Element {
                 }
                 if let Some((ok, text)) = export_msg() { p { class: if ok { "ok" } else { "error" }, "{text}" } }
                 button { class: "primary", r#type: "submit", {tr(lang, Msg::ExportButton)} }
+            }
+            if me.is_some() {
+                h3 { {tr(lang, Msg::ProfileSection)} }
+                form {
+                    onsubmit: move |e| {
+                        e.prevent_default();
+                        let Some(id) = (ctx.active)() else { return };
+                        let mut list = ctx.profiles.read().clone();
+                        let result = list
+                            .edit(id, &pf_name.read(), &pf_user.read())
+                            .map_err(|e| tr(lang, profile_error_msg(e)).to_string())
+                            .and_then(|()| profiles::save(&data_dir(), &list));
+                        match result {
+                            Ok(()) => {
+                                if let Some(p) = list.get(id) {
+                                    pf_name.set(p.full_name.clone());
+                                    pf_user.set(p.username.clone());
+                                }
+                                ctx.profiles.set(list);
+                                pf_msg.set(Some((true, tr(lang, Msg::ProfileSaved).to_string())));
+                            }
+                            Err(e) => pf_msg.set(Some((false, e))),
+                        }
+                    },
+                    label { r#for: "pf-name", {tr(lang, Msg::ProfileFullName)} }
+                    input { id: "pf-name", autocomplete: "off", value: "{pf_name}", oninput: move |e| pf_name.set(e.value()) }
+                    label { r#for: "pf-user", {tr(lang, Msg::ProfileUsername)} }
+                    input { id: "pf-user", class: "ltr", dir: "ltr", autocomplete: "off", value: "{pf_user}", oninput: move |e| pf_user.set(e.value()) }
+                    if let Some((ok, text)) = pf_msg() { p { class: if ok { "ok" } else { "error" }, role: if ok { "status" } else { "alert" }, "{text}" } }
+                    button { class: "primary", r#type: "submit", {tr(lang, Msg::ProfileSave)} }
+                }
+                h3 { {tr(lang, Msg::DeleteProfileTitle)} }
+                if only_profile {
+                    p { class: "muted small", {tr(lang, Msg::LastProfile)} }
+                } else {
+                    p { class: "muted small", id: "delete-warning", {tr(lang, Msg::DeleteProfileWarning)} }
+                    form {
+                        onsubmit: move |e| {
+                            e.prevent_default();
+                            let pw = del_pw.read().clone();
+                            del_pw.set(String::new());
+                            let Some(id) = (ctx.active)() else { return };
+                            let mut list = ctx.profiles.read().clone();
+                            let checked = ctx.model.write().as_mut().map(|m| m.confirm_password(&pw, now()));
+                            match checked {
+                                Some(Ok(())) => {}
+                                Some(Err(e)) => { del_msg.set(Some(e)); return; }
+                                None => return,
+                            }
+                            let gone = match list.remove(id) {
+                                Ok(p) => p,
+                                Err(e) => { del_msg.set(Some(tr(lang, profile_error_msg(e)).to_string())); return; }
+                            };
+                            if let Err(e) = profiles::save(&data_dir(), &list) {
+                                del_msg.set(Some(e));
+                                return;
+                            }
+                            // Open the next profile (locked) first, so the deleted vault is closed before its file goes.
+                            if let Some(next) = list.all().first() {
+                                match open_profile(next) {
+                                    Startup::Ready(m) => ctx.model.set(Some(*m)),
+                                    Startup::NeedsSetup => {}
+                                    Startup::Broken(msg) => ctx.broken.set(Some(msg)),
+                                }
+                                ctx.active.set(Some(next.id));
+                            }
+                            if let Some(file) = profiles::vault_file(&data_dir(), &gone) {
+                                profiles::delete_vault(&file);
+                            }
+                            ctx.profiles.set(list);
+                        },
+                        label { r#for: "del-pw", {tr(lang, Msg::ExportMasterPassword)} }
+                        input {
+                            id: "del-pw", class: "ltr", dir: "ltr", r#type: "password", autocomplete: "off", value: "{del_pw}",
+                            aria_describedby: "delete-warning", oninput: move |e| del_pw.set(e.value()),
+                        }
+                        if let Some(text) = del_msg() { p { class: "error", role: "alert", "{text}" } }
+                        button { class: "danger", r#type: "submit", {tr(lang, Msg::DeleteProfileButton)} }
+                    }
+                }
             }
         }
     }

@@ -165,6 +165,10 @@ index structure to keep consistent or to leak. Updated incrementally on every op
 4. **History inside the payload vs. separate version records?** *Recommendation:* inside the payload (section 6). Separate records scale
    better for very large histories, which we do not need, but complicate sync and the store trait.
 
+## 10b. Profiles (E13)
+
+Decided 2026-10-24: **one vault file and one master password per profile.** Nothing in the store, core or record formats changed. `rahasyakosh_app::ProfileList` (pure, tested) holds each profile's ID, full name, unique username (case-insensitive) and vault file name; the front-end saves it as versioned JSON (`profiles.json`, written through a temporary file). The list is **plaintext** because the picker needs it before unlocking; it holds no secret. An existing single vault is adopted in place as the default profile, so no vault is touched or re-encrypted. A profile's file name is checked so it cannot point outside the data folder.
+
 ## 11. Work packages (in order)
 
 1. `store` crate: trait, errors, memory backend, conformance suite.
