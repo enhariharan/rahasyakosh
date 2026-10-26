@@ -20,7 +20,7 @@ The primitives, parameters, nonce handling, AAD design and known-answer tests lo
 ## Phases
 | # | Phase | Scope | Main questions | Status |
 |---|---|---|---|---|
-| 1 | Crypto core | `core/{crypto,vault,item,totp,generator}.rs` | Secrets escaping `Zeroizing`? `Item` zeroization incl. history? Generator modulo bias? TOTP handling? | partly read |
+| 1 | Crypto core | `core/{crypto,vault,item,totp,generator}.rs` | Secrets escaping `Zeroizing`? `Item` zeroization incl. history? Generator modulo bias? TOTP handling? | done |
 | 2 | Storage and integrity | `store/{sqlite,directory}.rs`, `app/vault.rs` | Rollback protection? Atomic writes, file permissions (0600)? SQL injection, path traversal? Plaintext left by tombstones? | done |
 | 3 | Session and lock | `app/session.rs` | Auto-lock, key dropped on lock, brute-force throttling, profile index leaks | done |
 | 4 | Clipboard and CLI | `clipboard`, `cli` | Clipboard readers, `current_exe()` re-spawn hijack, secrets in argv/env/history/TTY echo, `println!` of passwords | done |
@@ -266,7 +266,7 @@ It touches only `~/.local`, builds with `--locked`, installs with explicit modes
 
 # Summary of the audit (2026-10-26)
 
-All seven phases are done. Nothing has been fixed, as agreed. Severity is the auditor's judgement for a local-first app whose main risks are a copied vault file and a hostile sync folder. "Confirmed" means reproduced; the rest is from reading code.
+All seven phases are done (Phase 1 was finished last, on the same day). Nothing has been fixed, as agreed. Severity is the auditor's judgement for a local-first app whose main risks are a copied vault file and a hostile sync folder. "Confirmed" means reproduced; the rest is from reading code.
 
 | ID | Sev | Finding | Status |
 |---|---|---|---|
@@ -274,7 +274,9 @@ All seven phases are done. Nothing has been fixed, as agreed. Severity is the au
 | P2-2 | High | Tombstones unauthenticated; any rev hides an item and blocks its id | confirmed |
 | P2-3 | Medium | One bad record makes the whole vault unopenable | confirmed |
 | P2-4 | Medium | Password change keeps the vault key; old header stays in the WAL | confirmed (WAL) |
-| P1* | Medium | Unauthenticated header drives Argon2 (up to 1 GiB, t=20); design doc and code disagree (Secret Key, verifier, mlock) | leads, phase 1 still partly read |
+| P1-1 | Medium | Master password is not Unicode-normalised before Argon2 (lock-out risk across keyboards and platforms, relevant to the Indic-language users) | reading |
+| P1-2 | Medium | Unauthenticated header drives Argon2: one unlock attempt with the allowed maximum took 10.8 s and 1 GiB | confirmed (measured) |
+| P1-3 | Medium | Design doc (`docs/04`) and code disagree: no Secret Key, verifier blob, header magic or mlock | confirmed |
 | P6-1 | Medium | No core-dump, ptrace or mlock hardening | reading |
 | P6-2 | Medium | Data and config folders and `profiles.json` readable by other users | confirmed |
 | P6-3 | Medium | Typed secrets pass through unwiped memory (web view, signals) | reading |
@@ -286,6 +288,52 @@ All seven phases are done. Nothing has been fixed, as agreed. Severity is the au
 | P7-1 | Medium | Installer turns the accessibility bus on session-wide | reading |
 | P2-5, P3-2..5, P4-3..8, P5-3..11, P6-4..8, P7-2..6 | Low/Info | Hardening and documentation items | see sections |
 
-Not yet done: **Phase 1** is marked "partly read" in the table (crypto core: `item`, `totp`, `generator`, Argon2 `zeroize` feature, `cfg!(test)` in `check_kdf`). It should be finished before the findings are reviewed, because the early leads 3, 4 and 6 depend on it.
-
 Suggested order for the fixes, once reviewed: (1) rollback and authenticated tombstones, with a sealed manifest (P2-1, P2-2, P2-3); (2) file modes and the folder mode on every platform path (P6-2, P3-2, P2-5); (3) the small, local bugs with tests (P4-2, P3-1, P5-1, P5-2, P4-1); (4) process hardening and memory hygiene (P6-1, P6-3); (5) CI pinning and release signing (P7-2, P7-3).
+
+---
+
+## Phase 1 — crypto core, finished (2026-10-26)
+Files read: all of `core/src/{crypto,vault,item,totp,generator}.rs` (the earlier pass had read parts of `crypto` and `vault`), the `argon2` 0.6.0 source in the cargo registry, and `core/Cargo.toml`. P1-2 was measured with a temporary test that was deleted afterwards (nothing in the repo changed).
+
+### P1-1 Medium — The master password is used as raw bytes (from reading)
+`derive_kek` passes `password.as_bytes()` to Argon2. The same visible password can be different bytes depending on how it was typed: `é` as one code point or as `e` plus a combining accent, and many Devanagari, Tamil, Telugu, Malayalam and Urdu sequences (a letter with a nukta or vowel sign can be composed or decomposed, and input methods differ between Linux, Android, macOS and web). The app offers seven languages, so users with non-Latin master passwords are a stated audience. A different keyboard or a future port then gives "wrong password" for a password the user typed correctly. Nothing in the repository normalises text (no NFKC/NFC code or dependency).
+Fix: normalise to NFKC before deriving keys. This changes the key for existing non-ASCII passwords, so do it with a format flag: new vaults record `"pw_norm": "nfkc"` in the authenticated header, and unlock of older vaults tries the raw bytes first, then the normalised form. Add golden vectors for both. The strength meter and the generator should use the same form.
+
+### P1-2 Medium — A tampered header makes unlock run a 1 GiB Argon2 first (confirmed; measured)
+Lead 3 is confirmed. `unlock` calls `check_kdf` and then `derive_kek` before anything is authenticated; the header, including `kdf`, is only authenticated by the decryption that follows. `KdfParams::validate` allows `m_kib` up to 1 GiB, `t` up to 20 and `p` up to 16. Measured: one derivation with `m = 1 GiB, t = 20, p = 1` took **10.8 s** and 1 GiB of memory on this machine (debug profile with optimised dependencies). Anyone who can write the vault file (a sync peer, a shared folder) can make each unlock attempt cost that, or fail with out-of-memory on a small machine. It cannot reveal anything: the header is bound as AAD, so a changed header never decrypts.
+Fix: lower the accepted ceiling to what the app can itself produce (the desktop slider tops out well below 1 GiB; for example 256 MiB and t ≤ 10), keep the floor, and show the parameters to the user before an expensive derivation ("this vault asks for 1 GiB; continue?"). Settings and `Settings::validated` use the same constants, so change them together.
+
+### P1-3 Medium — `docs/04` promises things the code does not do (confirmed; lead 2)
+The design document describes a Secret Key (two-secret key derivation), a `verifier` blob, a header `magic` field and `mlock`ed memory. `VaultHeader` has none of these: its fields are `format_version`, `vault_id`, `kdf`, `salt` and `wrapped_vk`; `MAGIC` is only mixed into the AAD; there is no Secret Key, and no memory locking anywhere (see P6-1). A reader of the document will believe a stolen vault file is protected by a high-entropy second secret; today it is protected by the master password alone and the Argon2 cost.
+Fix: either mark these as planned and say what protects the vault today, or build them. This matters most for the Secret Key, because it changes what a weak master password costs the user. Also note the missing `verifier`: the wrong-password test is "AEAD open fails", which is fine, but it is also what the throttle in `Session::unlock` relies on (see P3).
+
+### P1-4 Low — Argon2 `zeroize` feature is off (confirmed; lead 4)
+`core/Cargo.toml` uses `argon2 = { default-features = false, features = ["alloc"] }`; the crate's `zeroize` feature is off, so `initial_hash` (line 389) and the `blockhash` temporaries (lines 570-573) are not wiped. `initial_hash` is a plain Blake2b of the password and salt, so a memory image that contains it lets someone test password guesses with one cheap hash instead of a full Argon2. The large memory matrix is not wiped even with the feature on (the crate source shows no wipe of it). Impact is low because an attacker who can read this memory also finds the key and the password buffers (P6-3).
+Fix: enable the `zeroize` feature (a one-word change; check it still builds for `wasm32`), and state the limit in `docs/04`.
+
+### P1-5 Low — `check_kdf` skips validation with `cfg!(test)` (checked; lead 6)
+Checked what `cfg!(test)` does here: it is true only when `rahasyakosh-core` itself is compiled for its own unit tests. Other crates' tests, the integration tests, the fuzz crate and every release build compile core normally, so validation is always on there. It is safe today. It is fragile because a unit test of core can never reach the validation path through `unlock`, and a later change to the build setup (a test-only feature, `--cfg test`) could silently switch it off.
+Fix: pass the check as an argument (`unlock_with(policy)`) or put the cheap parameters behind a `test-kdf` cargo feature that is named in `deny` and CI so it is never enabled in a release.
+
+### P1-6 Low — Old secrets are dropped without being wiped (from reading)
+`Item`, `Field` and `ItemVersion` are `ZeroizeOnDrop`, which is good (history included: truncated versions are wiped when dropped). But assignments drop the old `String` as plain memory: `set_field` (`f.value = value.into()`), `revert_to` for `title` and `notes`, and `Form`/signal copies in the UI. After a password edit the previous password stays in freed heap until it is overwritten. Also `UnlockedVault::unlock` copies the key into a stack array (`vk`) before wrapping it in `Zeroizing`, the generator builds the password in a plain `Vec<char>` first, and `base32_decode` fills a plain `Vec<u8>`.
+Fix: wipe before replacing (`f.value.zeroize()` first), build intermediate buffers in `Zeroizing`, and construct keys directly inside `Zeroizing`.
+
+### P1-7 Low — No limit on the size of an item (from reading)
+Nothing in `core` or `app` caps an item. `pad` stores the length as `u32` (`data.len() as u32` would wrap above 4 GiB), and `DirectoryStore` refuses to read any file over 64 MiB (`MAX_FILE`). An item that is a little too large (a very large note or an import of one huge row) is written without complaint and then makes the directory store unreadable at the next unlock (the same all-or-nothing failure as P2-3).
+Fix: reject items above a fixed size (for example 1 MiB of plaintext) in `Vault::commit`, and make the store limit and the item limit agree.
+
+### P1-8 Low — A generated master passphrase can be very short (from reading)
+`rk init --passphrase --words 3` generates a master passphrase of about 39 bits (EFF large list, 12.9 bits a word) and skips the strength check that typed passwords go through. The default is 6 words (about 77 bits). Fix: require at least 5 or 6 words for a master passphrase, or show the bits and ask for confirmation.
+
+### P1-9 Info — Generator and TOTP details (from reading)
+- `uniform` is correct rejection sampling: `zone = u32::MAX - (2^32 mod n)`, so no modulo bias.
+- The password generator draws one character per selected class and fills the rest from the union before shuffling. That is slightly less entropy than "uniform over all strings that contain every class", negligible at length 20 and visible only below about 6 characters; `entropy_bits` is documented as an upper bound.
+- TOTP matches RFC 6238 (the test file uses the Appendix B vectors for SHA-1, SHA-256 and SHA-512), checks digits 6..8 and period > 0, and the secret is `ZeroizeOnDrop`. `otpauth://hotp` is refused. Codes are plain `String`s, which is fine for a 30-second value.
+
+### What held up (core)
+- Primitives: Argon2id, HKDF-SHA256, XChaCha20-Poly1305 from RustCrypto, with RFC 5869 and the XChaCha draft vectors in the tests. `random_bytes` takes an injected `CryptoRng`; nonces are 192-bit random, so reuse is not a practical risk.
+- Key hierarchy: master key, then a KEK by HKDF with a domain label, which unwraps the vault key; every item has its own key (`HKDF(vk, "rk/item/v1" ‖ id)`).
+- AAD: the header binds version, vault id, KDF parameters and salt (so a changed header never opens); records bind magic, vault id, item id, revision and record version, and `open_record` checks the id inside the payload against the record id. Moving a record to another vault, item id or revision fails.
+- `unpad` is bounds-checked and safe on 32-bit and WebAssembly; padding to 64 bytes hides exact lengths; all key types are `Zeroizing`.
+- Search (`Item::matches`) never looks at concealed fields or notes; `Debug` for `Item`, `Field` and `ItemVersion` redacts concealed values, and a fuzz target asserts it.
