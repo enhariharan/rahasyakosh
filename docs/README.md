@@ -18,4 +18,4 @@ Targets: Linux, macOS, Windows, Android, iOS (later), Browser (WASM + extension)
 
 Status: **draft v0.1** — decisions marked *ADR* in 03 are open to revision until M2.
 
-Manual test checklists are in [`tests/`](tests/): [accessibility](tests/a11y-test-checklist.md), [shortcuts](tests/shortcuts-test-checklist.md), [profiles](tests/profiles-test-checklist.md) and [unlock screen](tests/unlock-screen-test-checklist.md).
+Manual test checklists are in [`tests/`](tests/): [accessibility](tests/a11y-test-checklist.md), [shortcuts](tests/shortcuts-test-checklist.md), [profiles](tests/profiles-test-checklist.md), [unlock screen](tests/unlock-screen-test-checklist.md) and [security audit](tests/security-audit-test-checklist.md).
