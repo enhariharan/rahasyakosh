@@ -1,4 +1,4 @@
-# Security audit test checklist (findings in `docs/13-security-audit.md`)
+# Security audit test checklist (findings in `docs/reports/`, plan in `docs/13-security-audit.md`)
 
 A manual pass that re-checks every finding of the 2026-10-26 security audit, using the finding IDs (P1-1 … P7-6). It has two uses:
 - **Before a fix:** the check should *fail* (the problem is reproduced). Write down what you saw.
@@ -229,4 +229,4 @@ Use the directory store or SQLite vault as noted. Always copy the vault first (`
 
 ## Recording results
 Fill in the Result column and paste the tables at the bottom of this file under a dated heading, with the commit, session type and Ubuntu version.
-Every `✘` or `?` becomes an issue labelled `security` that names the finding ID, the steps and what was seen. When a finding is fixed, update its Status in `docs/13-security-audit.md` and re-run the matching section here.
+Every `✘` or `?` becomes an issue labelled `security` that names the finding ID, the steps and what was seen. When a finding is fixed, update its Status in the latest report in `docs/reports/` and re-run the matching section here.
