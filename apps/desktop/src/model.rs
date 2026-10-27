@@ -642,6 +642,9 @@ impl<S: Store, C: Clipboard> Model<S, C> {
                 if u.purged > 0 {
                     self.info(trf(lang, Msg::DeletedOld, &[&u.purged]), now);
                 }
+                if u.unreadable > 0 {
+                    self.info(trf(lang, Msg::SkippedItems, &[&u.unreadable]), now);
+                }
             }
             // The unlock screen shows the live countdown, so the messages do not repeat the wait.
             Err(UnlockError::WrongPassword { .. }) => {

@@ -9,7 +9,10 @@
 //! half-written record. A batch is **not** atomic across files; if the program dies mid-batch, some records are
 //! written and some are not, and each file on its own is always complete. Files with other names (a sync tool's
 //! conflict copies, temporary files) are ignored.
-use crate::{check_batch, Error, Record, RecordMeta, Result, Store, Tombstone, Uuid, VaultHeader};
+use crate::{
+    check_batch, Error, Readable, Record, RecordMeta, Result, Store, Tombstone, Unreadable, Uuid,
+    VaultHeader,
+};
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
@@ -232,6 +235,44 @@ impl Store for DirectoryStore {
 
     fn all(&self) -> Result<Vec<Record>> {
         self.live_records()
+    }
+
+    fn all_readable(&self) -> Result<Readable> {
+        self.require_vault()?;
+        let mut out = Readable::default();
+        // A tombstone that cannot be read is reported and ignored: the item it names stays visible.
+        let mut tombs = BTreeMap::new();
+        for id in self.ids_with_extension("rkt")? {
+            match self.read_tombstone_file(id) {
+                Ok(Some(rev)) => {
+                    tombs.insert(id, rev);
+                }
+                Ok(None) => {}
+                Err(Error::Corrupt(reason)) => out.unreadable.push(Unreadable {
+                    id: Some(id),
+                    source: Self::tombstone_name(id),
+                    reason,
+                }),
+                Err(e) => return Err(e),
+            }
+        }
+        for id in self.ids_with_extension("rkr")? {
+            match self.read_record_file(id) {
+                Ok(Some(r)) => {
+                    if tombs.get(&id).is_none_or(|t| r.rev > *t) {
+                        out.records.push(r);
+                    }
+                }
+                Ok(None) => {}
+                Err(Error::Corrupt(reason)) => out.unreadable.push(Unreadable {
+                    id: Some(id),
+                    source: Self::record_name(id),
+                    reason,
+                }),
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(out)
     }
 
     fn put_many(&mut self, records: &[Record]) -> Result<()> {

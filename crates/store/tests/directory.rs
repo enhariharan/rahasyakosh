@@ -233,3 +233,23 @@ fn two_handles_on_one_directory_see_each_others_writes() {
     .unwrap();
     assert_eq!(b.header().unwrap().salt, [9; 16]);
 }
+
+#[test]
+fn all_readable_skips_and_reports_bad_files_instead_of_failing() {
+    let t = TempDir::new("readable");
+    let mut s = ready(&t);
+    s.put_many(&[record(1, 1), record(2, 1), record(3, 1)])
+        .unwrap();
+    std::fs::write(t.0.join(format!("{}.rkr", id(1))), b"{}").unwrap();
+    std::fs::write(t.0.join(format!("{}.rkt", id(9))), b"nope").unwrap();
+
+    // The strict calls still fail, so nothing that relies on them changes.
+    assert!(matches!(s.all(), Err(Error::Corrupt(_))));
+
+    let r = s.all_readable().unwrap();
+    assert_eq!(r.records, vec![record(2, 1), record(3, 1)]);
+    let mut bad: Vec<_> = r.unreadable.iter().map(|u| u.id).collect();
+    bad.sort();
+    assert_eq!(bad, vec![Some(id(1)), Some(id(9))]);
+    assert!(r.unreadable.iter().all(|u| !u.reason.is_empty()));
+}

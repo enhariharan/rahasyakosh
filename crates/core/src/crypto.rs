@@ -30,9 +30,11 @@ impl KdfParams {
     /// Lower bounds enforced when *reading* a header, to resist downgrade.
     pub const MIN_M_KIB: u32 = 19 * 1024;
     pub const MIN_T: u32 = 2;
-    /// Upper bounds to avoid DoS from a hostile header.
-    pub const MAX_M_KIB: u32 = 1024 * 1024;
-    pub const MAX_T: u32 = 20;
+    /// Upper bounds to avoid DoS from a hostile header: the header is read, and its cost paid, before anything is
+    /// authenticated. They are what the app itself can produce (the settings clamp to the same constants), so a
+    /// vault made by the app always opens. A hostile header can cost at most about 256 MiB and a few seconds.
+    pub const MAX_M_KIB: u32 = 256 * 1024;
+    pub const MAX_T: u32 = 10;
     pub const MAX_P: u32 = 16;
 
     pub const DESKTOP: Self = Self {

@@ -85,7 +85,7 @@ fuzzing run adds beyond the seeds is not committed, to keep the repository small
   `fuzz/regressions/item_json/`. Lesson: a fuzz check is code too, and fuzzing tests it as hard as it tests the program.
 - **A 32-bit overflow, found by reading.** While wiring up the `payload` target we read the padding code and saw that `4 + length` could overflow on 32-bit systems such as WebAssembly (where the web app will run
   this exact code) when the stored length is near 4 GB. A 64-bit fuzzer can never reach that, so we fixed it with checked arithmetic. Fuzzing and careful reading complement each other.
-- **A known limit, not a bug.** A hostile vault header may legitimately ask for the maximum key-derivation cost (1 GiB of memory, 20 passes) because the format allows it. Opening such a file is slow by design; the
+- **A known limit, not a bug.** A hostile vault header may legitimately ask for the maximum key-derivation cost (256 MiB of memory, 10 passes; it was 1 GiB and 20 passes before audit finding P1-2) because the format allows it. Opening such a file is slow by design; the
   fuzz target only tries to unlock headers with cheap settings so it does not spend its time there.
 
 The other targets ran millions of inputs each without a crash (in 45 seconds each: about 2.9 million for `vault_header`, 12.8 million for `record`, 15.5 million for `bundle`; `sqlite_store` ran 391,000 inputs under AddressSanitizer, and `item_json` 17.5 million after the check was fixed). That does not prove there are no

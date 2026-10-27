@@ -12,7 +12,10 @@
 //! Settings: write-ahead log, `synchronous = FULL` (a committed write survives power loss), and
 //! `secure_delete = ON` so purged ciphertext is overwritten with zeros rather than left in free pages.
 //! The file (and its `-wal`/`-shm` companions) is private to the owner.
-use crate::{check_batch, Error, Record, RecordMeta, Result, Store, Tombstone, Uuid, VaultHeader};
+use crate::{
+    check_batch, Error, Readable, Record, RecordMeta, Result, Store, Tombstone, Unreadable, Uuid,
+    VaultHeader,
+};
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -325,6 +328,29 @@ impl Store for SqliteStore {
             .map_err(db)?;
         let rows = stmt.query_map([], record_from_row).map_err(db)?;
         rows.map(|row| row.map_err(db)?.into_record()).collect()
+    }
+
+    fn all_readable(&self) -> Result<Readable> {
+        let mut stmt = self
+            .conn
+            .prepare(&format!("{SELECT_RECORD} ORDER BY id"))
+            .map_err(db)?;
+        let rows = stmt.query_map([], record_from_row).map_err(db)?;
+        let mut out = Readable::default();
+        for row in rows {
+            let raw = row.map_err(db)?;
+            let id = Uuid::from_slice(&raw.id).ok();
+            match raw.into_record() {
+                Ok(r) => out.records.push(r),
+                Err(Error::Corrupt(reason)) => out.unreadable.push(Unreadable {
+                    id,
+                    source: "records".into(),
+                    reason,
+                }),
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(out)
     }
 
     fn put_many(&mut self, records: &[Record]) -> Result<()> {

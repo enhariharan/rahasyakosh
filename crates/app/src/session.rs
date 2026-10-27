@@ -225,6 +225,8 @@ pub struct Locked;
 pub struct Unlocked {
     /// Items deleted because they had been in the trash too long.
     pub purged: usize,
+    /// Stored items that could not be opened and were left out (see [`Vault::unreadable`]). Tell the user.
+    pub unreadable: usize,
 }
 
 struct Active<S: Store> {
@@ -361,11 +363,12 @@ impl<S: Store> Session<S> {
                 };
                 self.failures = 0;
                 self.next_attempt_at = 0;
+                let unreadable = vault.unreadable().len();
                 self.state = State::Unlocked(Box::new(Active {
                     vault,
                     last_activity: now,
                 }));
-                Ok(Unlocked { purged })
+                Ok(Unlocked { purged, unreadable })
             }
             Err(failed) => {
                 self.state = State::Locked(failed.store);

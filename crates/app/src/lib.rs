@@ -19,4 +19,4 @@ pub use session::{
     backoff_secs, should_clear, Language, Locked, Session, Settings, ThemeMode, Tick, ToolbarStyle,
     UnlockError, Unlocked,
 };
-pub use vault::{Config, Error, Result, Scope, UnlockFailed, Vault};
+pub use vault::{Config, Error, Result, Scope, Skipped, UnlockFailed, Vault};

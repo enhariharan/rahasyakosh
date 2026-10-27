@@ -51,6 +51,24 @@ pub struct RecordMeta {
     pub size: usize,
 }
 
+/// A stored record or tombstone that could not be read (garbled, truncated, or a sync conflict copy). It is
+/// reported to the user and skipped, so that one bad file cannot lock them out of everything else.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Unreadable {
+    /// The item it belongs to, when that is known (for a directory store, from the file name).
+    pub id: Option<Uuid>,
+    /// Where it was found: a file name, or `records` for a database row.
+    pub source: String,
+    pub reason: String,
+}
+
+/// The result of reading everything that can be read: see [`Store::all_readable`].
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Readable {
+    pub records: Vec<Record>,
+    pub unreadable: Vec<Unreadable>,
+}
+
 /// Marks an item as permanently removed, so the removal can later be propagated by sync.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Tombstone {
@@ -81,6 +99,16 @@ pub trait Store {
 
     /// Every record. Used once, when the vault is unlocked.
     fn all(&self) -> Result<Vec<Record>>;
+
+    /// Like [`all`](Self::all), but a record that cannot be parsed is reported in `unreadable` instead of failing
+    /// the whole call. Problems with the store itself (I/O errors, a damaged database) still fail.
+    /// The default is for backends that cannot have a bad record on its own.
+    fn all_readable(&self) -> Result<Readable> {
+        Ok(Readable {
+            records: self.all()?,
+            unreadable: vec![],
+        })
+    }
 
     /// Write records. All are validated first; where the backend can, the writes are one atomic step.
     fn put_many(&mut self, records: &[Record]) -> Result<()>;

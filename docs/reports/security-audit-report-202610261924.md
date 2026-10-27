@@ -12,7 +12,7 @@
 How to read the findings:
 - **Severity** is the auditor's judgement for a local-first app whose main risks are a copied vault file and a hostile sync folder: High, Medium, Low, Info.
 - **How found:** *Confirmed* = reproduced with a test or command; *Measured* = reproduced and timed; *From reading* = found by reading the code, not run; *Checked* = a suspicion that was looked at and judged.
-- **Status:** `open` = not fixed. Nothing has been fixed yet, as agreed. Update this column as fixes land, and re-run the matching section of the test checklist.
+- **Status:** `open` = not fixed. The report records the audit as it stood on 2026-10-26; fixes are noted in this column as they land (with the date and the test), and re-run the matching section of the test checklist.
 
 ## Contents
 
@@ -100,10 +100,10 @@ All seven phases are done (Phase 1 was finished last, on the same day). 52 findi
 |---|---|---|---|---|
 | [P2-1](#p2-1) | High | Rollback and deletion of records are undetected (no high-water mark) | Confirmed | open |
 | [P2-2](#p2-2) | High | Tombstones are unauthenticated; any rev hides an item and blocks its id | Confirmed | open |
-| [P2-3](#p2-3) | Medium | One bad record makes the whole vault unopenable | Confirmed | open |
+| [P2-3](#p2-3) | Medium | One bad record makes the whole vault unopenable | Confirmed | fixed |
 | [P2-4](#p2-4) | Medium | Password change keeps the vault key; the old header stays in the WAL | Confirmed (WAL) | open |
 | [P1-1](#p1-1) | Medium | The master password is not Unicode-normalised before Argon2 (lock-out risk across keyboards and platforms; relevant to the Indic-language users) | From reading | open |
-| [P1-2](#p1-2) | Medium | The unauthenticated header drives Argon2: one unlock attempt with the allowed maximum took 10.8 s and 1 GiB | Measured | open |
+| [P1-2](#p1-2) | Medium | The unauthenticated header drives Argon2: one unlock attempt with the allowed maximum took 10.8 s and 1 GiB | Measured | fixed in part |
 | [P1-3](#p1-3) | Medium | The design doc (`docs/04`) and the code disagree: no Secret Key, verifier blob, header magic or `mlock` | Confirmed | open |
 | [P6-1](#p6-1) | Medium | No core-dump, ptrace or `mlock` hardening | From reading | open |
 | [P6-2](#p6-2) | Medium | Data and config folders and `profiles.json` are readable by other users | Confirmed | open |
@@ -180,7 +180,7 @@ Files read: all of `core/src/{crypto,vault,item,totp,generator}.rs`, the `argon2
 - **Evidence:** `unlock` calls `check_kdf` and then `derive_kek` first; the header (including `kdf`) is authenticated only by the decryption that follows. `KdfParams::validate` allows `m_kib` up to 1 GiB, `t` up to 20, `p` up to 16. One derivation with `m = 1 GiB, t = 20, p = 1` took 10.8 s and 1 GiB (debug profile, optimised dependencies).
 - **Impact:** Anyone who can write the vault file (sync peer, shared folder) makes each unlock attempt cost that, or fail with out-of-memory on a small machine. It reveals nothing: the header is bound as AAD, so a changed header never decrypts.
 - **Recommended fix:** Lower the accepted ceiling to what the app can itself produce (the desktop slider tops out well below 1 GiB; for example 256 MiB and t ≤ 10), keep the floor, and show the parameters before an expensive derivation ("this vault asks for 1 GiB; continue?"). Change `Settings::validated` and the validator together.
-- **Status:** open
+- **Status:** fixed in part, 2026-10-26: the ceiling is now 256 MiB and 10 passes (`KdfParams::MAX_*`, test `crates/core/tests/hostile_header.rs`). Not done: showing the cost to the user before an expensive derivation.
 
 [Top](#top)
 
@@ -314,7 +314,7 @@ Files read: `store/{lib,directory,sqlite}.rs`, `app/vault.rs`. Four findings wer
 - **Evidence:** `Vault::unlock_inner` uses `?` on every record. PoC: drop a `<uuid>.rkr` containing `{}` into the directory; unlock fails with `vault storage is corrupted`.
 - **Impact:** A sync peer or a sync conflict can lock the user out of everything until they delete the file by hand.
 - **Recommended fix:** Skip and report records that fail (a quarantine list the UI shows) and open the rest. A wrong password must still fail closed; that is decided by the header before any record is read.
-- **Status:** open
+- **Status:** fixed, 2026-10-26: `Vault::unlock` skips unreadable and unopenable records and lists them in `Vault::unreadable()`; the CLI prints their ids and the desktop app shows a notice (tests `crates/app/tests/hostile_store.rs`, `crates/store/tests/directory.rs`). A skipped record is not detected as missing until P2-1 is fixed.
 
 [Top](#top)
 

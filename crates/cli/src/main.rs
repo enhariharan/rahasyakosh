@@ -411,6 +411,19 @@ fn open_vault(path: &Path) -> Result<Vault<SqliteStore>> {
     let store = SqliteStore::open(path)?;
     let pw = read_password("Master password: ")?;
     let mut vault = Vault::unlock(store, &pw, Config::default())?;
+    if !vault.unreadable().is_empty() {
+        // Only ids are printed: the parser's reason can quote text from the damaged or planted data.
+        let ids: Vec<String> = vault
+            .unreadable()
+            .iter()
+            .map(|s| s.id.map_or_else(|| s.source.clone(), |id| id.to_string()))
+            .collect();
+        eprintln!(
+            "Warning: {} stored item(s) could not be read and were skipped (a sync conflict, a damaged file, or tampering). Your other items are shown. Skipped: {}",
+            ids.len(),
+            ids.join(", ")
+        );
+    }
     let purged = vault.purge_expired(now())?;
     if purged > 0 {
         eprintln!(

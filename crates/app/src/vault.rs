@@ -2,7 +2,7 @@ use crate::index::SearchIndex;
 use rahasyakosh_core::crypto::KdfParams;
 use rahasyakosh_core::item::{Item, ItemVersion, DEFAULT_HISTORY_LIMIT};
 use rahasyakosh_core::vault::UnlockedVault;
-use rahasyakosh_store::{Record, Store};
+use rahasyakosh_store::{Record, Store, Unreadable};
 use std::collections::BTreeMap;
 use uuid::Uuid;
 
@@ -53,6 +53,26 @@ pub enum Scope {
     Any,
 }
 
+/// A stored item that could not be opened at unlock and was left out (see [`Vault::unreadable`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Skipped {
+    /// The item it belongs to, when known.
+    pub id: Option<Uuid>,
+    /// Where it was found: a file name or `records`.
+    pub source: String,
+    pub reason: String,
+}
+
+impl From<Unreadable> for Skipped {
+    fn from(u: Unreadable) -> Self {
+        Self {
+            id: u.id,
+            source: u.source,
+            reason: u.reason,
+        }
+    }
+}
+
 struct Entry {
     item: Item,
     rev: u64,
@@ -73,6 +93,7 @@ pub struct Vault<S: Store> {
     entries: BTreeMap<Uuid, Entry>,
     index: SearchIndex,
     config: Config,
+    skipped: Vec<Skipped>,
 }
 
 impl<S: Store> Vault<S> {
@@ -92,6 +113,7 @@ impl<S: Store> Vault<S> {
             entries: BTreeMap::new(),
             index: SearchIndex::default(),
             config,
+            skipped: vec![],
         })
     }
 
@@ -107,12 +129,13 @@ impl<S: Store> Vault<S> {
         config: Config,
     ) -> std::result::Result<Self, UnlockFailed<S>> {
         match Self::unlock_inner(&store, password) {
-            Ok((keys, entries, index)) => Ok(Self {
+            Ok((keys, entries, index, skipped)) => Ok(Self {
                 store,
                 keys,
                 entries,
                 index,
                 config,
+                skipped,
             }),
             Err(error) => Err(UnlockFailed { error, store }),
         }
@@ -122,12 +145,32 @@ impl<S: Store> Vault<S> {
     fn unlock_inner(
         store: &S,
         password: &str,
-    ) -> Result<(UnlockedVault, BTreeMap<Uuid, Entry>, SearchIndex)> {
+    ) -> Result<(
+        UnlockedVault,
+        BTreeMap<Uuid, Entry>,
+        SearchIndex,
+        Vec<Skipped>,
+    )> {
+        // The header decides the password first, so a wrong password still fails closed. After that, one bad
+        // record (a sync conflict, a damaged file, a hostile file) is skipped and reported, not fatal.
         let keys = store.header()?.unlock(password)?;
         let mut entries = BTreeMap::new();
         let mut index = SearchIndex::default();
-        for record in store.all()? {
-            let item = keys.open_record(&record)?;
+        let readable = store.all_readable()?;
+        let mut skipped: Vec<Skipped> =
+            readable.unreadable.into_iter().map(Skipped::from).collect();
+        for record in readable.records {
+            let item = match keys.open_record(&record) {
+                Ok(item) => item,
+                Err(e) => {
+                    skipped.push(Skipped {
+                        id: Some(record.item_id),
+                        source: "records".into(),
+                        reason: e.to_string(),
+                    });
+                    continue;
+                }
+            };
             index.set(&item);
             entries.insert(
                 record.item_id,
@@ -137,7 +180,14 @@ impl<S: Store> Vault<S> {
                 },
             );
         }
-        Ok((keys, entries, index))
+        Ok((keys, entries, index, skipped))
+    }
+
+    /// Stored items that could not be opened at unlock and are not in this vault. Show them to the user: they are
+    /// usually a sync conflict or a damaged file, and may also be someone tampering with the folder. They are
+    /// left in the store untouched.
+    pub fn unreadable(&self) -> &[Skipped] {
+        &self.skipped
     }
 
     /// Lock: wipe keys and items, and hand the store back.
