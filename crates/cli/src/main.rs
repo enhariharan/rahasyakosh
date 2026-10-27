@@ -340,6 +340,30 @@ fn new_password(allow_weak: bool) -> Result<zeroize::Zeroizing<String>> {
     Ok(p)
 }
 
+/// A vault file can ask for a very expensive key derivation, and the header is read before anything is checked. Say so,
+/// and when someone is at the terminal let them back out.
+fn confirm_costly_unlock(kdf: &KdfParams) -> Result<()> {
+    if !kdf.is_unusually_costly() {
+        return Ok(());
+    }
+    eprintln!(
+        "Note: this vault asks for {} MiB of memory and {} passes to unlock (this program's default is {} MiB and {}), so unlocking will be slow.",
+        kdf.m_kib / 1024,
+        kdf.t,
+        KdfParams::DESKTOP.m_kib / 1024,
+        KdfParams::DESKTOP.t
+    );
+    if std::env::var("RK_PASSWORD").is_err() {
+        eprint!("Continue? [y/N] ");
+        let mut answer = String::new();
+        std::io::stdin().read_line(&mut answer)?;
+        if !matches!(answer.trim(), "y" | "Y" | "yes") {
+            bail!("cancelled");
+        }
+    }
+    Ok(())
+}
+
 /// The Secret Key for the vault in `store`, if it needs one: from this device's key folder, `RK_SECRET_KEY`, or by
 /// asking. The flag says whether it was typed (and so is worth keeping).
 fn find_secret_key(
@@ -482,6 +506,7 @@ fn open_vault(path: &Path) -> Result<Vault<SqliteStore>> {
     }
     drop(file);
     let store = SqliteStore::open(path)?;
+    confirm_costly_unlock(&store.header()?.kdf)?;
     let pw = read_password("Master password: ")?;
     let secret_key = find_secret_key(&store)?;
     let mut highwater =

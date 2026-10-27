@@ -829,3 +829,33 @@ fn a_secret_key_vault_needs_the_key_and_this_device_keeps_it() {
     );
     let _ = std::fs::remove_file(&path);
 }
+
+#[test]
+fn an_unusually_costly_vault_is_announced_before_unlocking() {
+    use rahasyakosh_app::{Config, Vault};
+    use rahasyakosh_core::crypto::KdfParams;
+    let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join("costly.db");
+    let _ = std::fs::remove_file(&path);
+    let kdf = KdfParams {
+        m_kib: 140 * 1024,
+        t: 2,
+        p: 1,
+    };
+    Vault::create(
+        SqliteStore::open(&path).unwrap(),
+        PW,
+        kdf,
+        Config::default(),
+        &mut rand::rng(),
+    )
+    .unwrap();
+    let out = run(&path, &["list"], "");
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("asks for 140 MiB"), "{err}");
+    let _ = std::fs::remove_file(&path);
+}

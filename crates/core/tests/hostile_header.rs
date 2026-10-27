@@ -50,6 +50,19 @@ fn a_header_asking_for_one_gib_is_refused_without_running_argon2() {
 }
 
 #[test]
+fn the_app_defaults_are_not_called_costly_but_the_ceiling_is() {
+    assert!(!KdfParams::DESKTOP.is_unusually_costly());
+    assert!(!KdfParams::MOBILE.is_unusually_costly());
+    assert!(!FAST_KDF.is_unusually_costly());
+    let top = KdfParams {
+        m_kib: KdfParams::MAX_M_KIB,
+        t: KdfParams::MAX_T,
+        p: 1,
+    };
+    assert!(top.is_unusually_costly());
+}
+
+#[test]
 fn each_limit_is_enforced_on_its_own() {
     let base = vault().header().clone();
     for kdf in [

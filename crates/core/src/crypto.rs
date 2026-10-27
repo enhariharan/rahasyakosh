@@ -54,6 +54,12 @@ impl KdfParams {
         p: 1,
     };
 
+    /// Whether unlocking costs clearly more than the app's own default (twice the memory or twice the passes), so a
+    /// front-end can tell the user before it starts (audit finding P1-2). A forged header can ask for this much.
+    pub fn is_unusually_costly(&self) -> bool {
+        self.m_kib > 2 * Self::DESKTOP.m_kib || self.t > 2 * Self::DESKTOP.t
+    }
+
     pub fn validate(&self) -> Result<()> {
         if self.m_kib < Self::MIN_M_KIB || self.t < Self::MIN_T {
             return Err(Error::KdfParams("below minimum strength".into()));

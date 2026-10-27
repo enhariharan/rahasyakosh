@@ -184,7 +184,7 @@ Files read: all of `core/src/{crypto,vault,item,totp,generator}.rs`, the `argon2
 - **Evidence:** `unlock` calls `check_kdf` and then `derive_kek` first; the header (including `kdf`) is authenticated only by the decryption that follows. `KdfParams::validate` allows `m_kib` up to 1 GiB, `t` up to 20, `p` up to 16. One derivation with `m = 1 GiB, t = 20, p = 1` took 10.8 s and 1 GiB (debug profile, optimised dependencies).
 - **Impact:** Anyone who can write the vault file (sync peer, shared folder) makes each unlock attempt cost that, or fail with out-of-memory on a small machine. It reveals nothing: the header is bound as AAD, so a changed header never decrypts.
 - **Recommended fix:** Lower the accepted ceiling to what the app can itself produce (the desktop slider tops out well below 1 GiB; for example 256 MiB and t ≤ 10), keep the floor, and show the parameters before an expensive derivation ("this vault asks for 1 GiB; continue?"). Change `Settings::validated` and the validator together.
-- **Status:** fixed in part, 2026-10-26: the ceiling is now 256 MiB and 10 passes (`KdfParams::MAX_*`, test `crates/core/tests/hostile_header.rs`). Not done: showing the cost to the user before an expensive derivation.
+- **Status:** fixed in part, 2026-10-26: the ceiling is now 256 MiB and 10 passes (`KdfParams::MAX_*`, test `crates/core/tests/hostile_header.rs`). 2026-10-27: `rk` now says what an unusually costly vault asks for (`KdfParams::is_unusually_costly`, more than twice the default) before it asks for the password, and lets someone at the terminal cancel (test `an_unusually_costly_vault_is_announced_before_unlocking`). Not done: the same notice in the desktop app, which would need a step before the unlock button.
 
 [Top](#top)
 
