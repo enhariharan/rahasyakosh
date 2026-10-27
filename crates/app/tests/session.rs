@@ -221,6 +221,37 @@ fn trash_older_than_the_retention_is_purged_on_unlock() {
     assert!(s.peek().unwrap().items(Scope::Any).is_empty());
 }
 
+#[test]
+fn a_retention_of_zero_days_cannot_empty_the_trash_at_unlock() {
+    // From a settings file (hand-edited, imported or forged): 0 is raised to the minimum.
+    let from_file = Settings::from_json(br#"{"trash_retention_days": 0}"#);
+    assert_eq!(from_file.trash_retention_days, Settings::MIN_RETENTION_DAYS);
+    let mut s = locked_session(Settings {
+        trash_retention_days: 0,
+        ..fast()
+    });
+    assert_eq!(s.settings().trash_retention_days, 1);
+    s.unlock(PW, 0, &mut rng()).unwrap();
+    s.vault(1).unwrap().trash(id(1), 1, &mut rng()).unwrap();
+    s.lock();
+    assert_eq!(s.unlock(PW, 100, &mut rng()).unwrap().purged, 0);
+    assert!(s.peek().unwrap().get(id(1)).is_some(), "still in the trash");
+}
+
+#[test]
+fn the_vault_itself_also_keeps_a_day_whatever_its_config_says() {
+    let mut s = locked_session(fast());
+    s.unlock(PW, 0, &mut rng()).unwrap();
+    let v = s.vault(1).unwrap();
+    v.trash(id(1), 1, &mut rng()).unwrap();
+    v.set_config(rahasyakosh_app::Config {
+        trash_retention_days: 0,
+        ..rahasyakosh_app::Config::default()
+    });
+    assert_eq!(v.purge_expired(2, &mut rng()).unwrap(), 0);
+    assert_eq!(v.purge_expired(1 + 86_400, &mut rng()).unwrap(), 1);
+}
+
 // ---- secrets on screen ---------------------------------------------------------------------------
 
 #[test]

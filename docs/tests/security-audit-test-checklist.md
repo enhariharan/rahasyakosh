@@ -94,8 +94,8 @@ Use the directory store or SQLite vault as noted. Always copy the vault first (`
 ## 3. Session and lock (Phase 3)
 
 ### P3-1 Trash retention of 0
-- [ ] Put an item in the trash. Write `"trash_retention_days": 0` into `settings.json` and unlock. Expected: the item is **still in the trash**; the setting is rejected, raised to 1 or treated as "never". (Today: the trash is emptied.)
-- [ ] Purging many items at once asks for confirmation (if implemented).
+- [ ] Put an item in the trash. Write `"trash_retention_days": 0` into `settings.json` and unlock. Expected: the item is **still in the trash**; the setting is raised to 1 (decided 2026-10-27). Automated.
+- [ ] Purging many items at once asks for confirmation: not implemented; the 1-day floor is the fix.
 
 ### P3-2 settings.json
 - [ ] `ls -l ~/.config/rahasyakosh/settings.json` is `-rw-------`. Write `garbage` into it and start the app: the user is told the file could not be read, defaults are used, and the broken file is kept as `settings.json.damaged` (the previous good file is `settings.json.bak`). Automated 2026-10-27; look once at the on-screen notice.

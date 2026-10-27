@@ -114,7 +114,7 @@ All seven phases are done (Phase 1 was finished last, on the same day). 52 findi
 | [P4-2](#p4-2) | Medium | `export -f vault --force` can overwrite the live vault | Confirmed | fixed 2026-10-27 |
 | [P5-1](#p5-1) | Medium | CSV import is quadratic (40 000 rows took 26 s in a debug build) | Confirmed | open |
 | [P5-2](#p5-2) | Medium | Terminal escape sequences from imported text are printed raw | Confirmed | open |
-| [P3-1](#p3-1) | Medium | `trash_retention_days = 0` purges all trash at the next unlock | From reading | open |
+| [P3-1](#p3-1) | Medium | `trash_retention_days = 0` purges all trash at the next unlock | From reading | fixed 2026-10-27 |
 | [P7-1](#p7-1) | Medium | The installer turns the accessibility bus on session-wide | From reading | open |
 
 <a id="suggested-order-for-the-fixes-once-the-findings-are-reviewed"></a>
@@ -382,7 +382,7 @@ Files read: `app/session.rs`, and how `apps/desktop/src/{model,lib}.rs` drive it
 - **Evidence:** `Settings::validated` only caps `trash_retention_days` (max 3650), with no minimum. `purge_expired` computes `keep_for = 0`, so `now - d >= 0` holds for every trashed item, and `Session::unlock` runs it right after each successful unlock.
 - **Impact:** A hand edit, a bad import or a malicious write of `"trash_retention_days": 0` in the plain `settings.json` permanently deletes the trash with no prompt and leaves tombstones.
 - **Recommended fix:** Set a minimum of 1 day (or treat 0 as "never purge"). Ask in the UI before purging more than a few items.
-- **Status:** open
+- **Status:** fixed 2026-10-27: `Settings::validated` clamps the retention to 1–3650 days (`MIN_RETENTION_DAYS`), the desktop field has `min=1`, and `Vault::purge_expired` itself never uses less than one day. Tests `a_retention_of_zero_days_cannot_empty_the_trash_at_unlock` and `the_vault_itself_also_keeps_a_day_whatever_its_config_says`. Not done: a confirmation before purging many items (the purge happens at unlock, where there is no screen to ask on; the one-day floor removes the surprise).
 
 [Top](#top)
 

@@ -757,7 +757,8 @@ impl<S: Store> Vault<S> {
         now: i64,
         rng: &mut impl rand_core::CryptoRng,
     ) -> Result<usize> {
-        let keep_for = i64::from(self.config.trash_retention_days) * SECONDS_PER_DAY;
+        // At least one day, whatever the config says: 0 would delete everything in the trash at once.
+        let keep_for = i64::from(self.config.trash_retention_days.max(1)) * SECONDS_PER_DAY;
         let expired: Vec<Uuid> = self
             .entries
             .values()

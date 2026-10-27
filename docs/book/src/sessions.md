@@ -56,7 +56,7 @@ The settings hold no secrets, so they live in a plain file (`~/.config/rahasyako
 | Clear clipboard after | 20 s | 0 = never |
 | Hide revealed secrets after | 10 s | 0 = until hidden by hand |
 | Lock when the window loses focus | off | |
-| Keep deleted items for | 30 days | Then they are deleted for good when you next unlock |
+| Keep deleted items for | 30 days | Then they are deleted for good when you next unlock. At least 1 day: a value of 0 (from a hand-edited file, say) is raised to 1, so the trash can never be emptied at once by a bad setting |
 | History per item | 10 versions | |
 | Key derivation memory / passes | 64 MiB / 3 | Higher is slower to guess offline, and slower to unlock |
 | Colour scheme | same as the system | Light, dark or system |

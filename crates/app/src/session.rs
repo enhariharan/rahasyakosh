@@ -115,7 +115,7 @@ pub struct Settings {
     pub reveal_secs: u32,
     /// Lock as soon as the window loses focus.
     pub lock_on_blur: bool,
-    /// Days an item stays in the trash.
+    /// Days an item stays in the trash (1 to 3650).
     pub trash_retention_days: u32,
     /// Earlier versions kept per item.
     pub history_limit: usize,
@@ -153,6 +153,9 @@ impl Settings {
     pub const MAX_IDLE_SECS: u32 = 24 * 3600;
     pub const MAX_CLIPBOARD_SECS: u32 = 3600;
     pub const MAX_REVEAL_SECS: u32 = 3600;
+    /// Never 0: an item must always get at least a day in the trash, so a bad or forged settings file cannot make the
+    /// next unlock empty the trash for good (audit finding P3-1).
+    pub const MIN_RETENTION_DAYS: u32 = 1;
     pub const MAX_RETENTION_DAYS: u32 = 3650;
     pub const MAX_HISTORY: usize = 100;
 
@@ -162,7 +165,9 @@ impl Settings {
         self.idle_lock_secs = self.idle_lock_secs.min(Self::MAX_IDLE_SECS);
         self.clipboard_clear_secs = self.clipboard_clear_secs.min(Self::MAX_CLIPBOARD_SECS);
         self.reveal_secs = self.reveal_secs.min(Self::MAX_REVEAL_SECS);
-        self.trash_retention_days = self.trash_retention_days.min(Self::MAX_RETENTION_DAYS);
+        self.trash_retention_days = self
+            .trash_retention_days
+            .clamp(Self::MIN_RETENTION_DAYS, Self::MAX_RETENTION_DAYS);
         self.history_limit = self.history_limit.min(Self::MAX_HISTORY);
         self.kdf_memory_mib = self.kdf_memory_mib.clamp(
             KdfParams::MIN_M_KIB.div_ceil(1024),

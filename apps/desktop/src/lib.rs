@@ -1722,7 +1722,7 @@ fn SettingsView() -> Element {
                 label { r#for: "s-reveal", {tr(lang, Msg::SetReveal)} }
                 input { id: "s-reveal", r#type: "number", min: "0", value: "{s.read().reveal_secs}", oninput: num!(reveal_secs, u32) }
                 label { r#for: "s-trash", {tr(lang, Msg::SetTrash)} }
-                input { id: "s-trash", r#type: "number", min: "0", value: "{s.read().trash_retention_days}", oninput: num!(trash_retention_days, u32) }
+                input { id: "s-trash", r#type: "number", min: "1", value: "{s.read().trash_retention_days}", oninput: num!(trash_retention_days, u32) }
                 label { r#for: "s-hist", {tr(lang, Msg::SetHistory)} }
                 input { id: "s-hist", r#type: "number", min: "0", value: "{s.read().history_limit}", oninput: num!(history_limit, usize) }
                 label { r#for: "s-toolbar", {tr(lang, Msg::SetToolbar)} }
