@@ -236,7 +236,7 @@ Files read: all of `core/src/{crypto,vault,item,totp,generator}.rs`, the `argon2
 - **Evidence:** `Item`, `Field` and `ItemVersion` are `ZeroizeOnDrop` (history included). But `set_field` (`f.value = value.into()`), `revert_to` for `title` and `notes`, and the UI `Form`/signal copies drop the old `String` as plain memory. `UnlockedVault::unlock` copies the key into a stack array before wrapping it in `Zeroizing`; the generator builds the password in a plain `Vec<char>`; `base32_decode` fills a plain `Vec<u8>`.
 - **Impact:** After a password edit, the previous password stays in freed heap until overwritten.
 - **Recommended fix:** Wipe before replacing (`f.value.zeroize()` first), build intermediate buffers in `Zeroizing`, construct keys directly inside `Zeroizing`.
-- **Status:** open
+- **Status:** fixed in part, 2026-10-27: `set_field` and `revert_to` wipe the text they replace; the vault key is built in place inside `Zeroizing` (no stack copy); the generator's character buffer and `base32_decode`'s buffer are `Zeroizing` (also on the error path). Not done: the UI `Form`/signal copies and the web view, which are tracked under [P6-3](#p6-3).
 
 [Top](#top)
 

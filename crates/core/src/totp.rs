@@ -3,7 +3,7 @@ use crate::{Error, Result};
 use hmac::{Hmac, KeyInit, Mac};
 use sha1::Sha1;
 use sha2::{Sha256, Sha512};
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Algorithm {
@@ -109,7 +109,9 @@ fn hmac_bytes<M: Mac + KeyInit>(key: &[u8], msg: &[u8]) -> Vec<u8> {
 
 /// RFC 4648 base32, case-insensitive, ignores spaces, dashes and padding.
 pub fn base32_decode(s: &str) -> Result<Vec<u8>> {
-    let (mut buf, mut bits, mut out) = (0u32, 0u32, Vec::new());
+    // Wiped on every exit, including the error return below; the result is moved out at the end.
+    let mut out = Zeroizing::new(Vec::with_capacity(s.len() * 5 / 8 + 1));
+    let (mut buf, mut bits) = (0u32, 0u32);
     for c in s.chars().filter(|c| !matches!(c, ' ' | '-' | '=')) {
         let v = match c.to_ascii_uppercase() {
             c @ 'A'..='Z' => c as u32 - 'A' as u32,
@@ -124,7 +126,7 @@ pub fn base32_decode(s: &str) -> Result<Vec<u8>> {
             buf &= (1 << bits) - 1;
         }
     }
-    Ok(out)
+    Ok(std::mem::take(&mut *out))
 }
 
 #[cfg(test)]

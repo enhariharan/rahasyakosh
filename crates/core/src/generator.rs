@@ -75,14 +75,15 @@ pub fn generate_password(
     let all: Vec<char> = classes.iter().flatten().copied().collect();
 
     // One guaranteed char per class, rest from the union, then Fisher-Yates shuffle.
-    let mut out: Vec<char> = classes.iter().map(|c| c[uniform(rng, c.len())]).collect();
+    let mut out: Zeroizing<Vec<char>> =
+        Zeroizing::new(classes.iter().map(|c| c[uniform(rng, c.len())]).collect());
     while out.len() < spec.length {
         out.push(all[uniform(rng, all.len())]);
     }
     for i in (1..out.len()).rev() {
         out.swap(i, uniform(rng, i + 1));
     }
-    Ok(Zeroizing::new(out.into_iter().collect()))
+    Ok(Zeroizing::new(out.iter().collect()))
 }
 
 /// Passphrase of `words` words drawn from the caller-supplied list (e.g. EFF large list).

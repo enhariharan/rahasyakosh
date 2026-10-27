@@ -199,6 +199,9 @@ impl Item {
             crate::Error::InvalidArgument(format!("no version {index} in this item's history"))
         })?;
         self.push_history(now, limit);
+        // The text being replaced may be a secret; wipe it rather than just drop it.
+        self.title.zeroize();
+        self.notes.zeroize();
         self.title = old.title.clone();
         self.fields = old.fields.clone();
         self.urls = old.urls.clone();
@@ -217,6 +220,8 @@ impl Item {
             .find(|f| f.name.eq_ignore_ascii_case(name))
         {
             Some(f) => {
+                // Wipe the old value before it is replaced (a plain assignment frees it unwiped).
+                f.value.zeroize();
                 f.value = value.into();
                 f.concealed = concealed;
             }

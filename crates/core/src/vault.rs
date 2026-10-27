@@ -121,11 +121,15 @@ impl VaultHeader {
             let kek = derive_kek(&candidate, &self.salt, &self.kdf, sk)?;
             match crypto::open(&kek, &(&self.wrapped_vk).into(), &self.aad()) {
                 Ok(vk_bytes) => {
-                    let vk: [u8; 32] =
-                        vk_bytes.as_slice().try_into().map_err(|_| Error::Decrypt)?;
+                    // Built in place: a plain `[u8; 32]` local would leave a copy of the key on the stack.
+                    let mut vk = Zeroizing::new([0u8; 32]);
+                    if vk_bytes.len() != vk.len() {
+                        return Err(Error::Decrypt);
+                    }
+                    vk.copy_from_slice(&vk_bytes);
                     return Ok(UnlockedVault {
                         header: self.clone(),
-                        vk: Zeroizing::new(vk),
+                        vk,
                         secret_key: sk.cloned(),
                     });
                 }

@@ -45,7 +45,7 @@ Most checks are also worth turning into automated tests when the fix is written.
 - [ ] `grep -rn "cfg!(test)" crates/` finds no check that changes security behaviour. `cargo build --release` of every crate, with `cargo tree -e features`, shows no test-only feature turned on. Checked 2026-10-27 (`cfg!(test)` removed; `INSECURE_TEST` removed).
 
 ### P1-6 Old secrets are wiped
-- [ ] Run the desktop app under `gdb` or use a core dump of a throwaway process: add an item with the sentinel password `SENTINEL-OLD-PW`, edit it to `SENTINEL-NEW-PW`, lock, then search the process memory (`gcore`, then `strings core | grep SENTINEL`). Expected after fix: the old value is not found in the `rk` process. (For the web view see P6-3.)
+- [ ] Run the desktop app under `gdb` or use a core dump of a throwaway process: add an item with the sentinel password `SENTINEL-OLD-PW`, edit it to `SENTINEL-NEW-PW`, lock, then search the process memory (`gcore`, then `strings core | grep SENTINEL`). Expected after fix: the old value is not found in the `rk` process. (For the web view see P6-3.) Code changed 2026-10-27; the memory check itself has not been run yet.
 
 ### P1-7 Item size limit
 - [ ] `rk add` with a note of 2 MiB (`head -c 2000000 /dev/zero | tr '\0' a`). Expected: refused with a clear message, and the vault still unlocks afterwards.
