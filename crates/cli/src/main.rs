@@ -138,7 +138,11 @@ enum Cmd {
         after: u64,
     },
     /// List items in the trash
-    Trash,
+    Trash {
+        /// Delete the items that are past the retention time now (asks first)
+        #[arg(long)]
+        purge_expired: bool,
+    },
     /// Bring an item back from the trash
     Restore { query: String },
     /// Move an item to trash (or --purge to delete forever, also from the trash)
@@ -583,10 +587,16 @@ fn open_vault(path: &Path) -> Result<Vault<SqliteStore>> {
             ids.join(", ")
         );
     }
-    let purged = vault.purge_expired(now(), &mut rand::rng())?;
+    let (purged, waiting) = vault.auto_purge(now(), &mut rand::rng())?;
     if purged > 0 {
         eprintln!(
             "Deleted {purged} item(s) that had been in the trash for {} days or more.",
+            vault.config().trash_retention_days
+        );
+    }
+    if waiting > 0 {
+        eprintln!(
+            "{waiting} item(s) have been in the trash for {} days or more and were not deleted, because that is a lot at once. Run `rk trash --purge-expired` to delete them.",
             vault.config().trash_retention_days
         );
     }
@@ -976,7 +986,21 @@ fn run() -> Result<()> {
                 safe::line(&title)
             );
         }
-        Cmd::Trash => {
+        Cmd::Trash { purge_expired } => {
+            if purge_expired {
+                let waiting = vault.expired_count(now());
+                if waiting == 0 {
+                    eprintln!("Nothing in the trash is past its retention time.");
+                } else if confirm(&format!(
+                    "Delete {waiting} item(s) from the trash for good?"
+                ))? {
+                    let n = vault.purge_expired(now(), &mut rng)?;
+                    eprintln!("Deleted {n} item(s)");
+                } else {
+                    eprintln!("Cancelled");
+                }
+                return Ok(());
+            }
             let mut trashed = vault.items(Scope::Trashed);
             trashed.sort_by_key(|i| std::cmp::Reverse(i.deleted_at));
             let t = now();

@@ -598,3 +598,34 @@ fn language_defaults_to_english_for_old_files_and_round_trips() {
     assert!(Language::Urdu.is_rtl());
     assert!(Language::ALL.iter().filter(|l| l.is_rtl()).count() == 1);
 }
+
+#[test]
+fn a_large_expired_trash_is_left_for_the_user_to_confirm() {
+    let few = rahasyakosh_app::AUTO_PURGE_LIMIT;
+    let mut s = locked_session(Settings {
+        trash_retention_days: 30,
+        ..fast()
+    });
+    s.unlock(PW, 0, &mut rng()).unwrap();
+    for n in 10..(10 + few as u128 + 1) {
+        let v = s.vault(1).unwrap();
+        v.add(Item::login("Old", "u", "p", 1, id(n)), &mut rng())
+            .unwrap();
+        v.trash(id(n), 1, &mut rng()).unwrap();
+    }
+    s.lock();
+    let late = 31 * 86_400;
+    // One more than the limit: nothing is deleted behind the user's back.
+    let u = s.unlock(PW, late, &mut rng()).unwrap();
+    assert_eq!((u.purged, u.purge_waiting), (0, few + 1));
+    assert_eq!(s.peek().unwrap().expired_count(late), few + 1);
+    // The user asks, and they go.
+    assert_eq!(
+        s.vault(late)
+            .unwrap()
+            .purge_expired(late, &mut rng())
+            .unwrap(),
+        few + 1
+    );
+    assert_eq!(s.peek().unwrap().expired_count(late), 0);
+}

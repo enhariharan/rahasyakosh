@@ -27,4 +27,5 @@ pub use session::{
     backoff_secs, should_clear, Language, Locked, Session, Settings, ThemeMode, Tick, ToolbarStyle,
     UnlockError, UnlockHints, Unlocked,
 };
+pub use vault::AUTO_PURGE_LIMIT;
 pub use vault::{Config, Error, Result, Scope, Skipped, UnlockFailed, Vault, Warning};

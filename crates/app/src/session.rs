@@ -246,6 +246,9 @@ pub struct UnlockHints {
 pub struct Unlocked {
     /// Items deleted because they had been in the trash too long.
     pub purged: usize,
+    /// Expired trash items left alone because there were more than [`crate::vault::AUTO_PURGE_LIMIT`]; the user
+    /// decides (see [`Vault::purge_expired`]).
+    pub purge_waiting: usize,
     /// Stored items that could not be opened and were left out (see [`Vault::unreadable`]). Tell the user.
     pub unreadable: usize,
     /// Things the vault's sealed manifest says are wrong (see [`Vault::warnings`]): a rolled-back, missing or
@@ -492,7 +495,7 @@ impl<S: Store> Session<S> {
                 if let Some(h) = highwater.take() {
                     vault.track(h);
                 }
-                let purged = match vault.purge_expired(now, rng) {
+                let (purged, purge_waiting) = match vault.auto_purge(now, rng) {
                     Ok(n) => n,
                     Err(e) => {
                         self.state = State::Locked(vault.into_store());
@@ -517,6 +520,7 @@ impl<S: Store> Session<S> {
                 }));
                 Ok(Unlocked {
                     purged,
+                    purge_waiting,
                     unreadable,
                     warnings,
                 })

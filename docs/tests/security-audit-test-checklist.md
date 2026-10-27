@@ -96,6 +96,7 @@ Use the directory store or SQLite vault as noted. Always copy the vault first (`
 
 ### P3-1 Trash retention of 0
 - [ ] Put an item in the trash. Write `"trash_retention_days": 0` into `settings.json` and unlock. Expected: the item is **still in the trash**; the setting is raised to 1 (decided 2026-10-27). Automated.
+- [ ] Trash 12 items and age them all past the retention (edit the stored times in a test vault). Unlock: none are deleted and a notice says so. Desktop: the Trash view shows the notice and **Delete them for good**; one click deletes them. CLI: `rk trash --purge-expired` asks, then deletes. With 10 or fewer expired items, unlock still deletes them by itself. (Not yet seen on screen.)
 - [ ] Purging many items at once asks for confirmation: not implemented; the 1-day floor is the fix.
 
 ### P3-2 settings.json

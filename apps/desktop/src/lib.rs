@@ -1355,7 +1355,7 @@ fn Browser() -> Element {
     let mut model = ctx.model;
     let _ = (ctx.clock)();
     let lang = lang_of(&ctx);
-    let (rows, selected, view, retention) = {
+    let (rows, selected, view, retention, expired) = {
         let m = ctx.model.read();
         let m = m.as_ref().expect("unlocked");
         (
@@ -1363,6 +1363,7 @@ fn Browser() -> Element {
             m.selected,
             m.view.clone(),
             m.session.settings().trash_retention_days,
+            m.expired_in_trash(now()),
         )
     };
     let trash = view == View::Trash;
@@ -1372,6 +1373,18 @@ fn Browser() -> Element {
             aside { aria_label: if trash { tr(lang, Msg::DeletedItems) } else { tr(lang, Msg::Items) },
                 if trash {
                     p { class: "muted small pad", "{trf(lang, Msg::TrashNote, &[&retention])}" }
+                    if expired > 0 {
+                        p { class: "warn pad", role: "status", "{trf(lang, Msg::PurgeWaiting, &[&expired])}" }
+                        button {
+                            class: "danger",
+                            onclick: move |_| {
+                                if let Some(m) = model.write().as_mut() {
+                                    m.purge_expired_now(now());
+                                }
+                            },
+                            {tr(lang, Msg::PurgeExpiredButton)}
+                        }
+                    }
                 }
                 if rows.is_empty() {
                     p { class: "muted pad", if trash { {tr(lang, Msg::TrashEmpty)} } else { {tr(lang, Msg::NothingHere)} } }

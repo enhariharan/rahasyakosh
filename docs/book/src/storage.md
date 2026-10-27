@@ -81,6 +81,8 @@ change something.
 Items left in the trash for **30 days** are deleted automatically. This happens whenever the vault is unlocked, and not inside the store, for a plain reason: the
 time an item was trashed is part of the scrambled data, so only the unlocked program can read it.
 
+To stop a clock jump or a long absence from deleting a whole trash, only up to **10** expired items are deleted this way at a time. If more are waiting, they are left alone and you are told: `rk trash --purge-expired` (asks first) or the **Delete them for good** button in the desktop Trash deletes them.
+
 ## History
 
 Each time an item's content changes, its previous content is saved inside the item, up to 10 earlier versions, newest first.

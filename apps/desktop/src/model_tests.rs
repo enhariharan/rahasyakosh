@@ -1028,3 +1028,37 @@ fn a_secret_key_can_be_added_to_an_open_vault_once_after_checking_the_password()
     m.lock();
     assert!(m.add_secret_key(PW, 23).is_err());
 }
+
+#[test]
+fn a_large_expired_trash_waits_for_a_button_and_a_few_items_go_on_their_own() {
+    let (mut m, _) = model(Settings {
+        idle_lock_secs: 0,
+        ..Settings::default()
+    });
+    let many = rahasyakosh_app::AUTO_PURGE_LIMIT as u128 + 1;
+    for n in 10..10 + many {
+        let v = m.session.vault(20).unwrap();
+        v.add(
+            Item::login("Old", "u", "p", 1, Uuid::from_u128(n)),
+            &mut ChaCha20Rng::seed_from_u64(n as u64),
+        )
+        .unwrap();
+        v.trash(
+            Uuid::from_u128(n),
+            20,
+            &mut ChaCha20Rng::seed_from_u64(n as u64),
+        )
+        .unwrap();
+    }
+    m.lock();
+    let late = 60 * 86_400;
+    m.unlock(PW, late);
+    assert!(m.is_unlocked());
+    assert_eq!(m.expired_in_trash(late), many as usize);
+    assert!(m
+        .notice
+        .as_ref()
+        .is_some_and(|n| n.text.contains("not deleted automatically")));
+    m.purge_expired_now(late + 1);
+    assert_eq!(m.expired_in_trash(late + 1), 0);
+}

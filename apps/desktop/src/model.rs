@@ -713,6 +713,9 @@ impl<S: Store, C: Clipboard> Model<S, C> {
                 if u.purged > 0 {
                     self.info(trf(lang, Msg::DeletedOld, &[&u.purged]), now);
                 }
+                if u.purge_waiting > 0 {
+                    self.info(trf(lang, Msg::PurgeWaiting, &[&u.purge_waiting]), now);
+                }
                 if u.unreadable > 0 {
                     self.info(trf(lang, Msg::SkippedItems, &[&u.unreadable]), now);
                 }
@@ -1143,6 +1146,28 @@ impl<S: Store, C: Clipboard> Model<S, C> {
             Ok(Ok(())) => {
                 self.selected = None;
                 self.info(t(self.lang(), Msg::Restored), now);
+            }
+            Ok(Err(e)) => self.error(e.to_string(), now),
+            Err(Locked) => self.forget_screen(),
+        }
+    }
+
+    /// Items in the trash past the retention time that unlock left alone because there were many.
+    pub fn expired_in_trash(&self, now: i64) -> usize {
+        self.session.peek().map_or(0, |v| v.expired_count(now))
+    }
+
+    /// Delete the expired trash. Only ever called from a button the user pressed.
+    pub fn purge_expired_now(&mut self, now: i64) {
+        self.activity(now);
+        match self
+            .session
+            .vault(now)
+            .map(|v| v.purge_expired(now, &mut rand::rng()))
+        {
+            Ok(Ok(n)) => {
+                self.selected = None;
+                self.info(trf(self.lang(), Msg::DeletedOld, &[&n]), now);
             }
             Ok(Err(e)) => self.error(e.to_string(), now),
             Err(Locked) => self.forget_screen(),

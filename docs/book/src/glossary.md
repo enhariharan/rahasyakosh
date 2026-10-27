@@ -94,7 +94,7 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Authenticator app** — A phone app (or `rk totp`) that shows the six-digit two-factor codes. See TOTP.
 
-**Auto-purge** — Deleting items that have been in the trash for 30 days, done whenever the vault is unlocked.
+**Auto-purge** — Deleting items that have been in the trash for 30 days, done whenever the vault is unlocked. It stops at 10 items at a time; if more are waiting, you are asked.
 
 **Backend** — One way of keeping stored data (memory, a folder of files, SQLite). See Store.
 

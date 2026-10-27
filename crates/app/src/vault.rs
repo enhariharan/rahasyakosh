@@ -25,6 +25,9 @@ pub enum Error {
     State(&'static str),
 }
 
+/// The most expired trash items [`Vault::auto_purge`] deletes without being asked.
+pub const AUTO_PURGE_LIMIT: usize = 10;
+
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Tunable behaviour. The defaults follow US-ITM-02 and US-ITM-03.
@@ -751,24 +754,47 @@ impl<S: Store> Vault<S> {
         Ok(())
     }
 
+    /// How many items are past the trash retention and waiting to be deleted.
+    pub fn expired_count(&self, now: i64) -> usize {
+        self.expired(now).len()
+    }
+
+    fn expired(&self, now: i64) -> Vec<Uuid> {
+        // At least one day, whatever the config says: 0 would delete everything in the trash at once.
+        let keep_for = i64::from(self.config.trash_retention_days.max(1)) * SECONDS_PER_DAY;
+        self.entries
+            .values()
+            .filter(|e| e.item.deleted_at.is_some_and(|d| now - d >= keep_for))
+            .map(|e| e.item.id)
+            .collect()
+    }
+
     /// Delete items that have been in the trash for at least `trash_retention_days`. Returns how many.
     pub fn purge_expired(
         &mut self,
         now: i64,
         rng: &mut impl rand_core::CryptoRng,
     ) -> Result<usize> {
-        // At least one day, whatever the config says: 0 would delete everything in the trash at once.
-        let keep_for = i64::from(self.config.trash_retention_days.max(1)) * SECONDS_PER_DAY;
-        let expired: Vec<Uuid> = self
-            .entries
-            .values()
-            .filter(|e| e.item.deleted_at.is_some_and(|d| now - d >= keep_for))
-            .map(|e| e.item.id)
-            .collect();
+        let expired = self.expired(now);
         for id in &expired {
             self.purge(*id, rng)?;
         }
         Ok(expired.len())
+    }
+
+    /// What happens at every unlock: delete the expired trash, unless there is a lot of it. More than
+    /// [`AUTO_PURGE_LIMIT`] items at once is more likely a clock jump or a long absence than housekeeping, so nothing
+    /// is deleted and the user decides (with [`Vault::purge_expired`]). Returns `(deleted, still waiting)`.
+    pub fn auto_purge(
+        &mut self,
+        now: i64,
+        rng: &mut impl rand_core::CryptoRng,
+    ) -> Result<(usize, usize)> {
+        let waiting = self.expired_count(now);
+        if waiting > AUTO_PURGE_LIMIT {
+            return Ok((0, waiting));
+        }
+        Ok((self.purge_expired(now, rng)?, 0))
     }
 
     /// Make an earlier version current again. The present content is saved to history first.
