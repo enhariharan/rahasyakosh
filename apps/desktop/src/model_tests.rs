@@ -931,3 +931,57 @@ fn a_costly_vault_is_announced_on_the_unlock_screen_and_a_normal_one_is_not() {
     assert!(note.contains("64 MiB"), "{note}");
     assert!(locked(KdfParams::MIN_T).costly_unlock_notice().is_none());
 }
+
+/// A locked model over an empty vault with a Secret Key (returned as text) and, optionally, a costly key derivation.
+fn locked_with_secret_key(kdf_passes: u32) -> (Model<MemoryStore, Fake>, String) {
+    let mut rng = ChaCha20Rng::seed_from_u64(4);
+    let mut session = Session::create(
+        MemoryStore::new(),
+        PW,
+        Settings {
+            kdf_passes,
+            ..fast(Settings::default())
+        },
+        0,
+        &mut rng,
+    )
+    .unwrap();
+    let sk = session
+        .vault(0)
+        .unwrap()
+        .set_secret_key(PW, &mut rng)
+        .unwrap();
+    session.lock();
+    (
+        Model::new(session, Fake::default(), None),
+        sk.to_text().to_string(),
+    )
+}
+
+#[test]
+fn a_secret_key_can_be_typed_on_the_unlock_screen() {
+    let (mut m, key) = locked_with_secret_key(KdfParams::MIN_T);
+    assert!(m.unlock_hints().needs_secret_key);
+
+    // Without it: told what is missing.
+    m.unlock(PW, 1);
+    assert!(!m.is_unlocked());
+    assert!(m
+        .unlock_error
+        .as_deref()
+        .unwrap()
+        .contains("Secret Key box"));
+
+    // Garbage: told it is not a key, and that does not count as a wrong password.
+    m.unlock_with_key(PW, "RK1-not-a-key", 2);
+    assert!(m
+        .unlock_error
+        .as_deref()
+        .unwrap()
+        .contains("not a valid Secret Key"));
+    assert_eq!(m.session.failed_attempts(), 0);
+
+    // The right key, with stray spaces around it, opens the vault.
+    m.unlock_with_key(PW, &format!("  {key} "), 3);
+    assert!(m.is_unlocked(), "{:?}", m.unlock_error);
+}

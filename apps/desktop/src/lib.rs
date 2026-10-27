@@ -887,14 +887,16 @@ fn Unlock() -> Element {
     let mut ctx = use_context::<Ctx>();
     let lang = lang_of(&ctx);
     let mut pw = use_signal(String::new);
+    let mut key = use_signal(String::new);
     let t = (ctx.clock)();
-    let (err, wait, costly) = {
+    let (err, wait, costly, needs_key) = {
         let m = ctx.model.read();
         let m = m.as_ref();
         (
             m.and_then(|m| m.unlock_error.clone()),
             m.map_or(0, |m| m.session.retry_in(t)),
             m.and_then(|m| m.costly_unlock_notice()),
+            m.is_some_and(|m| m.unlock_hints().needs_secret_key),
         )
     };
     let has_err = err.is_some();
@@ -904,7 +906,7 @@ fn Unlock() -> Element {
     let mut submit = move || {
         let t = now();
         if let Some(m) = ctx.model.write().as_mut() {
-            m.unlock(&pw.read(), t);
+            m.unlock_with_key(&pw.read(), &key.read(), t);
         }
         pw.set(String::new());
         spawn(async move {
@@ -962,6 +964,15 @@ fn Unlock() -> Element {
                             .await;
                         });
                     },
+                }
+                if needs_key {
+                    label { class: "sr-only", r#for: "secret-key", {tr(lang, Msg::SecretKeyLabel)} }
+                    input {
+                        id: "secret-key", class: "ltr", dir: "ltr", r#type: "password", autocomplete: "off",
+                        aria_label: tr(lang, Msg::SecretKeyLabel),
+                        placeholder: tr(lang, Msg::SecretKeyLabel),
+                        oninput: move |e| key.set(e.value()),
+                    }
                 }
                 if let Some(n) = costly { p { id: "unlock-notice", class: "muted", role: "note", "{n}" } }
                 if let Some(e) = err { p { id: "unlock-error", class: "error", "{e}" } }

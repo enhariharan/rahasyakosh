@@ -226,6 +226,8 @@ pub struct UnlockHints {
     /// The vault's file asks for a clearly more expensive key derivation than this program's default (audit finding
     /// P1-2). The header is read before it is authenticated, so a forged one can ask for this; unlocking will be slow.
     pub costly_kdf: Option<rahasyakosh_core::crypto::KdfParams>,
+    /// The vault needs a Secret Key and this device has none saved, so the user has to type it (audit finding P1-3).
+    pub needs_secret_key: bool,
 }
 
 /// What a successful unlock did besides opening the vault.
@@ -301,8 +303,16 @@ impl<S: Store> Session<S> {
         let Ok(header) = store.header() else {
             return UnlockHints::default();
         };
+        #[cfg(not(target_family = "wasm"))]
+        let on_device = self
+            .secret_keys
+            .as_ref()
+            .is_some_and(|d| d.load(header.vault_id).is_some());
+        #[cfg(target_family = "wasm")]
+        let on_device = false;
         UnlockHints {
             costly_kdf: header.kdf.is_unusually_costly().then_some(header.kdf),
+            needs_secret_key: header.secret_key && self.secret_key.is_none() && !on_device,
         }
     }
 
@@ -456,6 +466,14 @@ impl<S: Store> Session<S> {
                 };
                 self.failures = 0;
                 self.next_attempt_at = 0;
+                // A key the user typed worked: keep it on this device so they are not asked again.
+                #[cfg(not(target_family = "wasm"))]
+                if let (Some(k), Some(dir), Ok(h)) =
+                    (&self.secret_key, &self.secret_keys, vault.store().header())
+                {
+                    let _ = dir.save(h.vault_id, k);
+                }
+                self.secret_key = None;
                 let unreadable = vault.unreadable().len();
                 let warnings = vault.warnings().len();
                 self.state = State::Unlocked(Box::new(Active {

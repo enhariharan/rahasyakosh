@@ -111,8 +111,9 @@ The point: someone who steals only your vault file cannot even start guessing ma
 - On a new computer, `rk` asks for it once (or reads `RK_SECRET_KEY`) and then keeps it on that computer.
 - **If you lose the Secret Key and every device that has it, the vault cannot be opened, even with the right master password.**
   That is the price of the protection. Print it and keep it somewhere safe.
-- The desktop app uses the key kept on the computer, but cannot yet take a typed one; on a new computer, run `rk list` once with
-  `RK_SECRET_KEY` set.
+- The desktop app uses the key kept on the computer. On a new computer its unlock screen shows a **Secret Key** box next to the
+  password box; type the key once and, when the vault opens, the app keeps it on that computer. The desktop app cannot yet
+  *create* a vault with a Secret Key or add one later; use `rk init --secret-key` or `rk secret-key enable` for that.
 
 ## Two things this design does not do
 

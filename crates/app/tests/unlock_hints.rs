@@ -33,6 +33,7 @@ fn the_unlock_screen_is_told_about_a_costly_vault_before_anything_is_typed() {
     .unwrap();
     let s = Session::new(v.into_store(), Settings::default());
     assert_eq!(s.unlock_hints().costly_kdf, Some(costly));
+    assert!(!s.unlock_hints().needs_secret_key);
 
     let v = Vault::create(MemoryStore::new(), PW, KDF, Config::default(), &mut rng()).unwrap();
     let s = Session::new(v.into_store(), Settings::default());

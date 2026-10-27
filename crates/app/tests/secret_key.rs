@@ -171,3 +171,27 @@ fn the_key_file_and_its_folder_are_private() {
         .path();
     assert_eq!(mode(&file), 0o600);
 }
+
+#[test]
+fn a_key_that_worked_is_kept_on_the_device_so_the_next_unlock_needs_only_the_password() {
+    let keys = SecretKeyDir::at(temp("typed").join("keys"));
+    let mut s = Session::create(MemoryStore::new(), PW, fast(), 0, &mut rng())
+        .unwrap()
+        .with_secret_keys(keys.clone());
+    let sk = s.vault(0).unwrap().set_secret_key(PW, &mut rng()).unwrap();
+    let id = s.vault(0).unwrap().vault_id();
+    s.lock();
+    assert!(s.unlock_hints().needs_secret_key);
+
+    // A wrong password with the right key saves nothing.
+    s.provide_secret_key(Some(sk.clone()));
+    assert!(s.unlock("wrong", 1, &mut rng()).is_err());
+    assert!(keys.load(id).is_none());
+
+    s.provide_secret_key(Some(sk.clone()));
+    s.unlock(PW, 100, &mut rng()).unwrap();
+    assert_eq!(keys.load(id).unwrap(), sk);
+    s.lock();
+    assert!(!s.unlock_hints().needs_secret_key);
+    s.unlock(PW, 200, &mut rng()).unwrap();
+}

@@ -38,6 +38,7 @@ Most checks are also worth turning into automated tests when the fix is written.
 - [ ] Read `docs/04-security-and-crypto.md`. Every claim is true of the current build, or is marked "planned": Secret Key, `verifier`, header `magic`, `mlock`.
 - [ ] The book (`docs/book`) says what protects a stolen vault file today (master password and Argon2 cost, plus the Secret Key if enabled).
 - [ ] Fixed 2026-10-27 for the Secret Key (`crates/core/tests/secret_key.rs`, `crates/cli/tests/cli.rs`): `rk init --secret-key` shows a key once; the vault file alone does not open; a new device asks for the key. `verifier`, a header `magic` field and `mlock` are documented as not built.
+- [ ] Desktop: with a Secret Key vault and no key saved on this device (move `~/.local/share/rahasyakosh/secret-keys` aside), the unlock screen shows a Secret Key box. A wrong or misspelt key gives "not a valid Secret Key" and does not start the wrong-password delay; the right key opens the vault and the next unlock needs only the password. (Automated 2026-10-27; look at it once on screen, including with Orca.)
 
 ### P1-4 Argon2 working memory
 - [ ] `core/Cargo.toml` enables the `zeroize` feature for `argon2`, and `cargo build --target wasm32-unknown-unknown -p rahasyakosh-core` (or the CI wasm job) still passes. Checked 2026-10-27.

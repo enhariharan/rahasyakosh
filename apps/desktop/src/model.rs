@@ -652,8 +652,31 @@ impl<S: Store, C: Clipboard> Model<S, C> {
     }
 
     pub fn unlock(&mut self, password: &str, now: i64) {
+        self.unlock_with_key(password, "", now);
+    }
+
+    /// Unlock, with a Secret Key the user typed (`""` when they typed none, so the one kept on this device is used).
+    pub fn unlock_with_key(&mut self, password: &str, secret_key: &str, now: i64) {
         let lang = self.lang();
-        match self.session.unlock(password, now, &mut rand::rng()) {
+        let typed = secret_key.trim();
+        if typed.is_empty() {
+            self.session.provide_secret_key(None);
+        } else {
+            match rahasyakosh_core::secret_key::SecretKey::parse(typed) {
+                Ok(k) => self.session.provide_secret_key(Some(k)),
+                Err(_) => {
+                    self.session.provide_secret_key(None);
+                    let e = t(lang, Msg::SecretKeyInvalid).to_string();
+                    self.unlock_error = Some(e.clone());
+                    self.say(e, true);
+                    return;
+                }
+            }
+        }
+        let result = self.session.unlock(password, now, &mut rand::rng());
+        // The session keeps a typed key on the device when it worked; never hold it longer than this call.
+        self.session.provide_secret_key(None);
+        match result {
             Ok(u) => {
                 self.unlock_error = None;
                 if u.purged > 0 {
