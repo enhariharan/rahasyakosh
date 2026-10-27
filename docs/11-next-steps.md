@@ -13,7 +13,7 @@ Written 2026-10-25. State at the end of the day: `main` is at `9fbbd38`, CI gree
    - No spoken (screen-reader) confirmation after deleting a profile.
    - Unused message `ProfileDeleted` in `apps/desktop/src/i18n.rs` (use it for the point above, or remove it).
 3. **`rk --profile <username>`** in the CLI. US-PRF-04 is done in the desktop app only; the CLI still sees one vault. Reuse `ProfileList` from `crates/app/src/profiles.rs`.
-4. **Desktop import screen.** Export has three formats in Settings; import is CLI-only (`rk import`). Show progress for large files (the import itself takes a fraction of a second for 40 000 rows).
+4. ~~Desktop import screen.~~ Built (Settings → Import passwords). Still open: a file chooser instead of typing the path, column mapping, and Bitwarden/KeePass/1Password formats (US-IMP-02).
 5. **Native-speaker review of translations** (Hindi, Sanskrit, Tamil, Telugu, Malayalam, Urdu). The strings were written by the assistant. Needs a human reviewer, not code.
 6. **Publishing to Ubuntu**: see [`12-publishing-ubuntu.md`](12-publishing-ubuntu.md). Items 2 and 1 should come before the first public release.
 

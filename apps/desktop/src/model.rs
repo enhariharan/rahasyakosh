@@ -196,6 +196,18 @@ pub enum View {
     Form,
 }
 
+/// What reading an import file found. Nothing is stored until the user confirms.
+pub struct ImportPlan {
+    pub file: std::path::PathBuf,
+    /// "chrome", "firefox" or "generic".
+    pub detected: &'static str,
+    pub items: Vec<Item>,
+    pub skipped_duplicates: usize,
+    pub skipped_empty: usize,
+    /// Notes from the reader. They never contain passwords.
+    pub warnings: Vec<String>,
+}
+
 /// One line in the item list.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ItemRow {
@@ -443,6 +455,8 @@ pub struct Model<S: Store, C: Clipboard> {
     pub form_error: Option<FormError>,
     /// Shown on the unlock screen after a wrong password.
     pub unlock_error: Option<String>,
+    /// A file read for import and waiting for the user to confirm. Holds passwords, so it goes when the screen does.
+    pub import: Option<ImportPlan>,
 }
 
 impl<S: Store, C: Clipboard> Model<S, C> {
@@ -459,6 +473,7 @@ impl<S: Store, C: Clipboard> Model<S, C> {
             announcement: Announcement::default(),
             form_error: None,
             unlock_error: None,
+            import: None,
         }
     }
 
@@ -509,6 +524,7 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         self.selected = None;
         self.form = None;
         self.form_error = None;
+        self.import = None;
         let text = t(self.lang(), Msg::VaultIsLocked);
         self.say(text, false);
     }
@@ -551,10 +567,7 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         if path.is_empty() {
             return Err(t(lang, Msg::ExportEmptyPath).into());
         }
-        let file = match (path.strip_prefix("~/"), std::env::var_os("HOME")) {
-            (Some(rest), Some(home)) => std::path::Path::new(&home).join(rest),
-            _ => std::path::PathBuf::from(path),
-        };
+        let file = expand_home(path);
         let folder = file
             .parent()
             .filter(|p| !p.as_os_str().is_empty())
@@ -584,6 +597,95 @@ impl<S: Store, C: Clipboard> Model<S, C> {
             }
         })?;
         Ok((items.len(), file))
+    }
+
+    // ---- import ---------------------------------------------------------------------------------------
+
+    /// Read the CSV at `path` (`~/` means the home folder) and keep what it would add, for the user to look at. Stores
+    /// nothing. Items already in the vault (even in the trash) are not added again.
+    pub fn import_preview(&mut self, path: &str, now: i64) -> Result<(), String> {
+        self.activity(now);
+        self.import = None;
+        let result = self.try_import_preview(path, now);
+        if let Err(e) = &result {
+            self.error(e.clone(), now);
+        }
+        result
+    }
+
+    fn try_import_preview(&mut self, path: &str, now: i64) -> Result<(), String> {
+        use std::io::Read;
+        let lang = self.lang();
+        let path = path.trim();
+        if path.is_empty() {
+            return Err(t(lang, Msg::ImportEmptyPath).into());
+        }
+        let file = expand_home(path);
+        let limit = rahasyakosh_transfer::MAX_IMPORT_BYTES as u64;
+        let mut data = zeroize::Zeroizing::new(Vec::new());
+        std::fs::File::open(&file)
+            .and_then(|f| {
+                if !f.metadata()?.is_file() {
+                    return Err(std::io::ErrorKind::InvalidInput.into());
+                }
+                f.take(limit + 1).read_to_end(&mut data)
+            })
+            .map_err(|e| trf(lang, Msg::ImportCannotRead, &[&e]))?;
+        if data.len() as u64 > limit {
+            return Err(t(lang, Msg::ImportTooLarge).into());
+        }
+        let vault = self
+            .session
+            .vault(now)
+            .map_err(|Locked| t(lang, Msg::VaultIsLocked).to_string())?;
+        let existing: Vec<Item> = vault.items(Scope::Any).into_iter().cloned().collect();
+        let report = rahasyakosh_transfer::import_csv(&data, &[], &existing, now, Uuid::now_v7)
+            .map_err(|e| trf(lang, Msg::ImportCannotRead, &[&e]))?;
+        self.import = Some(ImportPlan {
+            file,
+            detected: report.detected,
+            items: report.items,
+            skipped_duplicates: report.skipped_duplicates,
+            skipped_empty: report.skipped_empty,
+            warnings: report.warnings,
+        });
+        Ok(())
+    }
+
+    /// Store what [`Self::import_preview`] found. Returns how many items were added.
+    pub fn import_confirm(&mut self, now: i64) -> Result<usize, String> {
+        self.activity(now);
+        let lang = self.lang();
+        let Some(plan) = self.import.take() else {
+            return Err(t(lang, Msg::ImportNothing).into());
+        };
+        let count = plan.items.len();
+        let result = self
+            .session
+            .vault(now)
+            .map_err(|Locked| t(lang, Msg::VaultIsLocked).to_string())
+            .and_then(|v| {
+                v.add_many(plan.items, &mut rand::rng())
+                    .map_err(|e| e.to_string())
+            });
+        match result {
+            Ok(_) => {
+                self.info(
+                    trf(lang, Msg::ImportDone, &[&count, &plan.file.display()]),
+                    now,
+                );
+                Ok(count)
+            }
+            Err(e) => {
+                self.error(e.clone(), now);
+                Err(e)
+            }
+        }
+    }
+
+    /// Forget a preview without storing it.
+    pub fn import_cancel(&mut self) {
+        self.import = None;
     }
 
     /// Checks the master password again against the open vault, for actions that must not be done by whoever
@@ -1296,4 +1398,12 @@ pub fn strength_label(lang: Language, score: u8) -> &'static str {
             _ => Msg::Strength4,
         },
     )
+}
+
+/// `~/rest` means `rest` in the home folder; anything else is taken as it is.
+fn expand_home(path: &str) -> std::path::PathBuf {
+    match (path.strip_prefix("~/"), std::env::var_os("HOME")) {
+        (Some(rest), Some(home)) => std::path::Path::new(&home).join(rest),
+        _ => std::path::PathBuf::from(path),
+    }
 }

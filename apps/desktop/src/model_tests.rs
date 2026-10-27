@@ -1062,3 +1062,64 @@ fn a_large_expired_trash_waits_for_a_button_and_a_few_items_go_on_their_own() {
     m.purge_expired_now(late + 1);
     assert_eq!(m.expired_in_trash(late + 1), 0);
 }
+
+#[test]
+fn import_shows_a_preview_first_and_stores_only_after_confirming() {
+    let (mut m, _) = model(Settings {
+        idle_lock_secs: 0,
+        ..Settings::default()
+    });
+    let dir = scratch_dir("import");
+    let file = dir.join("in.csv");
+    // "GitHub / alice / gh-pw" is already in the vault, so it is skipped as a duplicate.
+    std::fs::write(
+        &file,
+        "name,url,username,password\nGitHub,https://github.com,alice,gh-pw\nMail,https://mail.example,bob,pw-1\n,,,\n",
+    )
+    .unwrap();
+    let before = m.session.peek().unwrap().items(Scope::Live).len();
+    m.import_preview(file.to_str().unwrap(), 30).unwrap();
+    let plan = m.import.as_ref().unwrap();
+    assert_eq!(plan.items.len(), 1);
+    assert_eq!(plan.skipped_duplicates, 1);
+    assert_eq!(m.session.peek().unwrap().items(Scope::Live).len(), before);
+    assert_eq!(m.import_confirm(31), Ok(1));
+    assert!(m.import.is_none());
+    assert_eq!(
+        m.session.peek().unwrap().items(Scope::Live).len(),
+        before + 1
+    );
+    // The same file again adds nothing.
+    m.import_preview(file.to_str().unwrap(), 32).unwrap();
+    assert!(m.import.as_ref().unwrap().items.is_empty());
+    m.import_cancel();
+    assert!(m.import.is_none());
+}
+
+#[test]
+fn import_refuses_bad_paths_and_a_waiting_preview_goes_when_the_vault_locks() {
+    let (mut m, _) = model(Settings {
+        idle_lock_secs: 0,
+        ..Settings::default()
+    });
+    assert!(m.import_preview("  ", 30).is_err());
+    assert!(m.import_preview("/nonexistent/x.csv", 30).is_err());
+    let dir = scratch_dir("import-bad");
+    assert!(
+        m.import_preview(dir.to_str().unwrap(), 30).is_err(),
+        "a folder"
+    );
+    let file = dir.join("no-password.csv");
+    std::fs::write(&file, "colour,shape\nred,round\n").unwrap();
+    assert!(m.import_preview(file.to_str().unwrap(), 30).is_err());
+    assert!(m.import.is_none());
+    assert!(m.import_confirm(31).is_err(), "nothing to confirm");
+    std::fs::write(&file, "name,password\nA,pw\n").unwrap();
+    m.import_preview(file.to_str().unwrap(), 32).unwrap();
+    assert!(m.import.is_some());
+    m.lock();
+    assert!(
+        m.import.is_none(),
+        "passwords from the file must not outlive the unlocked screen"
+    );
+}

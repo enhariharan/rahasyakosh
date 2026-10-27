@@ -148,7 +148,7 @@ Use the directory store or SQLite vault as noted. Always copy the vault first (`
 
 ### P5-1 CSV import speed
 - [ ] Generate a CSV with 40 000 distinct rows and run `time rk import big.csv --dry-run`. Expected after fix: a few seconds at most, and doubling the rows about doubles the time (not four times). (Today: 26 s in a debug build.)
-- [ ] Desktop import: not applicable yet, the desktop app has no import screen. When it is built, check that a file this size does not freeze the window (the library test takes 0.25 s). Automated in `crates/transfer/tests/large_import.rs`.
+- [ ] Desktop **Settings → Import passwords** with the same 40 000-row file: the preview appears within a second or two and the window does not freeze. The preview lists at most 50 rows and never shows a password. Confirm adds the items; Cancel or locking drops the preview. A missing path, a folder and a file with no password column each show an error. (Not yet seen on screen.) Automated in `crates/transfer/tests/large_import.rs`.
 
 ### P5-2 Terminal escape sequences
 - [ ] Import a CSV whose title is `ESC ] 52 ; c ; aGk= BEL ESC [ 2 J` (`printf '\033]52;c;aGk=\a\033[2J'`). Run `rk import f.csv --dry-run`, then import it and run `rk list`, `rk trash`, `rk history`.

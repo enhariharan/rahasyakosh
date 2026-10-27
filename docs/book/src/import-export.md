@@ -13,6 +13,8 @@ reverse. It never opens files, prompts, reads the clock or touches keys. The CLI
 
 ## Importing (US-IMP-01)
 
+The desktop app does the same from **Settings → Import passwords**: type the file's path, look at the preview, then confirm. It has no `--map`; use `rk import` for odd column names.
+
 ```
 rk import passwords.csv --dry-run         # preview, change nothing
 rk import passwords.csv                   # preview, ask "Import N item(s)? [y/N]"

@@ -1698,6 +1698,8 @@ fn SettingsView() -> Element {
     let mut new_pw2 = use_signal(String::new);
     let mut pw_msg = use_signal(|| Option::<(bool, String)>::None);
     let mut sk_pw = use_signal(String::new);
+    let mut imp_path = use_signal(String::new);
+    let mut imp_msg = use_signal(|| Option::<String>::None);
     let mut sk_msg = use_signal(|| Option::<String>::None);
     let has_key = ctx
         .model
@@ -1804,6 +1806,72 @@ fn SettingsView() -> Element {
                 input { id: "p2", class: "ltr", dir: "ltr", r#type: "password", autocomplete: "off", value: "{new_pw2}", oninput: move |e| new_pw2.set(e.value()) }
                 if let Some((ok, text)) = pw_msg() { p { class: if ok { "ok" } else { "error" }, role: "status", "{text}" } }
                 button { class: "primary", r#type: "submit", {tr(lang, Msg::ChangeMasterButton)} }
+            }
+            h3 { {tr(lang, Msg::ImportTitle)} }
+            p { class: "muted small", id: "import-hint", {tr(lang, Msg::ImportHint)} }
+            form {
+                onsubmit: move |e| {
+                    e.prevent_default();
+                    let path = imp_path.read().clone();
+                    let r = ctx.model.write().as_mut().map(|m| m.import_preview(&path, now()));
+                    imp_msg.set(match r {
+                        Some(Err(e)) => Some(e),
+                        _ => None,
+                    });
+                },
+                label { r#for: "imp-path", {tr(lang, Msg::ImportPath)} }
+                input {
+                    id: "imp-path", class: "ltr mono", dir: "ltr", autocomplete: "off", value: "{imp_path}",
+                    aria_describedby: "import-hint", oninput: move |e| imp_path.set(e.value()),
+                }
+                if let Some(e) = imp_msg() { p { class: "error", role: "alert", "{e}" } }
+                button { class: "primary", r#type: "submit", {tr(lang, Msg::ImportPreviewButton)} }
+            }
+            {
+                let plan = ctx.model.read().as_ref().and_then(|m| {
+                    m.import.as_ref().map(|p| {
+                        let rows: Vec<(String, String, String)> = p.items.iter().take(50).map(|i| (
+                            i.title.clone(),
+                            i.field("username").map(|f| f.value.clone()).unwrap_or_default(),
+                            i.urls.first().cloned().unwrap_or_default(),
+                        )).collect();
+                        (p.detected, p.items.len(), p.skipped_duplicates, p.skipped_empty, p.warnings.clone(), rows)
+                    })
+                });
+                match plan {
+                    None => rsx! {},
+                    Some((detected, count, dups, empty, warnings, rows)) => rsx! {
+                        div { role: "region", aria_label: tr(lang, Msg::ImportTitle),
+                            p { role: "status", "{trf(lang, Msg::ImportSummary, &[&detected, &count, &dups, &empty])}" }
+                            for w in warnings { p { class: "muted small", "{w}" } }
+                            if count == 0 { p { class: "muted", {tr(lang, Msg::ImportNothing)} } }
+                            ul { class: "list",
+                                for (n, (title, user, url)) in rows.iter().enumerate() {
+                                    li { key: "{n}", class: "pad", "{title}  {user}  {url}" }
+                                }
+                            }
+                            if count > 50 { p { class: "muted small", "{trf(lang, Msg::ImportMore, &[&(count - 50)])}" } }
+                            div { class: "row",
+                                if count > 0 {
+                                    button {
+                                        class: "primary",
+                                        onclick: move |_| {
+                                            let r = ctx.model.write().as_mut().map(|m| m.import_confirm(now()));
+                                            if let Some(Err(e)) = r { imp_msg.set(Some(e)); } else { imp_path.set(String::new()); }
+                                        },
+                                        "{trf(lang, Msg::ImportButton, &[&count])}"
+                                    }
+                                }
+                                button {
+                                    onclick: move |_| {
+                                        if let Some(m) = ctx.model.write().as_mut() { m.import_cancel(); }
+                                    },
+                                    {tr(lang, Msg::Cancel)}
+                                }
+                            }
+                        }
+                    },
+                }
             }
             h3 { {tr(lang, Msg::SecretKeyTitle)} }
             if has_key {

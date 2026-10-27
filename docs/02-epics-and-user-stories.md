@@ -62,7 +62,7 @@ IDs are stable; reference them in commits and tests (e.g. `US-VLT-02`).
 ## E7 — Import / Export (P0/P1)
 | ID | Story | Acceptance criteria |
 |----|-------|---------------------|
-| US-IMP-01 | Import from CSV (generic, Chrome, Firefox). (P0) | Column mapping, preview, dedupe. |
+| US-IMP-01 | Import from CSV (generic, Chrome, Firefox). (P0) | Column mapping, preview, dedupe. Available in the CLI (`rk import`) and in the desktop app (**Settings → Import passwords**; columns are recognised by name, no manual mapping there). |
 | US-IMP-02 | Import Bitwarden JSON, KeePass KDBX, 1Password 1pux. (P1) | Mapped to native types; unsupported fields reported. |
 | US-IMP-03 | Export CSV/JSON (plaintext, with warning) and encrypted. (P0) | Re-auth required; warning modal. |
 
