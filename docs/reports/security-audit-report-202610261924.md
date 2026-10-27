@@ -111,7 +111,7 @@ All seven phases are done (Phase 1 was finished last, on the same day). 52 findi
 | [P6-2](#p6-2) | Medium | Data and config folders and `profiles.json` are readable by other users | Confirmed | fixed 2026-10-27 |
 | [P6-3](#p6-3) | Medium | Typed secrets pass through memory that is never wiped (web view, signals) | From reading | open |
 | [P4-1](#p4-1) | Medium | `RK_PASSWORD` stays in the clipboard helpers' environment | From reading | open |
-| [P4-2](#p4-2) | Medium | `export -f vault --force` can overwrite the live vault | Confirmed | open |
+| [P4-2](#p4-2) | Medium | `export -f vault --force` can overwrite the live vault | Confirmed | fixed 2026-10-27 |
 | [P5-1](#p5-1) | Medium | CSV import is quadratic (40 000 rows took 26 s in a debug build) | Confirmed | open |
 | [P5-2](#p5-2) | Medium | Terminal escape sequences from imported text are printed raw | Confirmed | open |
 | [P3-1](#p3-1) | Medium | `trash_retention_days = 0` purges all trash at the next unlock | From reading | open |
@@ -475,7 +475,7 @@ Files read: `clipboard/src/lib.rs`, `cli/src/{main,clipboard,file}.rs`. [P4-2](#
 - **Evidence:** The guard `out == path` compares path text. PoC: `rk --vault ./v.db export -f vault -o v.db --force` exits 0 and `file::save` renames the JSON bundle over the open SQLite vault; the next `rk --vault v.db list` says the file is "in the old vault file format".
 - **Impact:** The vault is unusable until the user works out `rk migrate` (the bundle holds the same records), and a `-wal` file may be left beside it. The desktop export has the same risk.
 - **Recommended fix:** Compare with `same_file` (device and inode, or `canonicalize` of the parent plus file name) and refuse when the target is an existing SQLite vault.
-- **Status:** open
+- **Status:** fixed 2026-10-27: `rk export` (every format) refuses an output that is the vault or its `-wal`/`-shm`/`-journal` file under any spelling (same device and inode, so relative paths, `..`, symlinks and hard links are caught) and any other file that starts with the SQLite signature, before asking for the password (`refuse_to_overwrite_a_vault`, `private_fs::is_same_file`). Test `an_export_can_never_overwrite_the_live_vault`. The desktop export already refused every existing file (`export_refuses_...`), so it cannot replace its own vault.
 
 [Top](#top)
 

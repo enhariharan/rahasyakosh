@@ -437,6 +437,27 @@ fn reauthenticate(
         .context("wrong master password")
 }
 
+/// Refuse to write an export over the vault being used (or its side files), however the path is spelled, or over any
+/// other SQLite database (audit finding P4-2).
+fn refuse_to_overwrite_a_vault(out: &std::path::Path, vault: &std::path::Path) -> Result<()> {
+    use rahasyakosh_store::private_fs::{is_same_file, is_sqlite_database};
+    let name = vault.as_os_str().to_owned();
+    for suffix in ["", "-wal", "-shm", "-journal"] {
+        let mut side = name.clone();
+        side.push(suffix);
+        if is_same_file(out, std::path::Path::new(&side)) {
+            bail!("{} is the vault itself; choose another file", out.display());
+        }
+    }
+    if is_sqlite_database(out) {
+        bail!(
+            "{} is a SQLite database (possibly a vault); choose another file",
+            out.display()
+        );
+    }
+    Ok(())
+}
+
 /// Write `bytes` to `path` (owner-only on Unix), refusing to replace an existing file without `force`.
 fn write_private(path: &std::path::Path, bytes: &[u8], force: bool) -> Result<()> {
     use std::io::Write;
@@ -1068,9 +1089,7 @@ fn main() -> Result<()> {
         } => {
             if let ExportFormat::Vault = format {
                 let out = output.context("--format vault needs --output FILE")?;
-                if out == path {
-                    bail!("output must differ from the vault file");
-                }
+                refuse_to_overwrite_a_vault(&out, &path)?;
                 if out.exists() && !force {
                     bail!("{} exists (use --force to overwrite)", out.display());
                 }
@@ -1083,6 +1102,9 @@ fn main() -> Result<()> {
                 )?;
                 eprintln!("Wrote encrypted copy to {}", out.display());
                 return Ok(());
+            }
+            if let Some(out) = &output {
+                refuse_to_overwrite_a_vault(out, &path)?;
             }
             eprintln!(
                 "WARNING: this export is PLAINTEXT. Anyone who can read it can read every password in it."

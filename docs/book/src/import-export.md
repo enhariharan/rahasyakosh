@@ -62,7 +62,7 @@ rk export -f vault -o backup.rkv          # encrypted copy of the vault
    The prompt needs a real terminal, so a script cannot bypass it, and `RK_PASSWORD` is deliberately
    not used for this step.
 3. **Careful file handling.** The output file is created with owner-only permissions (`0600`) and the
-   command **refuses to overwrite** an existing file unless you pass `--force`.
+   command **refuses to overwrite** an existing file unless you pass `--force`. Even with `--force` it will never write over the vault you are using (however you spell its path, and also through a link) or over any other SQLite database, so a slip cannot destroy your vault.
 
 Trashed items are not exported.
 

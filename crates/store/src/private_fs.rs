@@ -48,6 +48,37 @@ fn temp_name(path: &Path) -> PathBuf {
     path.with_file_name(format!(".{}.tmp", name.as_deref().unwrap_or("file")))
 }
 
+/// Are `a` and `b` the same file on disk, however they are spelled (a relative path, a symlink, a hard link)? Both
+/// must exist; two paths to nothing are not "the same file". Audit finding P4-2.
+pub fn is_same_file(a: &Path, b: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        match (fs::metadata(a), fs::metadata(b)) {
+            (Ok(x), Ok(y)) => x.dev() == y.dev() && x.ino() == y.ino(),
+            _ => false,
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        match (fs::canonicalize(a), fs::canonicalize(b)) {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        }
+    }
+}
+
+/// Does `path` start with the SQLite file signature? Whatever it is called, that is somebody's database (possibly a
+/// vault), and an export must not replace it.
+pub fn is_sqlite_database(path: &Path) -> bool {
+    use std::io::Read;
+    let mut head = [0u8; 15];
+    fs::File::open(path)
+        .and_then(|mut f| f.read_exact(&mut head))
+        .is_ok()
+        && &head == b"SQLite format 3"
+}
+
 /// Make `root` and everything under it owner-only: folders 0700, files 0600. Used at start-up on the folders the
 /// program owns, to repair installs made before these rules. Symlinks are neither followed nor changed. Returns how
 /// many entries were changed. Missing paths are fine (nothing to do).
@@ -148,6 +179,33 @@ mod tests {
         write_private_atomic(&root.join("x.json"), b"new").unwrap();
         assert_eq!(fs::read(&victim).unwrap(), b"keep");
         assert_eq!(fs::read(root.join("x.json")).unwrap(), b"new");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_same_file_is_recognised_under_any_spelling() {
+        let root = scratch("same");
+        fs::create_dir_all(&root).unwrap();
+        let a = root.join("v.db");
+        fs::write(&a, b"SQLite format 3\0rest").unwrap();
+        std::os::unix::fs::symlink(&a, root.join("link.db")).unwrap();
+        fs::hard_link(&a, root.join("hard.db")).unwrap();
+        fs::write(root.join("other.db"), b"x").unwrap();
+        assert!(is_same_file(
+            &a,
+            &root
+                .join("../")
+                .join(root.file_name().unwrap())
+                .join("v.db")
+        ));
+        assert!(is_same_file(&a, &root.join("link.db")));
+        assert!(is_same_file(&a, &root.join("hard.db")));
+        assert!(!is_same_file(&a, &root.join("other.db")));
+        assert!(!is_same_file(&a, &root.join("missing")));
+        assert!(!is_same_file(&root.join("missing"), &root.join("missing")));
+        assert!(is_sqlite_database(&a));
+        assert!(!is_sqlite_database(&root.join("other.db")));
+        assert!(!is_sqlite_database(&root.join("missing")));
     }
 
     #[cfg(unix)]

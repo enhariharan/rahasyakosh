@@ -120,7 +120,7 @@ Use the directory store or SQLite vault as noted. Always copy the vault first (`
 
 ### P4-2 `export -f vault --force`
 - [ ] `rk export -f vault -o v.db --force` (target = the live vault, by name, by `./v.db`, by absolute path, and through a symlink). Expected: refused every time, and `rk list` still works. (Today: the vault is replaced by a JSON bundle.)
-- [ ] The desktop Settings export to the vault file's own path is refused too.
+- [ ] The desktop Settings export to the vault file's own path is refused too (it refuses any existing file). Automated 2026-10-27.
 
 ### P4-3 Secrets in the command line
 - [ ] Run `rk add ... --totp JBSWY3DPEHPK3PXP` and in another terminal `ps aux | grep JBSW`. Expected after fix: a warning for use on the command line, and a `--totp-stdin` (or prompt) route that does not show in `ps`. Check `~/.bash_history` too.

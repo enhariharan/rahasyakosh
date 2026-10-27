@@ -900,3 +900,48 @@ fn the_default_folder_of_an_older_install_is_made_private() {
     assert_eq!(mode(&dir), 0o700);
     assert_eq!(mode(&dir.join("profiles.json")), 0o600);
 }
+
+#[cfg(unix)]
+#[test]
+fn an_export_can_never_overwrite_the_live_vault() {
+    let v = Vault::new("export_over_vault");
+    v.ok(&["add", "Site", "-u", "alice", "--password-stdin"], "pw\n");
+    let before = std::fs::read(&v.0).unwrap();
+    let dir = v.0.parent().unwrap();
+    let name = v.0.file_name().unwrap().to_str().unwrap();
+
+    let link = dir.join("export_over_vault.link");
+    let _ = std::fs::remove_file(&link);
+    std::os::unix::fs::symlink(&v.0, &link).unwrap();
+    let dotdot = dir.join("..").join(dir.file_name().unwrap()).join(name);
+    let spellings = [
+        v.0.display().to_string(),
+        link.display().to_string(),
+        dotdot.display().to_string(),
+    ];
+    for target in &spellings {
+        for format in ["vault", "csv"] {
+            let err = v.err(&["export", "-f", format, "-o", target, "--force"]);
+            assert!(
+                err.contains("is the vault itself") || err.contains("SQLite database"),
+                "{format} to {target}: {err}"
+            );
+        }
+    }
+    // Nothing changed, and the vault still works.
+    assert_eq!(std::fs::read(&v.0).unwrap(), before);
+    assert!(v.ok(&["list"], "").contains("Site"));
+
+    // Another SQLite database is not overwritten either, wherever it lives.
+    let other = dir.join("export_over_vault.other.db");
+    std::fs::copy(&v.0, &other).unwrap();
+    let err = v.err(&[
+        "export",
+        "-f",
+        "vault",
+        "-o",
+        other.to_str().unwrap(),
+        "--force",
+    ]);
+    assert!(err.contains("SQLite database"), "{err}");
+}
