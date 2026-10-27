@@ -316,7 +316,7 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Scrollback** — Everything your terminal remembers having shown. A password printed by `rk get` stays there; `--copy` avoids that.
 
-**Secret Key** — A planned, optional extra random key kept only on your devices and combined with your password, so a stolen vault is safe even against a weak password. Not built yet.
+**Secret Key** — An optional extra random key (128 bits, written `RK1-XXXX-...`) kept on your devices and on a printed sheet, never in the vault file, and combined with your password to open the vault. A stolen vault file is then safe even against a weak password. Lose all copies and the vault cannot be opened. See "The Secret Key" in *How a vault works*.
 
 **Secure delete** — Overwriting deleted data with zeros so it cannot be recovered from the file's free space.
 

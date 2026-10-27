@@ -595,7 +595,7 @@ impl<S: Store, C: Clipboard> Model<S, C> {
             .store()
             .header()
             .map_err(|e| e.to_string())?
-            .unlock(password)
+            .unlock_with(password, vault.secret_key())
             .map(drop)
             .map_err(|_| t(lang, Msg::WrongPassword).to_string())
     }
@@ -656,6 +656,9 @@ impl<S: Store, C: Clipboard> Model<S, C> {
             Err(UnlockError::LockedOut { .. }) => {
                 self.unlock_error = Some(t(lang, Msg::TooManyWrong).into());
             }
+            Err(UnlockError::Failed(rahasyakosh_app::Error::Core(
+                rahasyakosh_core::Error::SecretKeyRequired,
+            ))) => self.unlock_error = Some(t(lang, Msg::SecretKeyNeeded).into()),
             Err(e) => self.unlock_error = Some(e.to_string()),
         }
         if let Some(e) = self.unlock_error.clone() {

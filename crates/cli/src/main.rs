@@ -35,7 +35,18 @@ struct Cli {
 #[derive(Subcommand)]
 enum Cmd {
     /// Create a new vault
-    Init(MasterOpts),
+    Init {
+        #[command(flatten)]
+        master: MasterOpts,
+        /// Also lock the vault with a random Secret Key (shown once, kept apart from the vault file)
+        #[arg(long)]
+        secret_key: bool,
+    },
+    /// Manage the vault's Secret Key: a second secret, needed with the master password to open the vault
+    SecretKey {
+        #[command(subcommand)]
+        action: SecretKeyCmd,
+    },
     /// Add a login (password generated if --password is omitted and --generate is set)
     Add {
         title: String,
@@ -226,6 +237,16 @@ fn output(value: &str, what: &str, opts: &CopyOpts) -> Result<()> {
     Ok(())
 }
 
+#[derive(Subcommand)]
+enum SecretKeyCmd {
+    /// Add a Secret Key to this vault (shown once; print it and keep it somewhere safe)
+    Enable,
+    /// Show the Secret Key again (to print a new recovery sheet)
+    Show,
+    /// Remove the Secret Key; the master password alone opens the vault again
+    Disable,
+}
+
 /// How the new master password is chosen.
 #[derive(clap::Args)]
 struct MasterOpts {
@@ -319,14 +340,66 @@ fn new_password(allow_weak: bool) -> Result<zeroize::Zeroizing<String>> {
     Ok(p)
 }
 
+/// The Secret Key for the vault in `store`, if it needs one: from this device's key folder, `RK_SECRET_KEY`, or by
+/// asking. The flag says whether it was typed (and so is worth keeping).
+fn find_secret_key(
+    store: &SqliteStore,
+) -> Result<Option<(rahasyakosh_core::secret_key::SecretKey, bool)>> {
+    use rahasyakosh_core::secret_key::SecretKey;
+    let header = store.header()?;
+    if !header.secret_key {
+        return Ok(None);
+    }
+    if let Some(dir) = rahasyakosh_app::SecretKeyDir::default_dir() {
+        if let Some(k) = dir.load(header.vault_id) {
+            return Ok(Some((k, false)));
+        }
+    }
+    let text = match std::env::var("RK_SECRET_KEY") {
+        Ok(t) => zeroize::Zeroizing::new(t),
+        Err(_) => zeroize::Zeroizing::new(
+            rpassword::prompt_password("Secret Key (RK1-XXXX-...): ").context(
+                "this vault needs its Secret Key; set RK_SECRET_KEY or run in a terminal",
+            )?,
+        ),
+    };
+    Ok(Some((SecretKey::parse(&text)?, true)))
+}
+
+/// Save the Secret Key on this device, and when `sheet` is set show it as a recovery sheet.
+fn keep_secret_key(vault: Uuid, key: &rahasyakosh_core::secret_key::SecretKey, sheet: bool) {
+    if let Some(dir) = rahasyakosh_app::SecretKeyDir::default_dir() {
+        match dir.save(vault, key) {
+            Ok(()) if !sheet => eprintln!("Secret Key kept on this device."),
+            Ok(()) => {}
+            Err(e) => eprintln!("Could not keep the Secret Key on this device: {e}"),
+        }
+    }
+    if sheet {
+        print_recovery_sheet(key);
+    }
+}
+
+fn print_recovery_sheet(key: &rahasyakosh_core::secret_key::SecretKey) {
+    eprintln!(
+        "\nYour Secret Key (copy it down; print it and keep it somewhere safe):\n\n    {}\n\n\
+         It is needed together with your master password on any new device, and it cannot be recovered from the vault.\n\
+         This device keeps a copy apart from the vault file.",
+        key.to_text().as_str()
+    );
+}
+
 /// Ask for the master password again and check it against the vault header.
-fn reauthenticate(header: &rahasyakosh_core::vault::VaultHeader) -> Result<()> {
+fn reauthenticate(
+    header: &rahasyakosh_core::vault::VaultHeader,
+    secret_key: Option<&rahasyakosh_core::secret_key::SecretKey>,
+) -> Result<()> {
     let again = zeroize::Zeroizing::new(
         rpassword::prompt_password("Re-enter master password to continue: ")
             .context("re-entering the password needs an interactive terminal")?,
     );
     header
-        .unlock(&again)
+        .unlock_with(&again, secret_key)
         .map(drop)
         .context("wrong master password")
 }
@@ -410,13 +483,24 @@ fn open_vault(path: &Path) -> Result<Vault<SqliteStore>> {
     drop(file);
     let store = SqliteStore::open(path)?;
     let pw = read_password("Master password: ")?;
+    let secret_key = find_secret_key(&store)?;
     let mut highwater =
         rahasyakosh_app::HighWater::default_path().map(rahasyakosh_app::HighWater::at);
     let last_seen = highwater
         .as_ref()
         .and_then(|h| h.last_seen(store.header().ok()?.vault_id));
-    let mut vault =
-        Vault::try_unlock_checked(store, &pw, Config::default(), last_seen).map_err(|f| f.error)?;
+    let mut vault = Vault::try_unlock_full(
+        store,
+        &pw,
+        secret_key.as_ref().map(|(k, _)| k),
+        Config::default(),
+        last_seen,
+    )
+    .map_err(|f| f.error)?;
+    if let Some((key, true)) = &secret_key {
+        // Typed in just now and it worked: keep it on this device so it is not asked for again.
+        keep_secret_key(vault.vault_id(), key, false);
+    }
     for w in vault.warnings() {
         // Warnings name item ids and numbers only, never text taken from the stored data.
         eprintln!("Warning: {w}.");
@@ -539,18 +623,25 @@ fn main() -> Result<()> {
             return Ok(());
         }
         Cmd::ClipboardClear { after } => return clipboard::run_clearer(*after),
-        Cmd::Init(opts) => {
+        Cmd::Init {
+            master: opts,
+            secret_key,
+        } => {
             if path.exists() {
                 bail!("{} already exists", path.display());
             }
             let pw = new_master(opts, &mut rng)?;
-            Vault::create(
+            let mut vault = Vault::create(
                 SqliteStore::open(&path)?,
                 &pw,
                 KdfParams::DESKTOP,
                 Config::default(),
                 &mut rng,
             )?;
+            if *secret_key {
+                let sk = vault.set_secret_key(&pw, &mut rng)?;
+                keep_secret_key(vault.vault_id(), &sk, true);
+            }
             eprintln!("Created {}", path.display());
             return Ok(());
         }
@@ -841,6 +932,37 @@ fn main() -> Result<()> {
             }
             eprintln!("{}", if purge { "Deleted" } else { "Moved to trash" });
         }
+        Cmd::SecretKey { action } => match action {
+            SecretKeyCmd::Enable => {
+                if vault.has_secret_key() {
+                    bail!("this vault already has a Secret Key (`rk secret-key show` prints it)");
+                }
+                let pw = read_password("Master password (to confirm): ")?;
+                let sk = vault.set_secret_key(&pw, &mut rng)?;
+                keep_secret_key(vault.vault_id(), &sk, true);
+            }
+            SecretKeyCmd::Show => {
+                let Some(sk) = vault.secret_key() else {
+                    bail!("this vault has no Secret Key");
+                };
+                reauthenticate(&vault.store().header()?, Some(sk))?;
+                print_recovery_sheet(sk);
+            }
+            SecretKeyCmd::Disable => {
+                if !vault.has_secret_key() {
+                    bail!("this vault has no Secret Key");
+                }
+                let pw = read_password("Master password (to confirm): ")?;
+                let vault_id = vault.vault_id();
+                vault.clear_secret_key(&pw, &mut rng)?;
+                if let Some(dir) = rahasyakosh_app::SecretKeyDir::default_dir() {
+                    let _ = dir.remove(vault_id);
+                }
+                eprintln!(
+                    "The Secret Key is removed. The master password alone opens this vault now."
+                );
+            }
+        },
         Cmd::Passwd(opts) => {
             let new = new_master(&opts, &mut rng)?;
             vault.change_password(&new, KdfParams::DESKTOP, &mut rng)?;
@@ -924,7 +1046,7 @@ fn main() -> Result<()> {
             eprintln!(
                 "WARNING: this export is PLAINTEXT. Anyone who can read it can read every password in it."
             );
-            reauthenticate(&vault.store().header()?)?;
+            reauthenticate(&vault.store().header()?, vault.secret_key())?;
             let items: Vec<Item> = vault.items(Scope::Any).into_iter().cloned().collect();
             let text = match format {
                 ExportFormat::Csv => transfer::export_csv(&items)?,
@@ -942,7 +1064,7 @@ fn main() -> Result<()> {
                 None => print!("{}", *text),
             }
         }
-        Cmd::Init(_) | Cmd::Gen { .. } | Cmd::ClipboardClear { .. } | Cmd::Migrate { .. } => {
+        Cmd::Init { .. } | Cmd::Gen { .. } | Cmd::ClipboardClear { .. } | Cmd::Migrate { .. } => {
             unreachable!()
         }
     }

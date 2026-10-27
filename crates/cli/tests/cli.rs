@@ -57,11 +57,17 @@ impl Drop for Vault {
     }
 }
 
+/// Where the test binary's Secret Keys are kept (never the real user's folder).
+fn data_home() -> PathBuf {
+    Path::new(env!("CARGO_TARGET_TMPDIR")).join("xdg-data")
+}
+
 fn run(vault: &Path, args: &[&str], stdin: &str) -> Output {
     let mut child = Command::new(env!("CARGO_BIN_EXE_rk"))
         .args(args)
         .env("RK_VAULT", vault)
         .env("XDG_STATE_HOME", env!("CARGO_TARGET_TMPDIR"))
+        .env("XDG_DATA_HOME", data_home())
         .env("RK_PASSWORD", PW)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -727,6 +733,99 @@ fn items_in_the_trash_for_30_days_are_deleted_on_the_next_unlock() {
     assert_eq!(
         String::from_utf8_lossy(&out.stdout),
         "Item2\tu\tdeleted 29 days ago\n"
+    );
+    let _ = std::fs::remove_file(&path);
+}
+
+// ---- Secret Key (audit finding P1-3) -------------------------------------------------------------------
+
+fn run_with(vault: &Path, args: &[&str], extra_env: &[(&str, &str)], data: &Path) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_rk"))
+        .args(args)
+        .env("RK_VAULT", vault)
+        .env("XDG_STATE_HOME", env!("CARGO_TARGET_TMPDIR"))
+        .env("XDG_DATA_HOME", data)
+        .env("RK_PASSWORD", PW)
+        .envs(extra_env.iter().copied())
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .unwrap()
+}
+
+#[test]
+fn a_secret_key_vault_needs_the_key_and_this_device_keeps_it() {
+    let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join("secret_key_cli.db");
+    let _ = std::fs::remove_file(&path);
+    let data = Path::new(env!("CARGO_TARGET_TMPDIR")).join("sk-cli-data");
+    let _ = std::fs::remove_dir_all(&data);
+
+    let init = run_with(&path, &["init", "--secret-key"], &[], &data);
+    assert!(
+        init.status.success(),
+        "{}",
+        String::from_utf8_lossy(&init.stderr)
+    );
+    let err = String::from_utf8_lossy(&init.stderr).into_owned();
+    let key = err
+        .split_whitespace()
+        .find(|w| w.starts_with("RK1-"))
+        .expect("the key is shown once")
+        .to_string();
+
+    // On this device the key is found by itself.
+    let out = run_with(
+        &path,
+        &["add", "Bank", "-u", "me", "--generate"],
+        &[],
+        &data,
+    );
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(!String::from_utf8_lossy(&out.stdout).contains(&key));
+
+    // Another device (an empty key folder) with the vault file alone: refused, no way to even try passwords.
+    let other = Path::new(env!("CARGO_TARGET_TMPDIR")).join("sk-cli-other");
+    let _ = std::fs::remove_dir_all(&other);
+    let out = run_with(&path, &["list"], &[], &other);
+    assert!(!out.status.success());
+    // With the key typed (here from the environment) it opens, and the device keeps it.
+    let out = run_with(&path, &["list"], &[("RK_SECRET_KEY", &key)], &other);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(String::from_utf8_lossy(&out.stdout).contains("Bank"));
+    let out = run_with(&path, &["list"], &[], &other);
+    assert!(
+        out.status.success(),
+        "kept on the device after the first use"
+    );
+
+    // A mistyped key is reported as such, not as a wrong password.
+    let third = Path::new(env!("CARGO_TARGET_TMPDIR")).join("sk-cli-third");
+    let _ = std::fs::remove_dir_all(&third);
+    let bad = format!("{}A", &key[..key.len() - 1]);
+    let out = run_with(&path, &["list"], &[("RK_SECRET_KEY", &bad)], &third);
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("typing mistake"));
+
+    // It can be removed again.
+    let out = run_with(&path, &["secret-key", "disable"], &[], &data);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let out = run_with(&path, &["list"], &[], &third);
+    assert!(
+        out.status.success(),
+        "the master password alone opens it again"
     );
     let _ = std::fs::remove_file(&path);
 }

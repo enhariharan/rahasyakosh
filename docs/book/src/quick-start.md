@@ -124,7 +124,8 @@ Plaintext exports contain every password. Delete them as soon as you are done, a
 
 | Command | What it does |
 |---|---|
-| `rk init [--passphrase]` | Create a vault |
+| `rk init [--passphrase] [--secret-key]` | Create a vault (optionally also locked with a Secret Key) |
+| `rk secret-key enable\|show\|disable` | Add, show again, or remove the vault's Secret Key |
 | `rk add TITLE [-u USER] [--url URL] [-g] [--password-stdin] [--totp SECRET]` | Add a login |
 | `rk list [TEXT]` | List or search items |
 | `rk get TEXT [-f FIELD] [-c] [--clear-after SECS]` | Show or copy a field (default: password) |

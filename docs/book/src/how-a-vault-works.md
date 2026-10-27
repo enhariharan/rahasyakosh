@@ -93,9 +93,28 @@ Every encryption includes **associated data** that is checked but not hidden:
 
 This is a powerful trick: **the context is part of the lock.**
 
+## The Secret Key (optional)
+
+A master password is chosen by a person, so it can be weak. A **Secret Key** is 128 random bits made by the program, written like
+`RK1-ABCD-EFGH-...` (eight groups of four letters and digits; the last part is a checksum, so a typing mistake is caught at once instead of
+looking like a wrong password). It is mixed into the key that locks the vault key, so opening the vault needs **both** the master
+password and the Secret Key.
+
+The point: someone who steals only your vault file cannot even start guessing master passwords, because they would have to guess a
+128-bit random value first. The Secret Key is **not** inside the vault file. Each computer keeps its own copy in a private file in
+`~/.local/share/rahasyakosh/secret-keys/`, and you keep a printed copy for a new device.
+
+- Make a vault with one: `rk init --secret-key`. Add it to an existing vault: `rk secret-key enable`. Show it again: `rk secret-key show`.
+  Remove it: `rk secret-key disable`.
+- On a new computer, `rk` asks for it once (or reads `RK_SECRET_KEY`) and then keeps it on that computer.
+- **If you lose the Secret Key and every device that has it, the vault cannot be opened, even with the right master password.**
+  That is the price of the protection. Print it and keep it somewhere safe.
+- The desktop app uses the key kept on the computer, but cannot yet take a typed one; on a new computer, run `rk list` once with
+  `RK_SECRET_KEY` set.
+
 ## Two things this design does not do
 
 - It cannot protect you from malware running as you while the vault is unlocked. See
   [What we defend against](threat-model.md).
 - It cannot rescue a weak master password. Argon2 makes guessing expensive, not impossible.
-  A planned optional **Secret Key** (extra random entropy stored on your devices) will help.
+  The optional **Secret Key** helps: extra random entropy that is kept on your devices and not in the vault file (see below).

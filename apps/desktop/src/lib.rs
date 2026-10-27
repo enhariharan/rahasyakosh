@@ -121,6 +121,9 @@ fn startup(path: &Path) -> Startup {
             if let Some(p) = rahasyakosh_app::HighWater::default_path() {
                 session = session.with_highwater(p);
             }
+            if let Some(d) = rahasyakosh_app::SecretKeyDir::default_dir() {
+                session = session.with_secret_keys(d);
+            }
             Startup::Ready(Box::new(make_model(session)))
         }
         Err(e) => Startup::Broken(trf(load_settings().language, Msg::CannotOpenVault, &[&e])),

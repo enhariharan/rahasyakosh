@@ -106,7 +106,7 @@ All seven phases are done (Phase 1 was finished last, on the same day). 52 findi
 | [P2-4](#p2-4) | Medium | Password change keeps the vault key; the old header stays in the WAL | Confirmed (WAL) | open |
 | [P1-1](#p1-1) | Medium | The master password is not Unicode-normalised before Argon2 (lock-out risk across keyboards and platforms; relevant to the Indic-language users) | From reading | fixed 2026-10-27 |
 | [P1-2](#p1-2) | Medium | The unauthenticated header drives Argon2: one unlock attempt with the allowed maximum took 10.8 s and 1 GiB | Measured | fixed in part |
-| [P1-3](#p1-3) | Medium | The design doc (`docs/04`) and the code disagree: no Secret Key, verifier blob, header magic or `mlock` | Confirmed | open |
+| [P1-3](#p1-3) | Medium | The design doc (`docs/04`) and the code disagree: no Secret Key, verifier blob, header magic or `mlock` | Confirmed | fixed in part 2026-10-27 |
 | [P6-1](#p6-1) | Medium | No core-dump, ptrace or `mlock` hardening | From reading | open |
 | [P6-2](#p6-2) | Medium | Data and config folders and `profiles.json` are readable by other users | Confirmed | open |
 | [P6-3](#p6-3) | Medium | Typed secrets pass through memory that is never wiped (web view, signals) | From reading | open |
@@ -197,7 +197,7 @@ Files read: all of `core/src/{crypto,vault,item,totp,generator}.rs`, the `argon2
 - **Evidence:** The design doc describes a Secret Key (two-secret key derivation), a `verifier` blob, a header `magic` field and `mlock`ed memory. `VaultHeader` has `format_version`, `vault_id`, `kdf`, `salt`, `wrapped_vk` only; `MAGIC` is only mixed into the AAD; there is no Secret Key and no memory locking.
 - **Impact:** A reader will believe a stolen vault file is protected by a high-entropy second secret. Today it is protected by the master password and the Argon2 cost alone.
 - **Recommended fix:** Either mark these as planned and say what protects the vault today, or build them. The Secret Key matters most, because it changes what a weak master password costs. The wrong-password test is "AEAD open fails", which is fine but is also what the throttle in `Session::unlock` relies on (see P3).
-- **Status:** open
+- **Status:** fixed in part, 2026-10-27: the Secret Key is built and opt-in (`SecretKey`, header `secret_key`, KEK label `rk/kek/v2`; `rk init --secret-key`, `rk secret-key enable|show|disable`; the key is kept on the device in a 0600 file apart from the vault). Tests `crates/core/tests/secret_key.rs`, `crates/app/tests/secret_key.rs`, `crates/cli/tests/cli.rs`. `docs/04` now says there is no `verifier` (a failed unwrap does that job) and that `magic` is part of the AAD, and that `mlock` is not built (see P6-1). Not done: the desktop app cannot yet take a typed Secret Key or create a vault with one; a Secret Key is not required by default.
 
 [Top](#top)
 

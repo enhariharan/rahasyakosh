@@ -1,6 +1,7 @@
 //! Vault header, key wrapping and per-item records. See docs/04-security-and-crypto.md.
 use crate::crypto::{self, KdfParams, Key, Sealed, NONCE_LEN, SALT_LEN};
 use crate::item::Item;
+use crate::secret_key::SecretKey;
 use crate::{Error, Result};
 use rand_core::CryptoRng;
 use serde::{Deserialize, Serialize};
@@ -76,6 +77,9 @@ pub struct VaultHeader {
     /// `None` in vaults made before the password was normalised: those were keyed from the raw bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pw_norm: Option<PwNorm>,
+    /// The vault key is also locked with a Secret Key (see [`SecretKey`]). Authenticated like every field.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub secret_key: bool,
 }
 
 impl VaultHeader {
@@ -85,18 +89,36 @@ impl VaultHeader {
         if let Some(PwNorm::Nfkc) = self.pw_norm {
             a.extend_from_slice(b"pw:nfkc");
         }
+        if self.secret_key {
+            a.extend_from_slice(b"sk:1");
+        }
         a
     }
 
     /// Derive keys from `password` and unwrap the vault key.
     pub fn unlock(&self, password: &str) -> Result<UnlockedVault> {
+        self.unlock_with(password, None)
+    }
+
+    /// Like [`unlock`](Self::unlock), for a vault that may need its Secret Key. A vault made with one fails with
+    /// [`Error::SecretKeyRequired`] when none is given; a Secret Key given to a vault without one is ignored.
+    pub fn unlock_with(
+        &self,
+        password: &str,
+        secret_key: Option<&SecretKey>,
+    ) -> Result<UnlockedVault> {
         if self.format_version != FORMAT_VERSION {
             return Err(Error::UnsupportedVersion(self.format_version));
         }
+        let sk = match (self.secret_key, secret_key) {
+            (true, None) => return Err(Error::SecretKeyRequired),
+            (true, Some(k)) => Some(k),
+            (false, _) => None,
+        };
         check_kdf(&self.kdf)?;
         let mut last = Error::Decrypt;
         for candidate in self.password_forms(password) {
-            let kek = derive_kek(&candidate, &self.salt, &self.kdf)?;
+            let kek = derive_kek(&candidate, &self.salt, &self.kdf, sk)?;
             match crypto::open(&kek, &(&self.wrapped_vk).into(), &self.aad()) {
                 Ok(vk_bytes) => {
                     let vk: [u8; 32] =
@@ -104,6 +126,7 @@ impl VaultHeader {
                     return Ok(UnlockedVault {
                         header: self.clone(),
                         vk: Zeroizing::new(vk),
+                        secret_key: sk.cloned(),
                     });
                 }
                 Err(e) => last = e,
@@ -151,9 +174,18 @@ fn header_aad(ver: u16, id: &Uuid, kdf: &KdfParams, salt: &[u8; SALT_LEN]) -> Ve
     a
 }
 
-fn derive_kek(password: &str, salt: &[u8], kdf: &KdfParams) -> Result<Key> {
+fn derive_kek(
+    password: &str,
+    salt: &[u8],
+    kdf: &KdfParams,
+    secret_key: Option<&SecretKey>,
+) -> Result<Key> {
     let mk = crypto::derive_master_key(password.as_bytes(), salt, kdf)?;
-    Ok(crypto::hkdf_expand(&*mk, None, b"rk/kek/v1"))
+    Ok(match secret_key {
+        None => crypto::hkdf_expand(&*mk, None, b"rk/kek/v1"),
+        // The Secret Key is the HKDF salt: without it the master key alone gives nothing useful.
+        Some(sk) => crypto::hkdf_expand(&*mk, Some(sk.as_bytes()), b"rk/kek/v2"),
+    })
 }
 
 /// One encrypted item as stored/synced. Only id and rev are plaintext.
@@ -190,6 +222,8 @@ pub struct Manifest {
 pub struct UnlockedVault {
     header: VaultHeader,
     vk: Key,
+    /// Kept so that a password change can lock the vault key with it again.
+    secret_key: Option<SecretKey>,
 }
 
 impl UnlockedVault {
@@ -219,20 +253,69 @@ impl UnlockedVault {
                 ct: vec![],
             },
             pw_norm: norm,
+            secret_key: false,
         };
-        header.wrapped_vk = Self::wrap(password, &header, &vk, rng)?;
-        Ok(Self { header, vk })
+        header.wrapped_vk = Self::wrap(password, &header, &vk, None, rng)?;
+        Ok(Self {
+            header,
+            vk,
+            secret_key: None,
+        })
+    }
+
+    /// Make a vault that is also locked with a new Secret Key. Show the key to the user once; it is not stored in the
+    /// vault and cannot be recovered from it.
+    pub fn create_with_secret_key(
+        password: &str,
+        kdf: KdfParams,
+        rng: &mut impl CryptoRng,
+    ) -> Result<(Self, SecretKey)> {
+        let mut v = Self::create(password, kdf, rng)?;
+        let sk = v.set_secret_key(password, rng)?;
+        Ok((v, sk))
+    }
+
+    /// Lock the vault key with a new Secret Key as well as the master password (replacing an earlier one). Items are
+    /// untouched. `password` must be the current master password, which the caller has just checked.
+    pub fn set_secret_key(
+        &mut self,
+        password: &str,
+        rng: &mut impl CryptoRng,
+    ) -> Result<SecretKey> {
+        let sk = SecretKey::generate(rng);
+        let mut h = self.header.clone();
+        h.secret_key = true;
+        h.wrapped_vk = Self::wrap(password, &h, &self.vk, Some(&sk), rng)?;
+        self.header = h;
+        self.secret_key = Some(sk.clone());
+        Ok(sk)
+    }
+
+    /// Go back to the master password alone.
+    pub fn clear_secret_key(&mut self, password: &str, rng: &mut impl CryptoRng) -> Result<()> {
+        let mut h = self.header.clone();
+        h.secret_key = false;
+        h.wrapped_vk = Self::wrap(password, &h, &self.vk, None, rng)?;
+        self.header = h;
+        self.secret_key = None;
+        Ok(())
+    }
+
+    /// The Secret Key this vault was opened with, if it has one.
+    pub fn secret_key(&self) -> Option<&SecretKey> {
+        self.secret_key.as_ref()
     }
 
     fn wrap(
         password: &str,
         h: &VaultHeader,
         vk: &Key,
+        secret_key: Option<&SecretKey>,
         rng: &mut impl CryptoRng,
     ) -> Result<SealedKey> {
         // The form of the password is the header's: `pw_norm` set means normalised, unset means the typed bytes.
         let form = h.password_forms(password).swap_remove(0);
-        let kek = derive_kek(&form, &h.salt, &h.kdf)?;
+        let kek = derive_kek(&form, &h.salt, &h.kdf, secret_key)?;
         Ok(crypto::seal(&kek, vk.as_slice(), &h.aad(), rng).into())
     }
 
@@ -253,7 +336,7 @@ impl UnlockedVault {
         // A password change moves an older vault to the normalised form.
         h.pw_norm = Some(PwNorm::Nfkc);
         h.salt = crypto::random_bytes::<SALT_LEN>(rng);
-        h.wrapped_vk = Self::wrap(new_password, &h, &self.vk, rng)?;
+        h.wrapped_vk = Self::wrap(new_password, &h, &self.vk, self.secret_key.as_ref(), rng)?;
         self.header = h;
         Ok(())
     }

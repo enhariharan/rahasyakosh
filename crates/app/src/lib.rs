@@ -11,6 +11,8 @@
 mod highwater;
 mod index;
 mod profiles;
+#[cfg(not(target_family = "wasm"))]
+mod secretkeys;
 mod session;
 mod vault;
 
@@ -19,6 +21,8 @@ pub use highwater::HighWater;
 pub use profiles::{
     new_profile_id, Profile, ProfileError, ProfileList, DEFAULT_FULL_NAME, DEFAULT_USERNAME,
 };
+#[cfg(not(target_family = "wasm"))]
+pub use secretkeys::SecretKeyDir;
 pub use session::{
     backoff_secs, should_clear, Language, Locked, Session, Settings, ThemeMode, Tick, ToolbarStyle,
     UnlockError, Unlocked,

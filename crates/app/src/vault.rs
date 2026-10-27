@@ -1,6 +1,7 @@
 use crate::index::SearchIndex;
 use rahasyakosh_core::crypto::KdfParams;
 use rahasyakosh_core::item::{Item, ItemVersion, DEFAULT_HISTORY_LIMIT};
+use rahasyakosh_core::secret_key::SecretKey;
 use rahasyakosh_core::vault::{Manifest, UnlockedVault, MANIFEST_ID};
 use rahasyakosh_store::{Record, Store, Unreadable};
 use std::collections::BTreeMap;
@@ -194,12 +195,25 @@ impl<S: Store> Vault<S> {
     /// Like [`try_unlock`](Self::try_unlock), also telling the vault the highest write number ([`seq`](Self::seq))
     /// this device has seen, kept outside the synced folder. A vault below it was rolled back as a whole.
     pub fn try_unlock_checked(
-        mut store: S,
+        store: S,
         password: &str,
         config: Config,
         last_seen: Option<u64>,
     ) -> std::result::Result<Self, UnlockFailed<S>> {
-        match Self::unlock_inner(&store, password, last_seen) {
+        Self::try_unlock_full(store, password, None, config, last_seen)
+    }
+
+    /// The general form: also takes the vault's Secret Key, for a vault that has one (see
+    /// [`set_secret_key`](Self::set_secret_key)). Without it such a vault fails with
+    /// `rahasyakosh_core::Error::SecretKeyRequired`.
+    pub fn try_unlock_full(
+        mut store: S,
+        password: &str,
+        secret_key: Option<&SecretKey>,
+        config: Config,
+        last_seen: Option<u64>,
+    ) -> std::result::Result<Self, UnlockFailed<S>> {
+        match Self::unlock_inner(&store, password, secret_key, last_seen) {
             Ok(o) => {
                 // Forged tombstones are removed so they cannot hide the item or block writes to it. If this
                 // fails, the vault still opens; the item stays hidden and the warning stays.
@@ -257,10 +271,15 @@ impl<S: Store> Vault<S> {
         }
     }
 
-    fn unlock_inner(store: &S, password: &str, last_seen: Option<u64>) -> Result<Opened> {
+    fn unlock_inner(
+        store: &S,
+        password: &str,
+        secret_key: Option<&SecretKey>,
+        last_seen: Option<u64>,
+    ) -> Result<Opened> {
         // The header decides the password first, so a wrong password still fails closed. After that, one bad
         // record (a sync conflict, a damaged file, a hostile file) is skipped and reported, not fatal.
-        let keys = store.header()?.unlock(password)?;
+        let keys = store.header()?.unlock_with(password, secret_key)?;
         let readable = store.all_readable()?;
         let mut skipped: Vec<Skipped> =
             readable.unreadable.into_iter().map(Skipped::from).collect();
@@ -409,6 +428,48 @@ impl<S: Store> Vault<S> {
 
     #[cfg(target_family = "wasm")]
     fn note_seq(&mut self) {}
+
+    /// Whether this vault is also locked with a Secret Key.
+    pub fn has_secret_key(&self) -> bool {
+        self.keys.header().secret_key
+    }
+
+    /// Lock the vault with a new Secret Key as well as the master password, and return the key to show the user once.
+    /// `password` is checked first, so a typing mistake cannot lock the vault with the wrong one.
+    pub fn set_secret_key(
+        &mut self,
+        password: &str,
+        rng: &mut impl rand_core::CryptoRng,
+    ) -> Result<SecretKey> {
+        self.check_password(password)?;
+        let sk = self.keys.set_secret_key(password, rng)?;
+        self.store.set_header(self.keys.header())?;
+        Ok(sk)
+    }
+
+    /// Go back to the master password alone.
+    pub fn clear_secret_key(
+        &mut self,
+        password: &str,
+        rng: &mut impl rand_core::CryptoRng,
+    ) -> Result<()> {
+        self.check_password(password)?;
+        self.keys.clear_secret_key(password, rng)?;
+        self.store.set_header(self.keys.header())?;
+        Ok(())
+    }
+
+    /// The Secret Key this vault was opened with.
+    pub fn secret_key(&self) -> Option<&SecretKey> {
+        self.keys.secret_key()
+    }
+
+    fn check_password(&self, password: &str) -> Result<()> {
+        self.store
+            .header()?
+            .unlock_with(password, self.keys.secret_key())?;
+        Ok(())
+    }
 
     /// The id of this vault.
     pub fn vault_id(&self) -> Uuid {

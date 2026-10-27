@@ -269,9 +269,27 @@ pub struct Session<S: Store> {
     /// Where this device remembers the newest write it has seen of each vault (see `HighWater`).
     #[cfg(not(target_family = "wasm"))]
     highwater_path: Option<std::path::PathBuf>,
+    /// Where this device keeps the Secret Keys of its vaults.
+    #[cfg(not(target_family = "wasm"))]
+    secret_keys: Option<crate::SecretKeyDir>,
+    /// A Secret Key the user typed in, used for the next unlock.
+    secret_key: Option<rahasyakosh_core::secret_key::SecretKey>,
 }
 
 impl<S: Store> Session<S> {
+    /// Look for vault Secret Keys in `dir` (kept apart from the vault file). See [`crate::SecretKeyDir`].
+    #[cfg(not(target_family = "wasm"))]
+    #[must_use]
+    pub fn with_secret_keys(mut self, dir: crate::SecretKeyDir) -> Self {
+        self.secret_keys = Some(dir);
+        self
+    }
+
+    /// Use this Secret Key (typed by the user) for the next unlock, in preference to the one kept on the device.
+    pub fn provide_secret_key(&mut self, key: Option<rahasyakosh_core::secret_key::SecretKey>) {
+        self.secret_key = key;
+    }
+
     /// Remember, in the file at `path` (outside the vault folder), the newest write seen of each vault, and warn
     /// at unlock when a vault is older than that. Audit finding P2-1.
     #[cfg(not(target_family = "wasm"))]
@@ -292,6 +310,9 @@ impl<S: Store> Session<S> {
             pending_clear: None,
             #[cfg(not(target_family = "wasm"))]
             highwater_path: None,
+            #[cfg(not(target_family = "wasm"))]
+            secret_keys: None,
+            secret_key: None,
         }
     }
 
@@ -323,6 +344,9 @@ impl<S: Store> Session<S> {
             pending_clear: None,
             #[cfg(not(target_family = "wasm"))]
             highwater_path: None,
+            #[cfg(not(target_family = "wasm"))]
+            secret_keys: None,
+            secret_key: None,
         })
     }
 
@@ -381,7 +405,22 @@ impl<S: Store> Session<S> {
         });
         #[cfg(target_family = "wasm")]
         let last_seen = None;
-        match Vault::try_unlock_checked(store, password, self.settings.vault_config(), last_seen) {
+        let secret_key = self.secret_key.clone().or_else(|| {
+            #[cfg(not(target_family = "wasm"))]
+            {
+                let header = store.header().ok().filter(|h| h.secret_key)?;
+                self.secret_keys.as_ref()?.load(header.vault_id)
+            }
+            #[cfg(target_family = "wasm")]
+            None
+        });
+        match Vault::try_unlock_full(
+            store,
+            password,
+            secret_key.as_ref(),
+            self.settings.vault_config(),
+            last_seen,
+        ) {
             Ok(mut vault) => {
                 #[cfg(not(target_family = "wasm"))]
                 if let Some(h) = highwater.take() {
