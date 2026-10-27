@@ -41,9 +41,16 @@ fn env_set(name: &str) -> bool {
     std::env::var_os(name).is_some_and(|v| !v.is_empty())
 }
 
+/// Variables that may hold the master password or the Secret Key. A helper that stays alive to serve the clipboard
+/// would keep them in its environment, where the same user and root can read them (audit finding P4-1).
+pub const SECRET_ENV: [&str; 2] = ["RK_PASSWORD", "RK_SECRET_KEY"];
+
 fn cmd(program: &str, args: &[&str]) -> Command {
     let mut c = Command::new(program);
     c.args(args);
+    for name in SECRET_ENV {
+        c.env_remove(name);
+    }
     c
 }
 

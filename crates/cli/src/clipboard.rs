@@ -29,14 +29,18 @@ pub fn copy_and_schedule_clear(value: &str, clear_after: u64) -> Result<()> {
 /// Re-run this program as a detached helper (own process group, so Ctrl-C in the terminal and closing it do
 /// not kill it) and hand it the value on stdin.
 fn spawn_clearer(value: &str, after: u64) -> Result<()> {
-    let mut child = Command::new(std::env::current_exe()?)
+    let mut child = Command::new(std::env::current_exe()?);
+    child
         .args(["clipboard-clear", "--after", &after.to_string()])
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .process_group(0)
-        .spawn()
-        .context("starting the clipboard helper")?;
+        .process_group(0);
+    // The helper needs only the value (on stdin) and the delay. It must not inherit the master password.
+    for name in rahasyakosh_clipboard::SECRET_ENV {
+        child.env_remove(name);
+    }
+    let mut child = child.spawn().context("starting the clipboard helper")?;
     child
         .stdin
         .take()

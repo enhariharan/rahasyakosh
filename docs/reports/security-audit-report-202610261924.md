@@ -110,7 +110,7 @@ All seven phases are done (Phase 1 was finished last, on the same day). 52 findi
 | [P6-1](#p6-1) | Medium | No core-dump, ptrace or `mlock` hardening | From reading | open |
 | [P6-2](#p6-2) | Medium | Data and config folders and `profiles.json` are readable by other users | Confirmed | fixed 2026-10-27 |
 | [P6-3](#p6-3) | Medium | Typed secrets pass through memory that is never wiped (web view, signals) | From reading | open |
-| [P4-1](#p4-1) | Medium | `RK_PASSWORD` stays in the clipboard helpers' environment | From reading | open |
+| [P4-1](#p4-1) | Medium | `RK_PASSWORD` stays in the clipboard helpers' environment | From reading | fixed 2026-10-27 |
 | [P4-2](#p4-2) | Medium | `export -f vault --force` can overwrite the live vault | Confirmed | fixed 2026-10-27 |
 | [P5-1](#p5-1) | Medium | CSV import is quadratic (40 000 rows took 26 s in a debug build) | Confirmed | fixed 2026-10-27 |
 | [P5-2](#p5-2) | Medium | Terminal escape sequences from imported text are printed raw | Confirmed | fixed 2026-10-27 |
@@ -462,7 +462,7 @@ Files read: `clipboard/src/lib.rs`, `cli/src/{main,clipboard,file}.rs`. [P4-2](#
 - **Evidence:** `read_password` takes the master password from `$RK_PASSWORD`. `spawn_clearer` (`cli/src/clipboard.rs`) and the `wl-copy`/`xclip`/`xsel` spawns (`clipboard/src/lib.rs`) never clear the environment, so every child inherits it.
 - **Impact:** The detached helper holds the master password in its environment for the whole delay, and `xclip`/`wl-copy`, which stay alive to serve the clipboard, hold it until the clipboard is replaced. The same user and root can read it from `/proc/<pid>/environ`.
 - **Recommended fix:** `env_remove("RK_PASSWORD")` (better `env_clear` plus `PATH`, `DISPLAY`, `WAYLAND_DISPLAY`, `XDG_RUNTIME_DIR`) on every spawn. Longer term offer `--password-file` or a file descriptor and describe `RK_PASSWORD` as scripting-only.
-- **Status:** open
+- **Status:** fixed 2026-10-27: every clipboard helper (`wl-copy`, `wl-paste`, `xclip`, `xsel` via `cmd()`, and the detached `rk clipboard-clear` process) is started without `RK_PASSWORD` or `RK_SECRET_KEY` (`rahasyakosh_clipboard::SECRET_ENV`). Test `the_clipboard_helpers_do_not_inherit_the_master_password` (fails without the fix). Not done: the longer-term `--password-file`/descriptor option, and `env_clear` with an allow-list (the two secret variables are removed by name).
 
 [Top](#top)
 

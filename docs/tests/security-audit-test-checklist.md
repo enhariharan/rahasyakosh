@@ -116,7 +116,7 @@ Use the directory store or SQLite vault as noted. Always copy the vault first (`
 ## 4. Clipboard and CLI (Phase 4)
 
 ### P4-1 `RK_PASSWORD` in helper processes
-- [ ] `RK_PASSWORD=... rk get <item> --copy`, then immediately `for p in $(pgrep -f 'wl-copy|xclip|xsel|rk'); do tr '\0' '\n' < /proc/$p/environ | grep -c RK_PASSWORD; done`. Expected after fix: `0` for every helper.
+- [ ] `RK_PASSWORD=... rk get <item> --copy`, then immediately `for p in $(pgrep -f 'wl-copy|xclip|xsel|rk'); do tr '\0' '\n' < /proc/$p/environ | grep -c RK_PASSWORD; done`. Expected after fix: `0` for every helper. Automated 2026-10-27 with a fake `wl-copy` that logs its environment; repeat once with the real tools.
 
 ### P4-2 `export -f vault --force`
 - [ ] `rk export -f vault -o v.db --force` (target = the live vault, by name, by `./v.db`, by absolute path, and through a symlink). Expected: refused every time, and `rk list` still works. (Today: the vault is replaced by a JSON bundle.)

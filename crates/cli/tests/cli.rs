@@ -998,3 +998,54 @@ fn escape_sequences_in_stored_text_are_shown_spelled_out_not_sent_to_the_termina
     v.ok(&["rm", &first.replace("\\x1b", "")[..4]], "");
     no_raw_escapes("trash", &v.rk(&["trash"], ""));
 }
+
+#[test]
+fn the_clipboard_helpers_do_not_inherit_the_master_password() {
+    use std::os::unix::fs::PermissionsExt;
+    let v = Vault::new("clip_env");
+    v.ok(&["add", "Site", "--password-stdin"], "s3cret-pw\n");
+    let clip = FakeClipboard::new("env");
+    // A `wl-copy` that also records the environment it was started with, every time it runs.
+    let log = clip.bin.parent().unwrap().join("env.log");
+    let _ = std::fs::remove_file(&log);
+    let p = clip.bin.join("wl-copy");
+    std::fs::write(
+        &p,
+        format!(
+            "#!/bin/sh\nf=\"{}\"\n/usr/bin/env >> \"{}\"\nif [ \"$1\" = \"--clear\" ]; then : > \"$f\"; exit 0; fi\n/bin/cat > \"$f\"\n",
+            clip.clip.display(),
+            log.display()
+        ),
+    )
+    .unwrap();
+    std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let out = Command::new(env!("CARGO_BIN_EXE_rk"))
+        .args(["get", "site", "-c", "--clear-after", "1"])
+        .env_clear()
+        .env("PATH", &clip.bin)
+        .env("WAYLAND_DISPLAY", "fake-0")
+        .env("RK_VAULT", &v.0)
+        .env("XDG_STATE_HOME", env!("CARGO_TARGET_TMPDIR"))
+        .env("RK_PASSWORD", PW)
+        .env("RK_SECRET_KEY", "RK1-NOT-REALLY-A-KEY")
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert!(clip.wait_until_empty(), "the helper should have cleared it");
+    let seen = std::fs::read_to_string(&log).unwrap();
+    assert!(
+        seen.contains("WAYLAND_DISPLAY"),
+        "the tool did run: {seen:?}"
+    );
+    assert!(
+        seen.matches("WAYLAND_DISPLAY").count() >= 2,
+        "both the copy and the clear were recorded"
+    );
+    assert!(
+        !seen.contains("RK_PASSWORD") && !seen.contains(PW),
+        "{seen}"
+    );
+    assert!(!seen.contains("RK_SECRET_KEY"), "{seen}");
+}
