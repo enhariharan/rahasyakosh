@@ -6,6 +6,7 @@ pub mod model;
 mod model_tests;
 mod platform;
 mod profiles;
+mod settings_file;
 mod style;
 
 use dioxus::desktop::{Config, LogicalSize, WindowBuilder};
@@ -69,12 +70,13 @@ fn load_settings() -> Settings {
         .unwrap_or_default()
 }
 
-fn save_settings(s: &Settings) {
-    let path = settings_path();
-    if let Some(dir) = path.parent() {
-        let _ = private_fs::create_private_dir(dir);
-    }
-    let _ = private_fs::write_private_atomic(&path, &s.to_json());
+/// See [`settings_file::check`].
+fn check_settings_file() -> Option<String> {
+    settings_file::check(&settings_path())
+}
+
+fn save_settings(s: &Settings) -> Result<(), String> {
+    settings_file::save(&settings_path(), s)
 }
 
 /// Make the program's own folders and files owner-only, also on installs made before that rule (audit finding
@@ -169,6 +171,8 @@ struct Ctx {
     setup_lang: Signal<Language>,
     /// A just-made Secret Key (as text, and whether this device kept it), shown once before the vault opens.
     key_sheet: Signal<Option<(zeroize::Zeroizing<String>, bool)>>,
+    /// Something the user should know about the program's own files (a settings file that could not be read or saved).
+    notice: Signal<Option<String>>,
     /// Everyone who has a vault here, and which of them is open or being unlocked.
     profiles: Signal<ProfileList>,
     active: Signal<Option<Uuid>>,
@@ -451,16 +455,18 @@ fn app() -> Element {
             }
         };
     });
+    let notice = use_signal(check_settings_file);
     let key_sheet = use_signal(|| Option::<(zeroize::Zeroizing<String>, bool)>::None);
     let setup_lang = use_signal(|| load_settings().language);
     let reader_notice: Signal<Option<ReaderNotice>> = use_signal(|| None);
-    let ctx = use_context_provider(|| Ctx {
+    let mut ctx = use_context_provider(|| Ctx {
         model,
         clock,
         last_input: last_input.clone(),
         broken,
         setup_lang,
         key_sheet,
+        notice,
         profiles,
         active,
         adding,
@@ -606,6 +612,12 @@ fn app() -> Element {
                     e.prevent_default();
                 }
             },
+            if let Some(n) = (ctx.notice)() {
+                div { class: "warn", role: "status",
+                    p { "{n}" }
+                    button { r#type: "button", onclick: move |_| ctx.notice.set(None), {tr(lang, Msg::Ok)} }
+                }
+            }
             { screen(ctx.clone()) }
         }
     }
@@ -736,12 +748,16 @@ fn Setup() -> Element {
                     error.set(Some(trf(lang, Msg::CouldNotCreateVault, &[&e])));
                     return;
                 }
-                save_settings(session.settings());
+                let settings_error = save_settings(session.settings()).err();
                 ctx.profiles.set(list);
                 ctx.active.set(Some(id));
                 ctx.adding.set(false);
                 ctx.model.set(Some(make_model(session)));
                 ctx.key_sheet.set(sheet);
+                if let Some(e) = settings_error {
+                    ctx.notice
+                        .set(Some(trf(lang, Msg::SettingsNotSaved, &[&e])));
+                }
             }
             Err(e) => error.set(Some(trf(lang, Msg::CouldNotCreateVault, &[&e]))),
         }

@@ -48,7 +48,7 @@ This is the same rule the command-line tool follows; both use one shared clipboa
 
 ## Settings (US-SET-01)
 
-The settings hold no secrets, so they live in a plain file (`~/.config/rahasyakosh/settings.json`).
+The settings hold no secrets, so they live in a plain file (`~/.config/rahasyakosh/settings.json`), though only you can read it. It is saved safely (a temporary file, then a rename, so a crash cannot leave half a file) and the previous version is kept as `settings.json.bak`. If the file cannot be read, the app tells you, uses the defaults and keeps the damaged file as `settings.json.damaged` instead of silently overwriting it. A settings file that anyone could edit could switch off the idle lock, so the file is not readable or writable by other users.
 
 | Setting | Default | Meaning |
 |---|---|---|

@@ -445,7 +445,8 @@ fn settings_are_applied_clamped_and_saved() {
         session,
         clip,
         Some(Box::new(move |s: &Settings| {
-            sink.borrow_mut().push(s.clone())
+            sink.borrow_mut().push(s.clone());
+            Ok(())
         })),
     );
     m.apply_settings(
@@ -984,4 +985,28 @@ fn a_secret_key_can_be_typed_on_the_unlock_screen() {
     // The right key, with stray spaces around it, opens the vault.
     m.unlock_with_key(PW, &format!("  {key} "), 3);
     assert!(m.is_unlocked(), "{:?}", m.unlock_error);
+}
+
+#[test]
+fn a_settings_file_that_cannot_be_written_is_reported_not_called_saved() {
+    let mut rng = ChaCha20Rng::seed_from_u64(6);
+    let session = Session::create(
+        MemoryStore::new(),
+        PW,
+        fast(Settings::default()),
+        0,
+        &mut rng,
+    )
+    .unwrap();
+    let mut m = Model::new(
+        session,
+        Fake::default(),
+        Some(Box::new(|_: &Settings| Err("disk full".to_string()))),
+    );
+    m.apply_settings(fast(Settings::default()), 5);
+    let text = &m.notice.as_ref().expect("a message").text;
+    assert!(
+        text.contains("could not be saved") && text.contains("disk full"),
+        "{text}"
+    );
 }

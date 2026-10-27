@@ -97,7 +97,7 @@ Use the directory store or SQLite vault as noted. Always copy the vault first (`
 - [ ] Purging many items at once asks for confirmation (if implemented).
 
 ### P3-2 settings.json
-- [ ] `ls -l ~/.config/rahasyakosh/settings.json` is `-rw-------`. Write `garbage` into it and start the app: the user is told the file could not be read, defaults are used, and the broken file is kept as `.bak`.
+- [ ] `ls -l ~/.config/rahasyakosh/settings.json` is `-rw-------`. Write `garbage` into it and start the app: the user is told the file could not be read, defaults are used, and the broken file is kept as `settings.json.damaged` (the previous good file is `settings.json.bak`). Automated 2026-10-27; look once at the on-screen notice.
 - [ ] Kill the app while saving settings (change a setting, `kill -9` immediately, repeat 20 times): the file is never empty or half-written.
 
 ### P3-3 Clock changes

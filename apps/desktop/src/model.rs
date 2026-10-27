@@ -426,7 +426,8 @@ pub fn changed_parts(lang: Language, a: &ItemVersion, b: &ItemVersion) -> String
 }
 
 /// Persists settings; `None` in tests.
-pub type SaveSettings = Box<dyn FnMut(&Settings)>;
+/// Saves the settings; the error says why it could not.
+pub type SaveSettings = Box<dyn FnMut(&Settings) -> Result<(), String>>;
 
 pub struct Model<S: Store, C: Clipboard> {
     pub session: Session<S>,
@@ -1157,10 +1158,15 @@ impl<S: Store, C: Clipboard> Model<S, C> {
     pub fn apply_settings(&mut self, settings: Settings, now: i64) {
         self.activity(now);
         self.session.set_settings(settings);
-        if let Some(save) = &mut self.save_settings {
-            save(self.session.settings());
+        let saved = match &mut self.save_settings {
+            Some(save) => save(self.session.settings()),
+            None => Ok(()),
+        };
+        match saved {
+            Ok(()) => self.info(t(self.lang(), Msg::SettingsSaved), now),
+            // They are in force until the app closes, but would be lost: say so.
+            Err(e) => self.error(trf(self.lang(), Msg::SettingsNotSaved, &[&e]), now),
         }
-        self.info(t(self.lang(), Msg::SettingsSaved), now);
     }
 
     /// Change the master password. Returns an error message if it is refused.

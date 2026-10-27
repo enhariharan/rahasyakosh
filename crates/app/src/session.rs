@@ -192,9 +192,15 @@ impl Settings {
 
     /// Parse a settings file; anything unreadable gives the defaults rather than an error, and values are clamped.
     pub fn from_json(bytes: &[u8]) -> Self {
+        Self::parse(bytes).unwrap_or_default()
+    }
+
+    /// Parse a settings file, clamping the values; `None` if it is not readable settings (audit finding P3-2), so
+    /// a front-end can tell the user instead of quietly using the defaults.
+    pub fn parse(bytes: &[u8]) -> Option<Self> {
         serde_json::from_slice::<Self>(bytes)
-            .unwrap_or_default()
-            .validated()
+            .ok()
+            .map(Self::validated)
     }
 
     pub fn to_json(&self) -> Vec<u8> {

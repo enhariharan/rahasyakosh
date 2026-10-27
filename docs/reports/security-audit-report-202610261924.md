@@ -395,7 +395,7 @@ Files read: `app/session.rs`, and how `apps/desktop/src/{model,lib}.rs` drive it
 - **Evidence:** `save_settings` uses `fs::write` with the default umask (likely 0644), is not atomic and ignores errors. `from_json` turns any parse error into the defaults.
 - **Impact:** A half-written file silently resets the user's choices. Anyone who can write it can switch off idle lock, clipboard clearing and reveal timeout (`0` means off for all three), the same class as [P3-1](#p3-1).
 - **Recommended fix:** Write via tmp + rename with mode 0600. Keep the previous file as `.bak` and tell the user when the file could not be read.
-- **Status:** open
+- **Status:** fixed 2026-10-27: saved through `private_fs::write_private_atomic` (0600, temp + rename) in a 0700 folder; the readable file being replaced is kept as `settings.json.bak`; a file that cannot be parsed is kept as `settings.json.damaged` and the user is told (`Settings::parse`, `check_settings_file`); a failed save is reported (`Msg::SettingsNotSaved`) instead of ignored. Tests in `apps/desktop/src/settings_file.rs` and `a_settings_file_that_cannot_be_written_is_reported_not_called_saved`. Not changed: a settings value of 0 still means "off" ([P3-1](#p3-1) covers the trash one).
 
 [Top](#top)
 
