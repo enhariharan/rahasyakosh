@@ -7,7 +7,6 @@
 //!
 //! The file holds only vault ids and counters. Losing it loses the protection, not any data.
 use std::collections::BTreeMap;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
@@ -56,16 +55,8 @@ impl HighWater {
 
     fn save(&self) -> std::io::Result<()> {
         let dir = self.path.parent().unwrap_or(Path::new("."));
-        std::fs::create_dir_all(dir)?;
-        let tmp = self.path.with_extension("json.tmp");
+        rahasyakosh_store::private_fs::create_private_dir(dir)?;
         let bytes = serde_json::to_vec(&self.seen).map_err(std::io::Error::other)?;
-        let mut opts = std::fs::OpenOptions::new();
-        opts.write(true).create(true).truncate(true);
-        #[cfg(unix)]
-        std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
-        let mut f = opts.open(&tmp)?;
-        f.write_all(&bytes)?;
-        f.sync_all()?;
-        std::fs::rename(&tmp, &self.path)
+        rahasyakosh_store::private_fs::write_private_atomic(&self.path, &bytes)
     }
 }

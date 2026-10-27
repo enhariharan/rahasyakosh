@@ -108,7 +108,7 @@ All seven phases are done (Phase 1 was finished last, on the same day). 52 findi
 | [P1-2](#p1-2) | Medium | The unauthenticated header drives Argon2: one unlock attempt with the allowed maximum took 10.8 s and 1 GiB | Measured | fixed 2026-10-27 |
 | [P1-3](#p1-3) | Medium | The design doc (`docs/04`) and the code disagree: no Secret Key, verifier blob, header magic or `mlock` | Confirmed | fixed 2026-10-27 (`mlock` is P6-1) |
 | [P6-1](#p6-1) | Medium | No core-dump, ptrace or `mlock` hardening | From reading | open |
-| [P6-2](#p6-2) | Medium | Data and config folders and `profiles.json` are readable by other users | Confirmed | open |
+| [P6-2](#p6-2) | Medium | Data and config folders and `profiles.json` are readable by other users | Confirmed | fixed 2026-10-27 |
 | [P6-3](#p6-3) | Medium | Typed secrets pass through memory that is never wiped (web view, signals) | From reading | open |
 | [P4-1](#p4-1) | Medium | `RK_PASSWORD` stays in the clipboard helpers' environment | From reading | open |
 | [P4-2](#p4-2) | Medium | `export -f vault --force` can overwrite the live vault | Confirmed | open |
@@ -753,7 +753,7 @@ Files read: `apps/desktop/src/{lib,model,profiles}.rs`, `platform/linux.rs`, `cr
 - **Evidence:** `~/.local/share/rahasyakosh` is mode 775, `profiles/` 775, `profiles.json` 664, `~/.config/rahasyakosh/settings.json` 664 (vault files and `-wal`/`-shm` are 600). `profiles::save`, `save_settings` and `create_dir_all` use the default umask.
 - **Impact:** Any other local user can list the folders, read `profiles.json` (every profile's real full name and username) and see how many vaults exist.
 - **Recommended fix:** Create folders with mode 0700, write both files 0600 via temp file and rename, and tighten existing installs at start-up. This also settles [P2-5](#p2-5) (parent directories) and [P3-2](#p3-2).
-- **Status:** open
+- **Status:** fixed 2026-10-27: `rahasyakosh_store::private_fs` creates folders 0700 and writes files 0600 atomically; `profiles.json`, `settings.json`, the high-water file and the store's new parent folders use it; `rk` and the desktop app run `tighten_tree` on their own folders at start-up (the desktop app only on the default data folder, not one set by `RK_VAULT`). Tests: `private_fs` unit tests, `the_list_and_the_folders_made_for_it_are_private`, `the_default_folder_of_an_older_install_is_made_private`. The vault's parent folder given with `--vault` is created 0700 only if it did not exist; an existing one is never changed.
 
 [Top](#top)
 

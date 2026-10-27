@@ -11,7 +11,7 @@ pub fn load(path: &Path) -> Result<Bundle> {
 /// Atomic write (temp file + fsync + rename), mode 0600 on Unix.
 pub fn save(bundle: &Bundle, path: &Path) -> Result<()> {
     if let Some(dir) = path.parent() {
-        fs::create_dir_all(dir)?;
+        rahasyakosh_store::private_fs::create_private_dir(dir)?;
     }
     let tmp = path.with_extension("rkv.tmp");
     {

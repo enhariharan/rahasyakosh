@@ -181,6 +181,7 @@ Use the directory store or SQLite vault as noted. Always copy the vault first (`
 - [ ] On a fresh install (empty `XDG_DATA_HOME` and `XDG_CONFIG_HOME`), then on an install created by the **old** build:
       `stat -c '%a %n' ~/.local/share/rahasyakosh ~/.local/share/rahasyakosh/profiles ~/.local/share/rahasyakosh/profiles.json ~/.config/rahasyakosh ~/.config/rahasyakosh/settings.json ~/.local/share/rahasyakosh/profiles/*`
       Expected: folders `700`, files `600`, including after the first start of the new build over old modes.
+- [ ] Automated 2026-10-27 (`private_fs` tests, desktop `profiles` test, CLI test); still look once at a real old install.
 - [ ] As another local user (`sudo -u nobody ls ~hariharan/.local/share/rahasyakosh`): permission denied.
 
 ### P6-3 Typed secrets in memory

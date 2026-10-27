@@ -16,6 +16,7 @@ use rahasyakosh_app::{
     new_profile_id, Language, Profile, ProfileError, ProfileList, Session, Settings, ThemeMode,
     ToolbarStyle, DEFAULT_FULL_NAME, DEFAULT_USERNAME,
 };
+use rahasyakosh_store::private_fs;
 use rahasyakosh_store::{SqliteStore, Uuid};
 use std::cell::Cell;
 use std::path::{Path, PathBuf};
@@ -71,9 +72,20 @@ fn load_settings() -> Settings {
 fn save_settings(s: &Settings) {
     let path = settings_path();
     if let Some(dir) = path.parent() {
-        let _ = std::fs::create_dir_all(dir);
+        let _ = private_fs::create_private_dir(dir);
     }
-    let _ = std::fs::write(path, s.to_json());
+    let _ = private_fs::write_private_atomic(&path, &s.to_json());
+}
+
+/// Make the program's own folders and files owner-only, also on installs made before that rule (audit finding
+/// P6-2). The data folder is only touched at its default place: `RK_VAULT` may point into a folder that is not ours.
+fn harden_app_folders() {
+    if std::env::var_os("RK_VAULT").is_none() {
+        let _ = private_fs::tighten_tree(&data_dir());
+    }
+    if let Some(dir) = settings_path().parent() {
+        let _ = private_fs::tighten_tree(dir);
+    }
 }
 
 pub fn make_model(session: Session<SqliteStore>) -> AppModel {
@@ -423,6 +435,7 @@ fn app() -> Element {
             model.set(Some(m));
             return;
         }
+        harden_app_folders();
         match profiles::load(&data_dir(), &vault_path()) {
             Err(msg) => broken.set(Some(msg)),
             Ok(list) => {

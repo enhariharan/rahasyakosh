@@ -1,7 +1,7 @@
 //! Where the profile list and the profiles' vault files live on disk (E13). The rules about names and usernames
 //! are in `rahasyakosh_app::ProfileList`; this file only reads and writes.
 use rahasyakosh_app::{new_profile_id, Profile, ProfileList, DEFAULT_FULL_NAME, DEFAULT_USERNAME};
-use rahasyakosh_store::Uuid;
+use rahasyakosh_store::{private_fs, Uuid};
 use std::path::{Component, Path, PathBuf};
 
 fn list_path(dir: &Path) -> PathBuf {
@@ -49,10 +49,8 @@ pub fn load(dir: &Path, legacy_vault: &Path) -> Result<ProfileList, String> {
 /// Writes the list through a temporary file so a crash cannot leave half of it.
 pub fn save(dir: &Path, list: &ProfileList) -> Result<(), String> {
     let write = || -> std::io::Result<()> {
-        std::fs::create_dir_all(dir)?;
-        let tmp = dir.join("profiles.json.tmp");
-        std::fs::write(&tmp, list.to_json())?;
-        std::fs::rename(tmp, list_path(dir))
+        private_fs::create_private_dir(dir)?;
+        private_fs::write_private_atomic(&list_path(dir), &list.to_json())
     };
     write().map_err(|e| e.to_string())
 }
@@ -60,7 +58,7 @@ pub fn save(dir: &Path, list: &ProfileList) -> Result<(), String> {
 /// Makes sure the folder for a new vault file exists.
 pub fn prepare_folder(vault: &Path) {
     if let Some(parent) = vault.parent() {
-        let _ = std::fs::create_dir_all(parent);
+        let _ = private_fs::create_private_dir(parent);
     }
 }
 
@@ -133,6 +131,22 @@ mod tests {
         }
         let got: Vec<_> = list.all().iter().map(|p| vault_file(&dir, p)).collect();
         assert_eq!(got, [None, None, Some(dir.join("profiles/a.db"))]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_list_and_the_folders_made_for_it_are_private() {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+        let root = scratch("modes");
+        let data = root.join("share/rahasyakosh");
+        save(&data, &ProfileList::new()).unwrap();
+        prepare_folder(&data.join("profiles/a.db"));
+        assert_eq!(mode(&data), 0o700);
+        assert_eq!(mode(&data.join("profiles")), 0o700);
+        assert_eq!(mode(&list_path(&data)), 0o600);
+        let leftovers: Vec<_> = std::fs::read_dir(&data).unwrap().collect();
+        assert_eq!(leftovers.len(), 2, "the list and profiles/: {leftovers:?}");
     }
 
     #[test]

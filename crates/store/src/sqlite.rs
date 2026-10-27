@@ -62,7 +62,7 @@ impl SqliteStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
         if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty()) {
-            std::fs::create_dir_all(dir).map_err(io)?;
+            crate::private_fs::create_private_dir(dir).map_err(io)?;
         }
         create_private_file(path)?;
         let conn = Connection::open(path).map_err(db)?;

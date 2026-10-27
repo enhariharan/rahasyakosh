@@ -613,7 +613,14 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     let path = match cli.vault {
         Some(p) => p,
-        None => default_path()?,
+        None => {
+            let p = default_path()?;
+            // Repair an install made before the folder was private (audit finding P6-2).
+            if let Some(dir) = p.parent() {
+                let _ = rahasyakosh_store::private_fs::tighten_tree(dir);
+            }
+            p
+        }
     };
     let mut rng = rand::rng();
 

@@ -872,3 +872,31 @@ fn a_short_generated_master_passphrase_is_refused() {
     assert!(err.contains("at least 5 words"), "{err}");
     assert!(!path.exists(), "no vault should have been made");
 }
+
+#[cfg(unix)]
+#[test]
+fn the_default_folder_of_an_older_install_is_made_private() {
+    use std::os::unix::fs::PermissionsExt;
+    let home = Path::new(env!("CARGO_TARGET_TMPDIR")).join("old-install-home");
+    let _ = std::fs::remove_dir_all(&home);
+    let dir = home.join(".local/share/rahasyakosh");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("profiles.json"), b"{}").unwrap();
+    for (p, m) in [(&dir, 0o775), (&dir.join("profiles.json"), 0o664)] {
+        std::fs::set_permissions(p, std::fs::Permissions::from_mode(m)).unwrap();
+    }
+
+    let out = Command::new(env!("CARGO_BIN_EXE_rk"))
+        .arg("list")
+        .env("HOME", &home)
+        .env_remove("RK_VAULT")
+        .env("RK_PASSWORD", PW)
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert!(!out.status.success(), "there is no vault there yet");
+
+    let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode(&dir), 0o700);
+    assert_eq!(mode(&dir.join("profiles.json")), 0o600);
+}

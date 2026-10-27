@@ -48,7 +48,7 @@ program, so you do not need to install anything. We configure it for safety rath
 - **Full sync.** A write is not reported as done until the operating system confirms it reached the disk.
 - **Secure delete.** When a record is deleted, its old bytes are overwritten with zeros instead of being left in the file's free space. A test
   proves this: it stores a recognisable pattern, deletes the record, and searches the file for the pattern.
-- **Private files.** The database and its helper files are readable only by you (mode `0600`).
+- **Private files and folders.** The database and its helper files are readable only by you (mode `0600`). The folders the programs create for them, the profile list (`profiles.json`, which holds each profile's name and username) and the settings file are private too (folders `0700`, files `0600`), and both programs repair an older install's modes when they start. Other people on the same computer cannot even list what is there.
 - **One transaction per change.** "Check that nobody changed this item, then write" happens as one indivisible step.
 
 ## Two terminals at once: revisions

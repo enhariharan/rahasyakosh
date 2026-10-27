@@ -7,6 +7,7 @@
 pub mod conformance;
 mod directory;
 mod memory;
+pub mod private_fs;
 #[cfg(feature = "sqlite")]
 mod sqlite;
 
