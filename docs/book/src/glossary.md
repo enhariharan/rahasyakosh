@@ -82,6 +82,10 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Accessibility (a11y)** — Making software usable by people with disabilities: using only a keyboard, a screen reader, high contrast or large text. "a11y" is short for "a, then 11 letters, then y". See [Accessibility](desktop-app.md#accessibility).
 
+**Accessibility bus (AT-SPI)** — The system on a Linux desktop through which programs tell assistive tools, such as the Orca screen reader, what is on screen. AT-SPI is its name. While it is on, any program in the same login session can read other programs' text and watch key presses, which is why switching it on is a security trade-off (audit finding P7-1).
+
+**Advisory (RUSTSEC)** — A published notice that a library has a known security problem or is no longer maintained. `cargo audit` and `cargo deny` check our dependencies against these notices. An accepted advisory is one we have read and decided to live with, with a written reason.
+
 **AEAD** — Authenticated encryption with associated data: encrypting *and* detecting any change in one step. Ours is XChaCha20-Poly1305.
 
 **Argon2id** — A deliberately slow, memory-hungry way to turn a password into a key, so that guessing passwords is expensive for an attacker.
@@ -128,7 +132,11 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Constant-time** — Code that takes the same time whatever the secret is, so timing cannot leak it.
 
+**Core dump / crash report** — When a program crashes, the system can save a copy of its memory to a file (a core dump) or send a report to the developers. For a password manager, that copy could contain the vault key and your decrypted items, so we want such files switched off.
+
 **Corpus / seed** — The collection of inputs a fuzzer works from. Seeds are the small valid inputs it starts with.
+
+**Cosign / signature** — A *signature* is proof of who made a file and that nobody changed it afterwards. `cosign` is a tool that signs releases without the project having to keep a long-lived secret key. Planned for releases (audit finding P7-3).
 
 **CSPRNG** — A random-number generator safe for secrets (cryptographically secure). Every key and nonce here comes from one.
 
@@ -140,6 +148,8 @@ so an old password is not lost by accident, and you can go back to it.
 
 **De-duplication** — Skipping an imported row that is identical to one already stored, so importing twice does not double your vault.
 
+**Dependabot** — A GitHub service that notices when a library or build step we use has a newer version and opens a proposed update for us to review.
+
 **Dependency** — A library our code uses. Every one is code we trust with your secrets, which is why we keep them few.
 
 **Deterministic** — Always giving the same result from the same input. The golden vault is generated deterministically so it can be reproduced exactly.
@@ -148,11 +158,19 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Downgrade attack** — Tricking software into using weaker settings than it should.
 
+**Dry run** — Running a command so that it shows what it *would* do but changes nothing. `rk import --dry-run` lists what would be imported without adding anything to the vault.
+
 **EFF wordlist** — A list of 7,776 easy words published by the Electronic Frontier Foundation, used to make random passphrases.
 
 **Entropy** — A measure of unpredictability in bits. The more bits, the harder to guess.
 
 **Environment variable** — A named setting a program inherits from its surroundings. `RK_VAULT` chooses the vault file; `RK_PASSWORD` supplies the master password to scripts. **Do not set `RK_PASSWORD` permanently**: it keeps your master password in your environment.
+
+**Escape sequence (OSC 52)** — A hidden code, starting with the "escape" character, that a terminal obeys instead of printing: for example, clear the screen, move the cursor, or (OSC 52) put some text on the clipboard. Text from an untrusted file can contain such codes, so it must be cleaned before it is printed to a terminal.
+
+**Fail closed** — When something is wrong or cannot be checked, refuse and stay locked rather than carry on. A wrong password must fail closed: the vault stays shut.
+
+**File mode (0600, 0700, umask)** — The numbers that say who may read, write or enter a file or folder on Linux. `0600` means only the owner can read and write; `0700` is the same for a folder. A *umask* is the default that removes rights from newly made files; a common one leaves folders readable by other users, which is not private enough for vault data.
 
 **Fixture** — A saved sample used by a test. Ours (the golden vault, the schema database) are never changed.
 
@@ -162,11 +180,15 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Gallery** — A development aid that opens one screen of the desktop app on sample data in an in-memory vault, to look at the design without touching a real vault.
 
+**GitHub Actions** — GitHub's service that runs our automatic checks (build, tests, lint, audits) every time the code changes. This is our CI. Each step in it can be a ready-made helper written by someone else, which is a supply-chain risk.
+
 **Golden file** — A saved known-good file that the code must always be able to open. See [Testing with known answers and properties](testing-with-known-answers.md).
 
 **Hash** — A one-way fingerprint of data. You cannot get the data back from it.
 
 **Header (vault header)** — The readable, non-secret part of a vault: the key-derivation settings, the salt and the locked vault key.
+
+**High-water mark** — The highest revision of each item that this device has ever seen. If a later version shows a lower number, something went backwards, which could be a rollback attack. It is kept on the device, outside the synced folder.
 
 **History** — Earlier versions of an item, kept inside it so they are as protected as the current one.
 
@@ -196,13 +218,25 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Locked / unlocked** — Whether the vault key is erased from memory or held for use. See the core ideas above.
 
+**LTO / release profile / overflow checks** — Settings that change how the final program is built. *LTO* (link-time optimisation) makes it smaller and faster. A *release profile* is the set of settings for the build we ship. *Overflow checks* make a program stop when arithmetic goes beyond the largest number a variable can hold, instead of silently wrapping around to a small one. See also Unwind / abort.
+
 **MAC** — A message authentication code: a keyed checksum that proves data was not altered.
+
+**Magic (file marker)** — A fixed set of bytes at the start of a file or inside the encrypted data that says what kind of file it is. Our records mix it into the AAD, so a record cannot be mistaken for something else.
+
+**Manifest** — A single list that names every item in the vault with its latest revision, sealed with the vault key so it cannot be changed unnoticed. It is the planned way to notice a deleted item (audit finding P2-1).
 
 **Master password (or passphrase)** — The one secret you remember. It is never stored; it is only used to open the vault. **There is no recovery.**
 
 **mdBook** — The tool that turns the Markdown files in `docs/book/` into this book.
 
 **Migration** — A safe, all-or-nothing upgrade of how data is stored. See the core ideas above.
+
+**mlock** — A request to the operating system never to copy a piece of the program's memory to disk (the swap). It would stop keys from ending up in the swap file. The design document promises it; it is not built yet.
+
+**Modulo bias** — A flaw in naive random choice: picking a number by taking a larger random number modulo (remainder after division by) *n* makes some results slightly more likely than others. We avoid it with rejection sampling.
+
+**Monotonic clock** — A clock that only counts forward and cannot be set back by the user, unlike the wall clock. On Linux the usual one stops while the computer is asleep, so neither clock is perfect for the idle timer (audit finding P3-3).
 
 **Mutation check** — Deliberately breaking the code to confirm the tests notice.
 
@@ -211,6 +245,8 @@ so an old password is not lost by accident, and you can go back to it.
 **Nightly Rust** — The experimental Rust toolchain. Only fuzzing needs it; everything else builds on stable.
 
 **Nonce** — "Number used once": a value that must never repeat for the same key. Ours are 24 random bytes.
+
+**Normalisation (NFKC)** — Unicode (the standard for writing every language's letters as numbers) allows the same visible text to be written as different sequences: é can be one character, or e followed by an accent mark. *Normalisation* converts text to one agreed form. NFKC is the form we plan to use for master passwords, so the same password always gives the same key (audit finding P1-1).
 
 **OpenSSL / ring** — Widely used C and Rust cryptography libraries. We do not link them, to keep builds pure Rust and portable to WebAssembly. OpenSSL was used *once*, as an independent source for expected test values.
 
@@ -224,13 +260,27 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Passphrase** — A password made of several random words, such as `correct-horse-battery-staple`.
 
+**Path traversal** — An attack where a file name such as `../../secret` makes a program step out of the folder it should stay in, and read or change other files. Names from untrusted data must be checked or refused.
+
+**PoC (proof of concept)** — A small test or command that shows a problem really happens. The audit report marks a finding "Confirmed" when it has one.
+
+**`/proc`** — A view of the running system in the form of files. `/proc/<number>/environ` and `/proc/<number>/cmdline` show another program's settings and the words used to start it, which is why secrets should not be put there.
+
 **Process group** — A way of grouping programs so closing the terminal does not stop a background helper.
 
 **Property test** — A test that checks a rule for hundreds of generated inputs, then shrinks any failure to the smallest example.
 
+**ptrace** — A Linux feature that lets one program attach to another and read its memory, as a debugger does. Where the system allows it, another program of the same user could use it to read the vault key out of a running app.
+
 **Purge** — Delete an item for good, as opposed to moving it to the trash.
 
 **Python `cryptography`** — A separate, widely used Python cryptography library. Used once, together with OpenSSL, to compute expected test values independently.
+
+**Quadratic growth** — When doubling the amount of input makes the work four times bigger (written O(n²)). Fine for ten rows, a freeze for hundreds of thousands (audit finding P5-1).
+
+**Quarantine (skipped records)** — Setting aside a stored record that cannot be read or opened, reporting it to the user, and carrying on with the rest instead of refusing to open the vault. The app lists the skipped records (`Vault::unreadable`).
+
+**Race condition** — A bug that appears only when two things happen close together in the wrong order, such as checking that a file does not exist and then creating it, while another program creates it in between.
 
 **Re-authentication** — Asking for the master password again before a dangerous action (plaintext export).
 
@@ -242,6 +292,8 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Rejection sampling** — Throwing away random numbers that would make a choice slightly uneven. Avoids "modulo bias".
 
+**Reproducible build** — Building the same source code twice, on different machines, gives exactly the same file. It lets anyone check that a downloaded program really came from the published source.
+
 **Reveal** — Showing a hidden secret on screen for a few seconds, then hiding it again.
 
 **Revision (rev)** — A counter on each record that goes up with every change. A write that is not newer than what is stored is refused.
@@ -250,9 +302,13 @@ so an old password is not lost by accident, and you can go back to it.
 
 **RFC** — A published technical standard ("Request for Comments"). The test vectors come from them.
 
+**Rollback** — Replacing the vault, or part of it, with an older copy so that an old password comes back or an item is gone, without the app noticing. Our records are authenticated, but an old valid record is still valid, so this needs separate protection (audit finding P2-1).
+
 **Salt** — Random public data mixed into password hashing so identical passwords give different keys.
 
 **Sanitizer (AddressSanitizer)** — Instrumentation that makes memory errors, such as reading freed memory, crash immediately. Useful for the C code inside SQLite.
+
+**SBOM (software bill of materials)** — A list of every library and version that went into a program, like an ingredients label. It lets users check whether a known-vulnerable library is inside.
 
 **Schema** — The layout of a database (its tables and columns), or of an item's saved data. It has a version number.
 
@@ -266,7 +322,11 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Session** — A period during which the vault stays unlocked, and the code that decides when it ends. The CLI has none; the desktop app does. See [Sessions](sessions.md).
 
+**Severity (High, Medium, Low, Info)** — How serious the auditor judges a finding to be. *High*: a real attack on the main promise (your passwords) with little effort. *Medium*: real but needs conditions or limits the damage. *Low*: small or unlikely. *Info*: a note, nothing to fix.
+
 **Shared secret** — The value that a website and your authenticator both know, from which the six-digit codes are computed. Treat it like a password.
+
+**SQL injection** — An attack where text supplied by an attacker is pasted into a database command and changes what the command does. Avoided by passing values as separate *parameters* and never building commands by joining strings.
 
 **SQLite** — A small, very reliable database that lives in a single file. The default store.
 
@@ -280,9 +340,13 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Supply chain** — All the third-party code a program depends on. Each dependency is trusted, so we keep few and scan them.
 
+**Symlink (symbolic link)** — A file that is only a shortcut to another file or folder. A planted symlink in a synced folder can make a program read or write a different file from the one it meant to.
+
 **Test vector** — A published input and its correct output, used to prove an implementation matches the standard.
 
 **Threat model** — A written answer to "who are we defending against, and who are we not?"
+
+**Throttling** — Slowing down repeated attempts, for example making you wait longer after each wrong master password. Also called backoff (see Backoff).
 
 **Tombstone** — A tiny marker left when an item is purged, so a deletion can later be shared with other devices.
 
@@ -292,6 +356,14 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Trash** — Items marked deleted but still stored, so they can be restored.
 
+**Trust on first use (TOFU)** — Accepting whatever you see the first time, then remembering it and complaining if it changes later. Old vaults that have no manifest would be treated this way.
+
+**TTY echo** — A *TTY* is a terminal. *Echo* is the terminal showing back what you type. For passwords, echo is turned off so the characters are not displayed.
+
+**`unsafe` (Rust)** — A keyword that tells the Rust compiler "trust me, I am doing something it cannot check". Most of our crates forbid it (`forbid(unsafe_code)`), so the compiler guarantees memory safety there.
+
+**Unwind / abort** — What a Rust program does when it panics. *Unwind* cleans up on the way out, which runs the code that wipes secrets. *Abort* (`panic = "abort"`) stops at once and skips that cleanup. The command-line tool uses abort; the desktop app unwinds.
+
 **UUID** — A long random identifier (like `0190…0001`) used to name each item.
 
 **Profile** — One person's set of passwords inside a shared installation. Each profile has its own vault and master password, plus a full name, a unique username and a user ID. See [Profiles](desktop-app.md#profiles-us-prf-01-to-05).
@@ -299,6 +371,8 @@ so an old password is not lost by accident, and you can go back to it.
 **Vault** — The encrypted file that holds all your saved items. See the core ideas above.
 
 **Vault key (VK)** — The random key that protects your items. It is stored in the header, locked by the key made from your password.
+
+**Verifier** — A small value stored with the vault that lets a program test a password quickly without opening everything. The design document describes one; our code instead checks the password by trying to decrypt the vault key.
 
 **Wayland / X11** — The two ways Linux draws a desktop. The clipboard tools differ between them.
 

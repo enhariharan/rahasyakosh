@@ -10,6 +10,7 @@
 | **Manual re-test list** | [`../tests/security-audit-test-checklist.md`](../tests/security-audit-test-checklist.md) |
 
 How to read the findings:
+- Any word you do not know is explained in the [Glossary](../book/src/glossary.md).
 - **Issue** (the first item of each finding in section 4) says in plain English what the problem is, and explains any technical word it uses. The items after it give the details for people who want to check the work.
 - **Severity** is the auditor's judgement for a local-first app whose main risks are a copied vault file and a hostile sync folder: High, Medium, Low, Info.
 - **How found:** *Confirmed* = reproduced with a test or command; *Measured* = reproduced and timed; *From reading* = found by reading the code, not run; *Checked* = a suspicion that was looked at and judged.
