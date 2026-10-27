@@ -106,14 +106,15 @@ The point: someone who steals only your vault file cannot even start guessing ma
 128-bit random value first. The Secret Key is **not** inside the vault file. Each computer keeps its own copy in a private file in
 `~/.local/share/rahasyakosh/secret-keys/`, and you keep a printed copy for a new device.
 
-- Make a vault with one: `rk init --secret-key`. Add it to an existing vault: `rk secret-key enable`. Show it again: `rk secret-key show`.
+- Make a vault with one: `rk init --secret-key` (or the checkbox in the desktop app). Add it to an existing vault: `rk secret-key enable`. Show it again: `rk secret-key show`.
   Remove it: `rk secret-key disable`.
 - On a new computer, `rk` asks for it once (or reads `RK_SECRET_KEY`) and then keeps it on that computer.
 - **If you lose the Secret Key and every device that has it, the vault cannot be opened, even with the right master password.**
   That is the price of the protection. Print it and keep it somewhere safe.
 - The desktop app uses the key kept on the computer. On a new computer its unlock screen shows a **Secret Key** box next to the
-  password box; type the key once and, when the vault opens, the app keeps it on that computer. The desktop app cannot yet
-  *create* a vault with a Secret Key or add one later; use `rk init --secret-key` or `rk secret-key enable` for that.
+  password box; type the key once and, when the vault opens, the app keeps it on that computer. To make a vault with one in the
+  desktop app, tick **Also protect this vault with a Secret Key** when you create it: the app then shows the key once, and you
+  confirm you have written it down before the vault opens. Adding one to an existing vault is done with `rk secret-key enable`.
 
 ## Two things this design does not do
 

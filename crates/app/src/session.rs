@@ -295,6 +295,30 @@ impl<S: Store> Session<S> {
         self
     }
 
+    /// Lock the open vault with a new Secret Key as well, and keep the key on this device. Returns the key as text
+    /// (to show the user once) and whether it could be kept on the device; when it could not, the user has to type
+    /// it at every unlock. The master password is checked first. Audit finding P1-3.
+    pub fn add_secret_key(
+        &mut self,
+        password: &str,
+        now: i64,
+        rng: &mut impl rand_core::CryptoRng,
+    ) -> std::result::Result<(Zeroizing<String>, bool), Error> {
+        let vault = self
+            .vault(now)
+            .map_err(|_| Error::State("the vault is locked"))?;
+        let key = vault.set_secret_key(password, rng)?;
+        #[cfg(not(target_family = "wasm"))]
+        let kept = self
+            .secret_keys
+            .as_ref()
+            .zip(self.peek().map(Vault::vault_id))
+            .is_some_and(|(dir, id)| dir.save(id, &key).is_ok());
+        #[cfg(target_family = "wasm")]
+        let kept = false;
+        Ok((key.to_text(), kept))
+    }
+
     /// What to tell the user about the locked vault before they unlock it. Empty when the vault is open.
     pub fn unlock_hints(&self) -> UnlockHints {
         let State::Locked(store) = &self.state else {

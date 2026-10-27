@@ -155,6 +155,8 @@ struct Ctx {
     broken: Signal<Option<String>>,
     /// The language chosen on the first-run screens, before there is a vault with settings.
     setup_lang: Signal<Language>,
+    /// A just-made Secret Key (as text, and whether this device kept it), shown once before the vault opens.
+    key_sheet: Signal<Option<(zeroize::Zeroizing<String>, bool)>>,
     /// Everyone who has a vault here, and which of them is open or being unlocked.
     profiles: Signal<ProfileList>,
     active: Signal<Option<Uuid>>,
@@ -436,6 +438,7 @@ fn app() -> Element {
             }
         };
     });
+    let key_sheet = use_signal(|| Option::<(zeroize::Zeroizing<String>, bool)>::None);
     let setup_lang = use_signal(|| load_settings().language);
     let reader_notice: Signal<Option<ReaderNotice>> = use_signal(|| None);
     let ctx = use_context_provider(|| Ctx {
@@ -444,6 +447,7 @@ fn app() -> Element {
         last_input: last_input.clone(),
         broken,
         setup_lang,
+        key_sheet,
         profiles,
         active,
         adding,
@@ -599,6 +603,9 @@ fn screen(ctx: Ctx) -> Element {
     if let Some(msg) = (ctx.broken)() {
         return rsx! { main { class: "centre", h1 { {tr(lang_of(&ctx), Msg::AppName)} } p { class: "error", role: "alert", "{msg}" } } };
     }
+    if (ctx.key_sheet)().is_some() {
+        return rsx! { KeySheet {} };
+    }
     if (ctx.adding)() {
         return rsx! { Setup {} };
     }
@@ -641,6 +648,7 @@ fn Setup() -> Element {
     let mut pw = use_signal(String::new);
     let mut pw2 = use_signal(String::new);
     let mut saved = use_signal(|| false);
+    let mut want_key = use_signal(|| false);
     let mut copied = use_signal(|| false);
     let mut error = use_signal(|| Option::<String>::None);
     let strength = rahasyakosh_strength::estimate(&pw.read(), &[]);
@@ -694,7 +702,23 @@ fn Setup() -> Element {
                 Session::create(store, &password, settings, now(), &mut rand::rng())
                     .map_err(|e| e.to_string())
             }) {
-            Ok(session) => {
+            Ok(mut session) => {
+                if let Some(p) = rahasyakosh_app::HighWater::default_path() {
+                    session = session.with_highwater(p);
+                }
+                if let Some(d) = rahasyakosh_app::SecretKeyDir::default_dir() {
+                    session = session.with_secret_keys(d);
+                }
+                let mut sheet = None;
+                if want_key() {
+                    match session.add_secret_key(&password, now(), &mut rand::rng()) {
+                        Ok(made) => sheet = Some(made),
+                        Err(e) => {
+                            error.set(Some(trf(lang, Msg::CouldNotCreateVault, &[&e])));
+                            return;
+                        }
+                    }
+                }
                 if let Err(e) = profiles::save(&dir, &list) {
                     error.set(Some(trf(lang, Msg::CouldNotCreateVault, &[&e])));
                     return;
@@ -704,6 +728,7 @@ fn Setup() -> Element {
                 ctx.active.set(Some(id));
                 ctx.adding.set(false);
                 ctx.model.set(Some(make_model(session)));
+                ctx.key_sheet.set(sheet);
             }
             Err(e) => error.set(Some(trf(lang, Msg::CouldNotCreateVault, &[&e]))),
         }
@@ -798,10 +823,74 @@ fn Setup() -> Element {
                     button { class: "link", onclick: move |_| own.set(false), {tr(lang, Msg::UseGenerated)} }
                 }
             }
+            section { aria_label: tr(lang, Msg::SecretKeyOption),
+                label { class: "check",
+                    input { r#type: "checkbox", checked: want_key(), aria_describedby: "sk-hint", onchange: move |e| want_key.set(e.checked()) }
+                    {tr(lang, Msg::SecretKeyOption)}
+                }
+                p { id: "sk-hint", class: "muted small", {tr(lang, Msg::SecretKeyOptionHint)} }
+            }
             if let Some(e) = error() { p { class: "error", role: "alert", "{e}" } }
             button { class: "primary", onclick: create, disabled: !own() && !saved(), {tr(lang, Msg::CreateVault)} }
             if adding { button { r#type: "button", onclick: move |_| ctx.adding.set(false), {tr(lang, Msg::CancelAdd)} } }
             p { class: "small", "{trf(lang, Msg::VaultLocation, &[&data_dir().display()])}" }
+        }
+    }
+}
+
+/// The Secret Key of a vault just made, shown once. The vault is already open behind it; Continue goes there.
+#[component]
+fn KeySheet() -> Element {
+    let mut ctx = use_context::<Ctx>();
+    let lang = lang_of(&ctx);
+    let mut confirmed = use_signal(|| false);
+    let mut copied = use_signal(|| false);
+    let mut error = use_signal(|| Option::<String>::None);
+    let Some((text, kept)) = (ctx.key_sheet)() else {
+        return rsx! {};
+    };
+    let copy_text = text.clone();
+    let copy = move |_| {
+        if model::Clipboard::copy(&mut SystemClipboard, &copy_text).is_err() {
+            error.set(Some(tr(lang, Msg::CouldNotCopy).into()));
+            return;
+        }
+        error.set(None);
+        copied.set(true);
+        let text = copy_text.to_string();
+        spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            copied.set(false);
+        });
+        let secs = load_settings().clipboard_clear_secs;
+        if secs > 0 {
+            spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(u64::from(secs))).await;
+                let _ = model::Clipboard::clear_if_unchanged(&mut SystemClipboard, &text);
+            });
+        }
+    };
+    rsx! {
+        main { class: "centre landing",
+            h1 { {tr(lang, Msg::SecretKeyTitle)} }
+            p { class: "warn", {tr(lang, Msg::SecretKeyShownOnce)} }
+            div { class: "passbox",
+                p { class: "passphrase", dir: "ltr", "{text.as_str()}" }
+                button {
+                    class: "icon", r#type: "button",
+                    aria_label: if copied() { tr(lang, Msg::Copied) } else { tr(lang, Msg::CopyToClipboard) },
+                    title: if copied() { tr(lang, Msg::Copied) } else { tr(lang, Msg::CopyToClipboard) },
+                    onclick: copy,
+                    if copied() { CheckIcon {} } else { CopyIcon {} }
+                }
+            }
+            if !kept { p { class: "error", role: "alert", {tr(lang, Msg::SecretKeyNotKept)} } }
+            if let Some(e) = error() { p { class: "error", role: "alert", "{e}" } }
+            label { class: "check",
+                input { r#type: "checkbox", checked: confirmed(), onchange: move |e| confirmed.set(e.checked()) }
+                {tr(lang, Msg::WrittenDown)}
+            }
+            button { class: "primary", disabled: !confirmed(), onclick: move |_| ctx.key_sheet.set(None), {tr(lang, Msg::Ok)} }
         }
     }
 }

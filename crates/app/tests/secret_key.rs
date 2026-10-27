@@ -195,3 +195,39 @@ fn a_key_that_worked_is_kept_on_the_device_so_the_next_unlock_needs_only_the_pas
     assert!(!s.unlock_hints().needs_secret_key);
     s.unlock(PW, 200, &mut rng()).unwrap();
 }
+
+#[test]
+fn a_session_can_add_a_secret_key_and_keeps_it_on_the_device() {
+    let keys = SecretKeyDir::at(temp("add").join("keys"));
+    let mut s = Session::create(MemoryStore::new(), PW, fast(), 0, &mut rng())
+        .unwrap()
+        .with_secret_keys(keys.clone());
+    let id = s.vault(0).unwrap().vault_id();
+
+    // The master password is checked first, and nothing is kept when it is wrong.
+    assert!(s.add_secret_key("not the password", 1, &mut rng()).is_err());
+    assert!(keys.load(id).is_none());
+
+    let (text, kept) = s.add_secret_key(PW, 2, &mut rng()).unwrap();
+    assert!(kept);
+    assert_eq!(keys.load(id).unwrap().to_text().as_str(), text.as_str());
+
+    // This device opens it with the password alone; a device without the key needs the text.
+    s.lock();
+    assert!(!s.unlock_hints().needs_secret_key);
+    s.unlock(PW, 100, &mut rng()).unwrap();
+    s.lock();
+    keys.remove(id).unwrap();
+    assert!(s.unlock_hints().needs_secret_key);
+    s.provide_secret_key(Some(
+        rahasyakosh_core::secret_key::SecretKey::parse(&text).unwrap(),
+    ));
+    s.unlock(PW, 200, &mut rng()).unwrap();
+}
+
+#[test]
+fn without_a_key_folder_the_key_is_not_kept_and_the_caller_is_told() {
+    let mut s = Session::create(MemoryStore::new(), PW, fast(), 0, &mut rng()).unwrap();
+    let (_, kept) = s.add_secret_key(PW, 1, &mut rng()).unwrap();
+    assert!(!kept);
+}
