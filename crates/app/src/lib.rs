@@ -25,6 +25,6 @@ pub use profiles::{
 pub use secretkeys::SecretKeyDir;
 pub use session::{
     backoff_secs, should_clear, Language, Locked, Session, Settings, ThemeMode, Tick, ToolbarStyle,
-    UnlockError, Unlocked,
+    UnlockError, UnlockHints, Unlocked,
 };
 pub use vault::{Config, Error, Result, Scope, Skipped, UnlockFailed, Vault, Warning};

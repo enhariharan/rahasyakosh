@@ -105,7 +105,7 @@ All seven phases are done (Phase 1 was finished last, on the same day). 52 findi
 | [P2-3](#p2-3) | Medium | One bad record makes the whole vault unopenable | Confirmed | fixed |
 | [P2-4](#p2-4) | Medium | Password change keeps the vault key; the old header stays in the WAL | Confirmed (WAL) | open |
 | [P1-1](#p1-1) | Medium | The master password is not Unicode-normalised before Argon2 (lock-out risk across keyboards and platforms; relevant to the Indic-language users) | From reading | fixed 2026-10-27 |
-| [P1-2](#p1-2) | Medium | The unauthenticated header drives Argon2: one unlock attempt with the allowed maximum took 10.8 s and 1 GiB | Measured | fixed in part |
+| [P1-2](#p1-2) | Medium | The unauthenticated header drives Argon2: one unlock attempt with the allowed maximum took 10.8 s and 1 GiB | Measured | fixed 2026-10-27 |
 | [P1-3](#p1-3) | Medium | The design doc (`docs/04`) and the code disagree: no Secret Key, verifier blob, header magic or `mlock` | Confirmed | fixed in part 2026-10-27 |
 | [P6-1](#p6-1) | Medium | No core-dump, ptrace or `mlock` hardening | From reading | open |
 | [P6-2](#p6-2) | Medium | Data and config folders and `profiles.json` are readable by other users | Confirmed | open |
@@ -184,7 +184,7 @@ Files read: all of `core/src/{crypto,vault,item,totp,generator}.rs`, the `argon2
 - **Evidence:** `unlock` calls `check_kdf` and then `derive_kek` first; the header (including `kdf`) is authenticated only by the decryption that follows. `KdfParams::validate` allows `m_kib` up to 1 GiB, `t` up to 20, `p` up to 16. One derivation with `m = 1 GiB, t = 20, p = 1` took 10.8 s and 1 GiB (debug profile, optimised dependencies).
 - **Impact:** Anyone who can write the vault file (sync peer, shared folder) makes each unlock attempt cost that, or fail with out-of-memory on a small machine. It reveals nothing: the header is bound as AAD, so a changed header never decrypts.
 - **Recommended fix:** Lower the accepted ceiling to what the app can itself produce (the desktop slider tops out well below 1 GiB; for example 256 MiB and t ≤ 10), keep the floor, and show the parameters before an expensive derivation ("this vault asks for 1 GiB; continue?"). Change `Settings::validated` and the validator together.
-- **Status:** fixed in part, 2026-10-26: the ceiling is now 256 MiB and 10 passes (`KdfParams::MAX_*`, test `crates/core/tests/hostile_header.rs`). 2026-10-27: `rk` now says what an unusually costly vault asks for (`KdfParams::is_unusually_costly`, more than twice the default) before it asks for the password, and lets someone at the terminal cancel (test `an_unusually_costly_vault_is_announced_before_unlocking`). Not done: the same notice in the desktop app, which would need a step before the unlock button.
+- **Status:** fixed 2026-10-27. 2026-10-26: the ceiling is now 256 MiB and 10 passes (`KdfParams::MAX_*`, test `crates/core/tests/hostile_header.rs`). 2026-10-27: `rk` now says what an unusually costly vault asks for (`KdfParams::is_unusually_costly`, more than twice the default) before it asks for the password, and lets someone at the terminal cancel (test `an_unusually_costly_vault_is_announced_before_unlocking`). The desktop app shows the same note above the password box (`Session::unlock_hints`, `Model::costly_unlock_notice`; tests `unlock_hints.rs` and `a_costly_vault_is_announced_on_the_unlock_screen_and_a_normal_one_is_not`). It cannot ask "continue?" first, because the unlock button is the choice: pressing it is the continue, and not pressing it is the cancel. Fixed.
 
 [Top](#top)
 

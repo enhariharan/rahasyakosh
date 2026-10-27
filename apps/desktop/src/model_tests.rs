@@ -908,3 +908,26 @@ fn choosing_another_format_changes_only_a_suggested_extension() {
         "/home/a/backup"
     );
 }
+
+#[test]
+fn a_costly_vault_is_announced_on_the_unlock_screen_and_a_normal_one_is_not() {
+    let locked = |passes| {
+        let mut rng = ChaCha20Rng::seed_from_u64(4);
+        let settings = Settings {
+            kdf_passes: passes,
+            ..fast(Settings::default())
+        };
+        let mut session = Session::create(MemoryStore::new(), PW, settings, 0, &mut rng).unwrap();
+        session.lock();
+        Model::new(session, Fake::default(), None)
+    };
+    let note = locked(KdfParams::DESKTOP.t * 2 + 1)
+        .costly_unlock_notice()
+        .expect("announced");
+    assert!(
+        note.contains("19 MiB") && note.contains("7 passes"),
+        "{note}"
+    );
+    assert!(note.contains("64 MiB"), "{note}");
+    assert!(locked(KdfParams::MIN_T).costly_unlock_notice().is_none());
+}

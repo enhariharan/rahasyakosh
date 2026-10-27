@@ -2,6 +2,7 @@
 //! behaviour (locking, hiding, copying, forms, trash, settings) is tested here without a window.
 use crate::i18n::{t, trf, Msg};
 use rahasyakosh_app::{Language, Locked, Scope, Session, Settings, UnlockError};
+use rahasyakosh_core::crypto::KdfParams;
 use rahasyakosh_core::generator::{self, PasswordSpec};
 use rahasyakosh_core::item::{Field, Item, ItemVersion};
 use rahasyakosh_core::totp::Totp;
@@ -633,6 +634,22 @@ impl<S: Store, C: Clipboard> Model<S, C> {
     }
 
     // ---- locking --------------------------------------------------------------------------------------
+
+    /// What to show on the unlock screen before anything is typed (audit finding P1-2).
+    pub fn unlock_hints(&self) -> rahasyakosh_app::UnlockHints {
+        self.session.unlock_hints()
+    }
+
+    /// The costly-vault notice in the current language, if the vault needs one.
+    pub fn costly_unlock_notice(&self) -> Option<String> {
+        let k = self.unlock_hints().costly_kdf?;
+        let d = KdfParams::DESKTOP;
+        Some(trf(
+            self.lang(),
+            Msg::CostlyUnlock,
+            &[&(k.m_kib / 1024), &k.t, &(d.m_kib / 1024), &d.t],
+        ))
+    }
 
     pub fn unlock(&mut self, password: &str, now: i64) {
         let lang = self.lang();

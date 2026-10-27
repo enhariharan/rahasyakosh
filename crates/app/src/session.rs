@@ -220,6 +220,14 @@ pub enum UnlockError {
 #[error("the vault is locked")]
 pub struct Locked;
 
+/// What a front-end should tell the user on the unlock screen, before they type anything.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct UnlockHints {
+    /// The vault's file asks for a clearly more expensive key derivation than this program's default (audit finding
+    /// P1-2). The header is read before it is authenticated, so a forged one can ask for this; unlocking will be slow.
+    pub costly_kdf: Option<rahasyakosh_core::crypto::KdfParams>,
+}
+
 /// What a successful unlock did besides opening the vault.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Unlocked {
@@ -283,6 +291,19 @@ impl<S: Store> Session<S> {
     pub fn with_secret_keys(mut self, dir: crate::SecretKeyDir) -> Self {
         self.secret_keys = Some(dir);
         self
+    }
+
+    /// What to tell the user about the locked vault before they unlock it. Empty when the vault is open.
+    pub fn unlock_hints(&self) -> UnlockHints {
+        let State::Locked(store) = &self.state else {
+            return UnlockHints::default();
+        };
+        let Ok(header) = store.header() else {
+            return UnlockHints::default();
+        };
+        UnlockHints {
+            costly_kdf: header.kdf.is_unusually_costly().then_some(header.kdf),
+        }
     }
 
     /// Use this Secret Key (typed by the user) for the next unlock, in preference to the one kept on the device.

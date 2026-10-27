@@ -31,6 +31,7 @@ Most checks are also worth turning into automated tests when the fix is written.
 ### P1-2 Tampered header cannot force a huge Argon2
 - [ ] Edit the vault header so `kdf` asks for `m = 1 GiB, t = 20` (use a hex editor on a copy; a throwaway test helper is fine). Try to unlock and time it with `time`.
 - [ ] Expected after fix: refused at once with a clear message, or a prompt showing the cost *before* deriving. Pass: well under 1 s and no more than the new ceiling of memory (watch with `/usr/bin/time -v`).
+- [ ] Desktop: with a vault whose header asks for more than twice the default (`t` ≥ 7), the unlock screen shows the note about memory and passes above the Unlock button, before any password is typed. A normal vault shows no note. (Automated 2026-10-27; look at it once on screen.)
 - [ ] A normal vault still unlocks in the usual time. The desktop slider for the Argon2 cost still reaches only values the unlock accepts (create a vault at the highest setting and unlock it).
 
 ### P1-3 Design document matches the code

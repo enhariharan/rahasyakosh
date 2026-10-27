@@ -888,15 +888,17 @@ fn Unlock() -> Element {
     let lang = lang_of(&ctx);
     let mut pw = use_signal(String::new);
     let t = (ctx.clock)();
-    let (err, wait) = {
+    let (err, wait, costly) = {
         let m = ctx.model.read();
         let m = m.as_ref();
         (
             m.and_then(|m| m.unlock_error.clone()),
             m.map_or(0, |m| m.session.retry_in(t)),
+            m.and_then(|m| m.costly_unlock_notice()),
         )
     };
     let has_err = err.is_some();
+    let has_notice = costly.is_some();
     let profile_list = ctx.profiles.read().all().to_vec();
     let active_id = (ctx.active)();
     let mut submit = move || {
@@ -947,7 +949,8 @@ fn Unlock() -> Element {
                 input {
                     id: "master", class: "ltr", dir: "ltr", r#type: "password", autofocus: true, autocomplete: "off",
                     aria_label: tr(lang, Msg::EnterMasterPassword),
-                    aria_invalid: has_err, aria_describedby: if has_err { "unlock-error" } else { "" },
+                    aria_invalid: has_err,
+                    aria_describedby: if has_err { "unlock-error" } else if has_notice { "unlock-notice" } else { "" },
                     placeholder: tr(lang, Msg::EnterMasterPassword),
                     oninput: move |e| pw.set(e.value()),
                     // The focus given by `autofocus` can happen before the screen reader is listening; do it again.
@@ -960,6 +963,7 @@ fn Unlock() -> Element {
                         });
                     },
                 }
+                if let Some(n) = costly { p { id: "unlock-notice", class: "muted", role: "note", "{n}" } }
                 if let Some(e) = err { p { id: "unlock-error", class: "error", "{e}" } }
                 if wait > 0 { p { class: "muted", "{trf(lang, Msg::TryAgainIn, &[&wait])}" } }
                 button { class: "primary", r#type: "submit", disabled: wait > 0, {tr(lang, Msg::Unlock)} }

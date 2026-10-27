@@ -58,7 +58,7 @@ The database is written safely: changes go through a log and a transaction (so a
 
 ## Unlocking
 
-1. Read the header; check the Argon2 settings are within allowed bounds.
+1. Read the header; check the Argon2 settings are within allowed bounds. The header cannot be checked for tampering yet (that needs the key), so a vault that asks for more than twice this app's usual work is announced first: `rk` prints a note and asks before it starts, and the desktop app shows the note above the password box. If you did not choose such settings, do not unlock that file.
 2. Run Argon2id on the password with the stored salt. Derive the KEK.
 3. Try to decrypt the wrapped vault key. If the password is wrong, authentication fails and we
    return one generic error — no hints.
