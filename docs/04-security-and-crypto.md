@@ -54,7 +54,7 @@ Header (plaintext, CBOR/JSON, canonical):
 Record (one per item):
   record_version u16, item_id uuid, rev u64 (HLC), nonce[24], ciphertext
   AAD = magic ‖ vault_id ‖ item_id ‖ rev ‖ record_version
-Payload (decrypted): JSON ItemPayload { schema, kind, title, fields, … } — padded to 64 B buckets
+Payload (decrypted): JSON ItemPayload { schema, kind, title, fields, … } — padded to 64 B buckets; at most 4 MiB serialised per item, history included (`MAX_ITEM_BYTES`, audit finding P1-7)
 ```
 Binding `item_id` and `rev` in AAD prevents record swapping/replay between items.
 Padding hides exact lengths coarsely.

@@ -201,6 +201,11 @@ pub struct Record {
     pub ct: Vec<u8>,
 }
 
+/// The most one item may take once serialised, history included (audit finding P1-7). Far above any real login or
+/// note. It keeps a record well inside the stores' file limit (64 MiB), so a too-large item is refused when it is
+/// saved instead of leaving a vault that cannot be opened, and keeps `pad`'s 32-bit length from ever wrapping.
+pub const MAX_ITEM_BYTES: usize = 4 * 1024 * 1024;
+
 /// The item id under which the sealed [`Manifest`] is stored. No item can have it (item ids are random UUIDs).
 pub const MANIFEST_ID: Uuid = Uuid::nil();
 
@@ -360,6 +365,12 @@ impl UnlockedVault {
     pub fn seal_item(&self, item: &Item, rev: u64, rng: &mut impl CryptoRng) -> Result<Record> {
         let json =
             Zeroizing::new(serde_json::to_vec(item).map_err(|e| Error::Malformed(e.to_string()))?);
+        if json.len() > MAX_ITEM_BYTES {
+            return Err(Error::ItemTooLarge {
+                size: json.len(),
+                max: MAX_ITEM_BYTES,
+            });
+        }
         let padded = pad(&json);
         let s = crypto::seal(
             &self.item_key(&item.id),

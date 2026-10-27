@@ -16,6 +16,9 @@ pub enum Error {
     UnsupportedVersion(u16),
     #[error("malformed data: {0}")]
     Malformed(String),
+    /// An item (with its history) is bigger than [`crate::MAX_ITEM_BYTES`]; saving it could make the vault unreadable.
+    #[error("this item is too large: {size} bytes; the limit is {max} bytes")]
+    ItemTooLarge { size: usize, max: usize },
     #[error("invalid argument: {0}")]
     InvalidArgument(String),
 }

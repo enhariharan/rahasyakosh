@@ -249,7 +249,7 @@ Files read: all of `core/src/{crypto,vault,item,totp,generator}.rs`, the `argon2
 - **Evidence:** Nothing in `core` or `app` caps an item. `pad` stores the length as `u32` (`data.len() as u32` would wrap above 4 GiB), and `DirectoryStore` refuses to read any file over 64 MiB (`MAX_FILE`).
 - **Impact:** A too-large item (a huge note, an import of one huge row) is written without complaint and then makes the directory store unreadable at the next unlock (same all-or-nothing failure as [P2-3](#p2-3)).
 - **Recommended fix:** Reject items above a fixed size (for example 1 MiB of plaintext) in `Vault::commit`, and make the store limit and the item limit agree.
-- **Status:** open
+- **Status:** fixed 2026-10-27: `seal_item` refuses an item above `MAX_ITEM_BYTES` (4 MiB serialised, history included; chosen so a record stays well under the stores' 64 MiB file limit) with `Error::ItemTooLarge`. A bulk import with one oversized row adds nothing and says why. Tests `crates/app/tests/item_size.rs`.
 
 [Top](#top)
 

@@ -52,6 +52,8 @@ Most checks are also worth turning into automated tests when the fix is written.
 - [ ] An item just under the limit is saved, and the vault unlocks and lists it.
 - [ ] Import a CSV with one huge cell: refused or truncated with a message, never a vault that cannot be reopened.
 
+(Automated 2026-10-27: `crates/app/tests/item_size.rs`. The limit is 4 MiB, so use a 5 MB note for the manual check.)
+
 ### P1-8 Short generated master passphrase
 - [ ] `rk init --passphrase --words 3` (on a scratch vault). Expected: refused, or the entropy is shown and confirmation is required. The default (6 words) works without a prompt.
 

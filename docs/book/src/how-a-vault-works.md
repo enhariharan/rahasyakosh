@@ -52,6 +52,8 @@ The same two parts, written out as one JSON file, form the portable *bundle* tha
 Before encryption, each item is padded to a multiple of 64 bytes so that file sizes do not
 reveal, say, how long your password is.
 
+One item (with its history) may take at most 4 MiB. That is far more than any login or note needs. The limit is there because the storage code refuses to read a file above 64 MiB: without it, one enormous note or CSV cell could be saved and then stop the whole vault from opening. An item over the limit is refused when you save it, with a message, and nothing is changed.
+
 The database is written safely: changes go through a log and a transaction (so a crash cannot leave half a vault) and the file is readable only by you (`0600`).
 
 ## Unlocking
