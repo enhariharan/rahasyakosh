@@ -113,7 +113,7 @@ All seven phases are done (Phase 1 was finished last, on the same day). 52 findi
 | [P4-1](#p4-1) | Medium | `RK_PASSWORD` stays in the clipboard helpers' environment | From reading | open |
 | [P4-2](#p4-2) | Medium | `export -f vault --force` can overwrite the live vault | Confirmed | fixed 2026-10-27 |
 | [P5-1](#p5-1) | Medium | CSV import is quadratic (40 000 rows took 26 s in a debug build) | Confirmed | fixed 2026-10-27 |
-| [P5-2](#p5-2) | Medium | Terminal escape sequences from imported text are printed raw | Confirmed | open |
+| [P5-2](#p5-2) | Medium | Terminal escape sequences from imported text are printed raw | Confirmed | fixed 2026-10-27 |
 | [P3-1](#p3-1) | Medium | `trash_retention_days = 0` purges all trash at the next unlock | From reading | fixed 2026-10-27 |
 | [P7-1](#p7-1) | Medium | The installer turns the accessibility bus on session-wide | From reading | open |
 
@@ -594,7 +594,7 @@ Files read: `transfer/src/{lib,bundle}.rs`, the import and export commands in `c
 - **Evidence:** `rk import --dry-run`, the confirmation listing and `rk list` print titles, usernames and URLs with `println!` unchanged. A CSV title holding `ESC ] 52 ; c ; … BEL` or `ESC [ 2 J` reaches the terminal as written.
 - **Impact:** Terminals that allow OSC 52 let it write to the clipboard; others let it rewrite the screen, so the user may confirm an import that does not look like what is in the file. Items arriving by sync or sharing behave the same.
 - **Recommended fix:** Print every untrusted string through one function that replaces control characters (`ESC`, `BEL`, C1 codes) in `list`, `trash`, `import`, `history` and error messages. `get` keeps writing raw to a pipe but escapes when stdout is a terminal.
-- **Status:** open
+- **Status:** fixed 2026-10-27: `rk` prints stored text through `safe::line` / `safe::block` (`crates/cli/src/safe.rs`), which spells out control characters (C0, DEL, C1), line separators and bidi overrides, for `list`, `trash`, `history`, `import` (preview), every message that quotes a title or field name, and all error messages. `rk get` and `rk totp` write the value unchanged into a pipe or file, and escaped onto a terminal (notes keep their line breaks). Tests: `safe.rs` unit tests and `escape_sequences_in_stored_text_are_shown_spelled_out_not_sent_to_the_terminal`. The desktop app shows text in a web view, which does not interpret terminal sequences.
 
 [Top](#top)
 

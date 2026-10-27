@@ -44,6 +44,10 @@ Items in the trash do not count.
 **Bad data.** Empty rows are skipped; a TOTP secret that cannot be decoded is dropped with a warning
 instead of failing the whole import; files over 50 MiB are refused.
 
+**Hostile text.** A file can hold a title such as `ESC ] 52 ; c ; ... BEL`, which a terminal obeys: it can rewrite the screen or put text on your clipboard. So `rk` never sends stored or imported text to the terminal as it is: control characters are shown spelled out (for example `\x1b`), in `list`, `trash`, `history`, the import preview and in error messages. `rk get` into a pipe or file still writes the value exactly as stored, because a script wants the real bytes.
+
+**Speed.** Duplicates are found with one lookup per row, so a file of 40 000 rows takes a fraction of a second, and twice the rows takes about twice the time.
+
 ## Exporting (US-IMP-03)
 
 ```

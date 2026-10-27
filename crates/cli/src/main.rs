@@ -4,6 +4,7 @@
 //! The vault is a SQLite database; `rk export -f vault` writes (and `rk migrate` reads) a portable JSON bundle.
 mod clipboard;
 mod file;
+mod safe;
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
@@ -222,7 +223,13 @@ struct CopyOpts {
 /// Print `value`, or copy it when asked (then say so on stderr and keep it off the screen).
 fn output(value: &str, what: &str, opts: &CopyOpts) -> Result<()> {
     if !opts.copy {
-        println!("{value}");
+        // Into a pipe or a file the value goes out exactly as stored; onto a terminal, control characters are spelled
+        // out so a stored value cannot drive the terminal.
+        if std::io::IsTerminal::is_terminal(&std::io::stdout()) {
+            println!("{}", safe::block(value));
+        } else {
+            println!("{value}");
+        }
         return Ok(());
     }
     clipboard::copy_and_schedule_clear(value, opts.clear_after)?;
@@ -620,7 +627,7 @@ fn changed_parts(a: &ItemVersion, b: &ItemVersion) -> String {
                 .map(|f| f.value.clone())
         };
         if find(a) != find(b) {
-            parts.push(name.to_string());
+            parts.push(safe::line(name).into_owned());
         }
     }
     if parts.is_empty() {
@@ -630,7 +637,18 @@ fn changed_parts(a: &ItemVersion, b: &ItemVersion) -> String {
     }
 }
 
-fn main() -> Result<()> {
+/// Errors can quote item titles (an ambiguous match lists them), so they are printed through [`safe::line`] too.
+fn main() -> std::process::ExitCode {
+    match run() {
+        Ok(()) => std::process::ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("Error: {}", safe::block(&format!("{e:#}")));
+            std::process::ExitCode::FAILURE
+        }
+    }
+}
+
+fn run() -> Result<()> {
     let cli = Cli::parse();
     let path = match cli.vault {
         Some(p) => p,
@@ -754,9 +772,9 @@ fn main() -> Result<()> {
             for i in vault.search(query.as_deref().unwrap_or("")) {
                 let user = i.field("username").map(|f| f.value.as_str()).unwrap_or("");
                 if i.favourite {
-                    println!("{}\t{}\t★", i.title, user);
+                    println!("{}\t{}\t★", safe::line(&i.title), safe::line(user));
                 } else {
-                    println!("{}\t{}", i.title, user);
+                    println!("{}\t{}", safe::line(&i.title), safe::line(user));
                 }
             }
         }
@@ -767,11 +785,15 @@ fn main() -> Result<()> {
             } else {
                 item.field(&field)
             };
-            let what = format!("{field} of '{}'", item.title);
+            let what = format!("{} of '{}'", safe::line(&field), safe::line(&item.title));
             match (field.as_str(), f) {
                 ("notes", _) => output(&item.notes, &what, &copy)?,
                 (_, Some(f)) => output(&f.value, &what, &copy)?,
-                _ => bail!("no field '{field}' on '{}'", item.title),
+                _ => bail!(
+                    "no field '{}' on '{}'",
+                    safe::line(&field),
+                    safe::line(&item.title)
+                ),
             }
         }
         Cmd::Totp { query, copy } => {
@@ -786,7 +808,7 @@ fn main() -> Result<()> {
             if copy.copy {
                 output(
                     &t.code_at(ts),
-                    &format!("TOTP code for '{}'", item.title),
+                    &format!("TOTP code for '{}'", safe::line(&item.title)),
                     &copy,
                 )?;
                 eprintln!("The code is valid for {}s more.", t.seconds_remaining(ts));
@@ -819,7 +841,7 @@ fn main() -> Result<()> {
             if generate {
                 println!("{}", *password);
             }
-            eprintln!("Added '{title}'");
+            eprintln!("Added '{}'", safe::line(&title));
         }
         Cmd::Edit {
             query,
@@ -911,7 +933,7 @@ fn main() -> Result<()> {
             })?;
             let title = vault.get(id).map(|i| i.title.clone()).unwrap_or_default();
             if had_no_totp {
-                eprintln!("note: '{title}' has no TOTP secret");
+                eprintln!("note: '{}' has no TOTP secret", safe::line(&title));
             }
             if generate {
                 if let Some(p) = &new_password {
@@ -919,9 +941,12 @@ fn main() -> Result<()> {
                 }
             }
             if changed {
-                eprintln!("Updated '{title}'");
+                eprintln!("Updated '{}'", safe::line(&title));
             } else {
-                eprintln!("No changes: '{title}' already has these values");
+                eprintln!(
+                    "No changes: '{}' already has these values",
+                    safe::line(&title)
+                );
             }
         }
         Cmd::History { query } => {
@@ -939,14 +964,17 @@ fn main() -> Result<()> {
             eprintln!(
                 "{} earlier version(s) of '{}'. `rk revert <item> <number>` makes one current again.",
                 item.history.len(),
-                item.title
+                safe::line(&item.title)
             );
         }
         Cmd::Revert { query, version } => {
             let id = vault.resolve(&query, Scope::Live)?.id;
             vault.revert(id, version, now(), &mut rng)?;
             let title = vault.get(id).map(|i| i.title.clone()).unwrap_or_default();
-            eprintln!("Reverted '{title}' to version {version} (the previous content is kept in its history)");
+            eprintln!(
+                "Reverted '{}' to version {version} (the previous content is kept in its history)",
+                safe::line(&title)
+            );
         }
         Cmd::Trash => {
             let mut trashed = vault.items(Scope::Trashed);
@@ -956,8 +984,8 @@ fn main() -> Result<()> {
                 let user = i.field("username").map(|f| f.value.as_str()).unwrap_or("");
                 println!(
                     "{}\t{}\tdeleted {}",
-                    i.title,
-                    user,
+                    safe::line(&i.title),
+                    safe::line(user),
                     days_ago(i.deleted_at.unwrap_or(t), t)
                 );
             }
@@ -974,7 +1002,7 @@ fn main() -> Result<()> {
                 .id;
             vault.restore(id, now(), &mut rng)?;
             let title = vault.get(id).map(|i| i.title.clone()).unwrap_or_default();
-            eprintln!("Restored '{title}'");
+            eprintln!("Restored '{}'", safe::line(&title));
         }
         Cmd::Rm { query, purge } => {
             let scope = if purge { Scope::Any } else { Scope::Live };
@@ -1063,9 +1091,9 @@ fn main() -> Result<()> {
                 let user = i.field("username").map(|f| f.value.as_str()).unwrap_or("");
                 println!(
                     "{}\t{}\t{}",
-                    i.title,
-                    user,
-                    i.urls.first().map_or("", |u| u)
+                    safe::line(&i.title),
+                    safe::line(user),
+                    safe::line(i.urls.first().map_or("", |u| u))
                 );
             }
             if report.items.is_empty() || dry_run {

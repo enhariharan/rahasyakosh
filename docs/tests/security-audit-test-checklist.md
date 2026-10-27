@@ -151,7 +151,7 @@ Use the directory store or SQLite vault as noted. Always copy the vault first (`
 ### P5-2 Terminal escape sequences
 - [ ] Import a CSV whose title is `ESC ] 52 ; c ; aGk= BEL ESC [ 2 J` (`printf '\033]52;c;aGk=\a\033[2J'`). Run `rk import f.csv --dry-run`, then import it and run `rk list`, `rk trash`, `rk history`.
       Expected after fix: the characters are shown as visible escapes (for example `\x1b`), the screen is not cleared, and the clipboard is not changed (`wl-paste`).
-- [ ] `rk get` into a pipe (`| xxd`) still writes the value unchanged.
+- [ ] `rk get` into a pipe (`| xxd`) still writes the value unchanged. Both automated 2026-10-27; run the first once in a real terminal and look at the screen and `wl-paste`.
 
 ### P5-3 History in the JSON export
 - [ ] Change a password with `rk edit`, export JSON, and search for the old password. Expected after fix: absent, unless `--with-history` is given, or the warning says the file holds old passwords.

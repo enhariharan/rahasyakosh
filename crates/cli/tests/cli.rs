@@ -945,3 +945,56 @@ fn an_export_can_never_overwrite_the_live_vault() {
     ]);
     assert!(err.contains("SQLite database"), "{err}");
 }
+
+#[test]
+fn escape_sequences_in_stored_text_are_shown_spelled_out_not_sent_to_the_terminal() {
+    let v = Vault::new("escape_sequences");
+    let csv = Path::new(env!("CARGO_TARGET_TMPDIR")).join("escape_sequences.csv");
+    let evil = "\x1b]52;c;aGk=\x07\x1b[2J";
+    std::fs::write(
+        &csv,
+        format!("name,url,username,password\n\"{evil}\",https://e.example/\x1b[31m,\"bob\x1b[1m\",secret\n"),
+    )
+    .unwrap();
+    let csv = csv.to_str().unwrap();
+    let no_raw_escapes = |label: &str, out: &Output| {
+        let text = String::from_utf8_lossy(&out.stdout).into_owned()
+            + &String::from_utf8_lossy(&out.stderr);
+        assert!(
+            !text.contains('\x1b') && !text.contains('\x07'),
+            "{label}: {text:?}"
+        );
+        text
+    };
+
+    let dry = v.rk(&["import", csv, "--dry-run"], "");
+    assert!(dry.status.success());
+    let text = no_raw_escapes("dry run", &dry);
+    assert!(text.contains("\\x1b]52;c;aGk=\\x07\\x1b[2J"), "{text:?}");
+
+    assert!(v.rk(&["import", csv, "--yes"], "").status.success());
+    let list = v.rk(&["list"], "");
+    no_raw_escapes("list", &list);
+    let first = String::from_utf8_lossy(&list.stdout)
+        .split('\t')
+        .next()
+        .unwrap()
+        .to_string();
+    assert!(first.contains("\\x1b"), "{first}");
+
+    // An error that quotes titles is cleaned as well.
+    let get = v.rk(&["get", "no-such-item-\x1b[2J"], "");
+    no_raw_escapes("error", &get);
+
+    // Into a pipe the stored value comes out exactly as it is.
+    let raw = v.rk(&["get", "52", "-f", "username"], "");
+    assert!(
+        raw.status.success(),
+        "{}",
+        String::from_utf8_lossy(&raw.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&raw.stdout), "bob\x1b[1m\n");
+
+    v.ok(&["rm", &first.replace("\\x1b", "")[..4]], "");
+    no_raw_escapes("trash", &v.rk(&["trash"], ""));
+}
