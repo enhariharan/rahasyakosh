@@ -1,7 +1,7 @@
 use crate::index::SearchIndex;
 use rahasyakosh_core::crypto::KdfParams;
 use rahasyakosh_core::item::{Item, ItemVersion, DEFAULT_HISTORY_LIMIT};
-use rahasyakosh_core::vault::UnlockedVault;
+use rahasyakosh_core::vault::{Manifest, UnlockedVault, MANIFEST_ID};
 use rahasyakosh_store::{Record, Store, Unreadable};
 use std::collections::BTreeMap;
 use uuid::Uuid;
@@ -73,6 +73,47 @@ impl From<Unreadable> for Skipped {
     }
 }
 
+/// Something the vault's sealed manifest says is wrong with what the store holds (audit findings P2-1 and P2-2).
+/// None of these stops the vault opening. Show them to the user: they mean a sync problem, a restored backup or
+/// someone changing the folder.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Warning {
+    /// The manifest lists this item but the store has no readable record for it.
+    Missing { id: Uuid, expected: u64 },
+    /// The store holds an older revision of this item than was last written.
+    RolledBack { id: Uuid, expected: u64, found: u64 },
+    /// An item that was deleted for good is back in the store. It is left out.
+    Resurrected { id: Uuid },
+    /// A tombstone that the manifest does not vouch for was removed; it would have hidden the item.
+    ForgedTombstone { id: Uuid },
+    /// The manifest could not be opened, so nothing could be checked.
+    ManifestUnreadable { reason: String },
+    /// This device had seen the vault with a manifest, but there is none now.
+    ManifestMissing,
+    /// The whole vault is older than this device last saw it (a restored backup, or a rolled-back sync folder).
+    OlderThanSeen { seen: u64, found: u64 },
+}
+
+impl std::fmt::Display for Warning {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Missing { id, .. } => write!(f, "item {id} is missing from the vault folder"),
+            Self::RolledBack { id, expected, found } => write!(
+                f,
+                "item {id} is at an older version ({found}) than the last one saved ({expected})"
+            ),
+            Self::Resurrected { id } => write!(f, "item {id} was deleted but its file is back; ignored"),
+            Self::ForgedTombstone { id } => write!(f, "a deletion mark for item {id} was not genuine; removed"),
+            Self::ManifestUnreadable { .. } => write!(f, "the vault's check list could not be read"),
+            Self::ManifestMissing => write!(f, "the vault's check list is missing"),
+            Self::OlderThanSeen { seen, found } => write!(
+                f,
+                "this vault is older than when this device last opened it (write {found}, was {seen})"
+            ),
+        }
+    }
+}
+
 struct Entry {
     item: Item,
     rev: u64,
@@ -94,6 +135,21 @@ pub struct Vault<S: Store> {
     index: SearchIndex,
     config: Config,
     skipped: Vec<Skipped>,
+    manifest: Manifest,
+    warnings: Vec<Warning>,
+    #[cfg(not(target_family = "wasm"))]
+    highwater: Option<crate::HighWater>,
+}
+
+/// What `unlock_inner` read.
+struct Opened {
+    keys: UnlockedVault,
+    entries: BTreeMap<Uuid, Entry>,
+    index: SearchIndex,
+    skipped: Vec<Skipped>,
+    manifest: Manifest,
+    warnings: Vec<Warning>,
+    forged: Vec<Uuid>,
 }
 
 impl<S: Store> Vault<S> {
@@ -114,6 +170,10 @@ impl<S: Store> Vault<S> {
             index: SearchIndex::default(),
             config,
             skipped: vec![],
+            manifest: Manifest::default(),
+            warnings: vec![],
+            #[cfg(not(target_family = "wasm"))]
+            highwater: None,
         })
     }
 
@@ -128,38 +188,148 @@ impl<S: Store> Vault<S> {
         password: &str,
         config: Config,
     ) -> std::result::Result<Self, UnlockFailed<S>> {
-        match Self::unlock_inner(&store, password) {
-            Ok((keys, entries, index, skipped)) => Ok(Self {
-                store,
-                keys,
-                entries,
-                index,
-                config,
-                skipped,
-            }),
+        Self::try_unlock_checked(store, password, config, None)
+    }
+
+    /// Like [`try_unlock`](Self::try_unlock), also telling the vault the highest write number ([`seq`](Self::seq))
+    /// this device has seen, kept outside the synced folder. A vault below it was rolled back as a whole.
+    pub fn try_unlock_checked(
+        mut store: S,
+        password: &str,
+        config: Config,
+        last_seen: Option<u64>,
+    ) -> std::result::Result<Self, UnlockFailed<S>> {
+        match Self::unlock_inner(&store, password, last_seen) {
+            Ok(o) => {
+                // Forged tombstones are removed so they cannot hide the item or block writes to it. If this
+                // fails, the vault still opens; the item stays hidden and the warning stays.
+                for id in &o.forged {
+                    let _ = store.discard_tombstone(*id);
+                }
+                let mut v = Self {
+                    store,
+                    keys: o.keys,
+                    entries: o.entries,
+                    index: o.index,
+                    config,
+                    skipped: o.skipped,
+                    manifest: o.manifest,
+                    warnings: o.warnings,
+                    #[cfg(not(target_family = "wasm"))]
+                    highwater: None,
+                };
+                if !o.forged.is_empty() {
+                    v.reload_after_discard();
+                }
+                Ok(v)
+            }
             Err(error) => Err(UnlockFailed { error, store }),
         }
     }
 
-    #[allow(clippy::type_complexity)]
-    fn unlock_inner(
-        store: &S,
-        password: &str,
-    ) -> Result<(
-        UnlockedVault,
-        BTreeMap<Uuid, Entry>,
-        SearchIndex,
-        Vec<Skipped>,
-    )> {
+    /// After forged tombstones were removed, records they hid are readable again: load them.
+    fn reload_after_discard(&mut self) {
+        let Ok(readable) = self.store.all_readable() else {
+            return;
+        };
+        for record in readable.records {
+            if record.item_id == MANIFEST_ID || self.entries.contains_key(&record.item_id) {
+                continue;
+            }
+            if self
+                .manifest
+                .gone
+                .get(&record.item_id)
+                .is_some_and(|g| record.rev <= *g)
+            {
+                continue;
+            }
+            if let Ok(item) = self.keys.open_record(&record) {
+                self.index.set(&item);
+                self.entries.insert(
+                    record.item_id,
+                    Entry {
+                        item,
+                        rev: record.rev,
+                    },
+                );
+            }
+        }
+    }
+
+    fn unlock_inner(store: &S, password: &str, last_seen: Option<u64>) -> Result<Opened> {
         // The header decides the password first, so a wrong password still fails closed. After that, one bad
         // record (a sync conflict, a damaged file, a hostile file) is skipped and reported, not fatal.
         let keys = store.header()?.unlock(password)?;
-        let mut entries = BTreeMap::new();
-        let mut index = SearchIndex::default();
         let readable = store.all_readable()?;
         let mut skipped: Vec<Skipped> =
             readable.unreadable.into_iter().map(Skipped::from).collect();
+        let mut warnings = vec![];
+
+        // The manifest, if there is one, is the authority on what should be here.
+        let mut manifest = None;
+        let mut unreadable_seq = None;
+        let mut records = vec![];
         for record in readable.records {
+            if record.item_id == MANIFEST_ID {
+                match keys.open_manifest(&record) {
+                    Ok(m) => manifest = Some(m),
+                    Err(e) => {
+                        // Keep its revision: the next manifest must be newer, or the store refuses it.
+                        unreadable_seq = Some(record.rev);
+                        warnings.push(Warning::ManifestUnreadable {
+                            reason: e.to_string(),
+                        });
+                    }
+                }
+            } else {
+                records.push(record);
+            }
+        }
+        let have_manifest = manifest.is_some();
+        let manifest_unreadable = unreadable_seq.is_some();
+        let mut manifest = manifest.unwrap_or_default();
+        manifest.seq = manifest.seq.max(unreadable_seq.unwrap_or(0));
+        if !have_manifest && !manifest_unreadable && last_seen.is_some_and(|s| s > 0) {
+            warnings.push(Warning::ManifestMissing);
+        }
+        if let Some(seen) = last_seen {
+            if have_manifest && manifest.seq < seen {
+                warnings.push(Warning::OlderThanSeen {
+                    seen,
+                    found: manifest.seq,
+                });
+            }
+        }
+
+        // Tombstones the manifest does not vouch for. (An old vault with no manifest is trusted as it stands,
+        // and the manifest written on its first change records them.)
+        let mut forged = vec![];
+        if have_manifest {
+            for t in store.tombstones()? {
+                if manifest.gone.get(&t.id).is_none_or(|g| t.rev > *g) {
+                    forged.push(t.id);
+                    warnings.push(Warning::ForgedTombstone { id: t.id });
+                }
+            }
+        } else {
+            for t in store.tombstones()? {
+                manifest.gone.insert(t.id, t.rev);
+            }
+        }
+
+        let mut entries = BTreeMap::new();
+        let mut index = SearchIndex::default();
+        for record in records {
+            if have_manifest
+                && manifest
+                    .gone
+                    .get(&record.item_id)
+                    .is_some_and(|g| record.rev <= *g)
+            {
+                warnings.push(Warning::Resurrected { id: record.item_id });
+                continue;
+            }
             let item = match keys.open_record(&record) {
                 Ok(item) => item,
                 Err(e) => {
@@ -171,6 +341,19 @@ impl<S: Store> Vault<S> {
                     continue;
                 }
             };
+            if have_manifest {
+                if let Some(&expected) = manifest.live.get(&record.item_id) {
+                    if record.rev < expected {
+                        warnings.push(Warning::RolledBack {
+                            id: record.item_id,
+                            expected,
+                            found: record.rev,
+                        });
+                    }
+                }
+            } else {
+                manifest.live.insert(record.item_id, record.rev);
+            }
             index.set(&item);
             entries.insert(
                 record.item_id,
@@ -180,7 +363,62 @@ impl<S: Store> Vault<S> {
                 },
             );
         }
-        Ok((keys, entries, index, skipped))
+        if have_manifest {
+            // Records that are listed but cannot be shown. One that was skipped is already reported.
+            for (&id, &expected) in &manifest.live {
+                let known = entries.contains_key(&id)
+                    || skipped.iter().any(|s| s.id == Some(id))
+                    || forged.contains(&id);
+                if !known {
+                    warnings.push(Warning::Missing { id, expected });
+                }
+            }
+        }
+        Ok(Opened {
+            keys,
+            entries,
+            index,
+            skipped,
+            manifest,
+            warnings,
+            forged,
+        })
+    }
+
+    /// Problems found at unlock by comparing the store with the sealed manifest. See [`Warning`].
+    pub fn warnings(&self) -> &[Warning] {
+        &self.warnings
+    }
+
+    /// Remember, in `highwater`, the highest write number this device sees from now on, and record the current one.
+    /// Saving is best effort.
+    #[cfg(not(target_family = "wasm"))]
+    pub fn track(&mut self, highwater: crate::HighWater) {
+        self.highwater = Some(highwater);
+        self.note_seq();
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    fn note_seq(&mut self) {
+        let id = self.keys.header().vault_id;
+        let seq = self.manifest.seq;
+        if let Some(h) = &mut self.highwater {
+            let _ = h.record(id, seq);
+        }
+    }
+
+    #[cfg(target_family = "wasm")]
+    fn note_seq(&mut self) {}
+
+    /// The id of this vault.
+    pub fn vault_id(&self) -> Uuid {
+        self.keys.header().vault_id
+    }
+
+    /// How many writes this vault has ever had. A device should remember the highest it has seen, and pass it to
+    /// [`try_unlock_checked`](Self::try_unlock_checked) next time.
+    pub fn seq(&self) -> u64 {
+        self.manifest.seq
     }
 
     /// Stored items that could not be opened at unlock and are not in this vault. Show them to the user: they are
@@ -328,11 +566,19 @@ impl<S: Store> Vault<S> {
                 return Err(Error::State("an item with this id already exists"));
             }
         }
-        let records = items
+        let mut manifest = self.next_manifest()?;
+        let mut records = items
             .iter()
             .map(|i| self.keys.seal_item(i, 1, rng))
             .collect::<std::result::Result<Vec<Record>, _>>()?;
+        for i in &items {
+            manifest.live.insert(i.id, 1);
+        }
+        // The manifest goes last: a crash part-way leaves records newer than it, which is harmless.
+        records.push(self.keys.seal_manifest(&manifest, rng)?);
         self.store.put_many(&records)?;
+        self.manifest = manifest;
+        self.note_seq();
         for item in items {
             self.index.set(&item);
             self.entries.insert(item.id, Entry { item, rev: 1 });
@@ -352,7 +598,12 @@ impl<S: Store> Vault<S> {
         let entry = self.entries.get(&new.id).ok_or(Error::NotFound(new.id))?;
         let rev = entry.rev + 1;
         let record = self.keys.seal_item(&new, rev, rng)?;
-        self.store.put(&record)?;
+        let mut manifest = self.next_manifest()?;
+        manifest.live.insert(new.id, rev);
+        let sealed = self.keys.seal_manifest(&manifest, rng)?;
+        self.store.put_many(&[record, sealed])?;
+        self.manifest = manifest;
+        self.note_seq();
         self.index.set(&new);
         self.entries.insert(new.id, Entry { item: new, rev });
         Ok(())
@@ -413,9 +664,26 @@ impl<S: Store> Vault<S> {
         self.commit(item, rng)
     }
 
+    /// The manifest as it will be after one more write.
+    fn next_manifest(&self) -> Result<Manifest> {
+        let mut m = self.manifest.clone();
+        m.seq = m
+            .seq
+            .checked_add(1)
+            .ok_or(Error::State("the vault's write counter is used up"))?;
+        Ok(m)
+    }
+
     /// Delete an item for good (live or trashed). Leaves a tombstone in the store.
-    pub fn purge(&mut self, id: Uuid) -> Result<()> {
+    pub fn purge(&mut self, id: Uuid, rng: &mut impl rand_core::CryptoRng) -> Result<()> {
         let rev = self.entries.get(&id).ok_or(Error::NotFound(id))?.rev;
+        // The manifest first, so a crash leaves a record that reads as deleted, never a tombstone nobody vouches for.
+        let mut manifest = self.next_manifest()?;
+        manifest.live.remove(&id);
+        manifest.gone.insert(id, rev + 1);
+        self.store.put(&self.keys.seal_manifest(&manifest, rng)?)?;
+        self.manifest = manifest;
+        self.note_seq();
         self.store.purge(id, rev + 1)?;
         self.index.remove(id);
         self.entries.remove(&id);
@@ -423,7 +691,11 @@ impl<S: Store> Vault<S> {
     }
 
     /// Delete items that have been in the trash for at least `trash_retention_days`. Returns how many.
-    pub fn purge_expired(&mut self, now: i64) -> Result<usize> {
+    pub fn purge_expired(
+        &mut self,
+        now: i64,
+        rng: &mut impl rand_core::CryptoRng,
+    ) -> Result<usize> {
         let keep_for = i64::from(self.config.trash_retention_days) * SECONDS_PER_DAY;
         let expired: Vec<Uuid> = self
             .entries
@@ -432,7 +704,7 @@ impl<S: Store> Vault<S> {
             .map(|e| e.item.id)
             .collect();
         for id in &expired {
-            self.purge(*id)?;
+            self.purge(*id, rng)?;
         }
         Ok(expired.len())
     }

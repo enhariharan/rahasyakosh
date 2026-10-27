@@ -4,6 +4,7 @@ use crate::item::Item;
 use crate::{Error, Result};
 use rand_core::CryptoRng;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use uuid::Uuid;
 use zeroize::Zeroizing;
 
@@ -120,6 +121,23 @@ pub struct Record {
     pub nonce: [u8; NONCE_LEN],
     #[serde(with = "b64")]
     pub ct: Vec<u8>,
+}
+
+/// The item id under which the sealed [`Manifest`] is stored. No item can have it (item ids are random UUIDs).
+pub const MANIFEST_ID: Uuid = Uuid::nil();
+
+/// A signed-off list of what the vault should contain, sealed under the vault key (audit findings P2-1 and P2-2).
+/// A record by itself proves only that it is genuine, not that it is the latest, or that nothing else was removed.
+/// The manifest says which revision of each item is the newest and which items were deleted for good, so a
+/// swapped-in old record, a removed record or a forged tombstone can be noticed. Its own `rev` in the store is `seq`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Manifest {
+    /// Counts the writes ever made to the vault. Only goes up.
+    pub seq: u64,
+    /// Item id to the newest revision written.
+    pub live: BTreeMap<Uuid, u64>,
+    /// Item id to the revision of its tombstone, for items deleted for good.
+    pub gone: BTreeMap<Uuid, u64>,
 }
 
 /// An unlocked vault holding the vault key. Key is zeroized on drop.
@@ -239,6 +257,52 @@ impl UnlockedVault {
             nonce: s.nonce,
             ct: s.ct,
         }
+    }
+
+    fn manifest_key(&self) -> Key {
+        crypto::hkdf_expand(self.vk.as_slice(), None, b"rk/manifest/v1")
+    }
+
+    /// Seal the manifest as a record with id [`MANIFEST_ID`] and revision `m.seq`.
+    pub fn seal_manifest(&self, m: &Manifest, rng: &mut impl CryptoRng) -> Result<Record> {
+        let json =
+            Zeroizing::new(serde_json::to_vec(m).map_err(|e| Error::Malformed(e.to_string()))?);
+        let s = crypto::seal(
+            &self.manifest_key(),
+            &pad(&json),
+            &self.record_aad(&MANIFEST_ID, m.seq, RECORD_VERSION),
+            rng,
+        );
+        Ok(Record {
+            record_version: RECORD_VERSION,
+            item_id: MANIFEST_ID,
+            rev: m.seq,
+            nonce: s.nonce,
+            ct: s.ct,
+        })
+    }
+
+    pub fn open_manifest(&self, r: &Record) -> Result<Manifest> {
+        if r.record_version != RECORD_VERSION {
+            return Err(Error::UnsupportedVersion(r.record_version));
+        }
+        if r.item_id != MANIFEST_ID {
+            return Err(Error::Decrypt);
+        }
+        let pt = crypto::open(
+            &self.manifest_key(),
+            &Sealed {
+                nonce: r.nonce,
+                ct: r.ct.clone(),
+            },
+            &self.record_aad(&MANIFEST_ID, r.rev, r.record_version),
+        )?;
+        let m: Manifest =
+            serde_json::from_slice(unpad(&pt)?).map_err(|e| Error::Malformed(e.to_string()))?;
+        if m.seq != r.rev {
+            return Err(Error::Decrypt);
+        }
+        Ok(m)
     }
 
     pub fn open_record(&self, r: &Record) -> Result<Item> {

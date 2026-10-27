@@ -406,6 +406,17 @@ impl Store for SqliteStore {
         tx.commit().map_err(db)
     }
 
+    fn discard_tombstone(&mut self, id: Uuid) -> Result<()> {
+        let tx = self.tx()?;
+        read_header(&tx)?.ok_or(Error::NotInitialised)?;
+        tx.execute(
+            "DELETE FROM tombstones WHERE id = ?1",
+            params![id.as_bytes().as_slice()],
+        )
+        .map_err(db)?;
+        tx.commit().map_err(db)
+    }
+
     fn tombstones(&self) -> Result<Vec<Tombstone>> {
         let mut stmt = self
             .conn

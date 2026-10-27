@@ -636,7 +636,7 @@ impl<S: Store, C: Clipboard> Model<S, C> {
 
     pub fn unlock(&mut self, password: &str, now: i64) {
         let lang = self.lang();
-        match self.session.unlock(password, now) {
+        match self.session.unlock(password, now, &mut rand::rng()) {
             Ok(u) => {
                 self.unlock_error = None;
                 if u.purged > 0 {
@@ -644,6 +644,9 @@ impl<S: Store, C: Clipboard> Model<S, C> {
                 }
                 if u.unreadable > 0 {
                     self.info(trf(lang, Msg::SkippedItems, &[&u.unreadable]), now);
+                }
+                if u.warnings > 0 {
+                    self.info(trf(lang, Msg::IntegrityWarnings, &[&u.warnings]), now);
                 }
             }
             // The unlock screen shows the live countdown, so the messages do not repeat the wait.
@@ -1075,7 +1078,11 @@ impl<S: Store, C: Clipboard> Model<S, C> {
     pub fn purge_selected(&mut self, now: i64) {
         self.activity(now);
         let Some(id) = self.selected else { return };
-        match self.session.vault(now).map(|v| v.purge(id)) {
+        match self
+            .session
+            .vault(now)
+            .map(|v| v.purge(id, &mut rand::rng()))
+        {
             Ok(Ok(())) => {
                 self.selected = None;
                 self.info(t(self.lang(), Msg::DeletedForGood), now);

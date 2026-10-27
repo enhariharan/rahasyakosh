@@ -90,6 +90,12 @@ impl Store for MemoryStore {
         Ok(())
     }
 
+    fn discard_tombstone(&mut self, id: Uuid) -> Result<()> {
+        self.header.as_ref().ok_or(Error::NotInitialised)?;
+        self.tombstones.remove(&id);
+        Ok(())
+    }
+
     fn tombstones(&self) -> Result<Vec<Tombstone>> {
         Ok(self
             .tombstones

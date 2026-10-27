@@ -52,7 +52,7 @@ fn a_new_session_is_locked_and_gives_no_access() {
 fn unlock_lock_unlock_keeps_the_data() {
     let mut s = locked_session(fast());
     assert!(!s.is_unlocked());
-    s.unlock(PW, 10).unwrap();
+    s.unlock(PW, 10, &mut rng()).unwrap();
     assert_eq!(s.peek().unwrap().items(Scope::Live).len(), 1);
     s.vault(11)
         .unwrap()
@@ -60,14 +60,14 @@ fn unlock_lock_unlock_keeps_the_data() {
         .unwrap();
     s.lock();
     assert!(s.peek().is_none(), "locking drops the vault");
-    s.unlock(PW, 20).unwrap();
+    s.unlock(PW, 20, &mut rng()).unwrap();
     assert_eq!(
         s.peek().unwrap().items(Scope::Live).len(),
         2,
         "changes made while unlocked were saved"
     );
     assert!(matches!(
-        s.unlock(PW, 21),
+        s.unlock(PW, 21, &mut rng()),
         Err(UnlockError::AlreadyUnlocked)
     ));
 }
@@ -75,7 +75,7 @@ fn unlock_lock_unlock_keeps_the_data() {
 #[test]
 fn a_wrong_password_returns_the_store_so_the_right_one_still_works() {
     let mut s = locked_session(fast());
-    let err = s.unlock("not it", 0).unwrap_err();
+    let err = s.unlock("not it", 0, &mut rng()).unwrap_err();
     assert!(
         matches!(
             err,
@@ -88,7 +88,7 @@ fn a_wrong_password_returns_the_store_so_the_right_one_still_works() {
     );
     assert_eq!(s.failed_attempts(), 1);
     assert!(!s.is_unlocked());
-    s.unlock(PW, 1).unwrap();
+    s.unlock(PW, 1, &mut rng()).unwrap();
     assert_eq!(s.failed_attempts(), 0, "success resets the counter");
 }
 
@@ -107,30 +107,30 @@ fn repeated_wrong_passwords_must_wait_and_the_password_is_not_even_checked_meanw
     let mut s = locked_session(fast());
     for n in 1..=3 {
         assert!(
-            matches!(s.unlock("bad", 100), Err(UnlockError::WrongPassword { failures, .. }) if failures == n)
+            matches!(s.unlock("bad", 100, &mut rng()), Err(UnlockError::WrongPassword { failures, .. }) if failures == n)
         );
     }
     // After the third failure the next attempt must wait 1 s.
     assert_eq!(s.retry_in(100), 1);
     // Even the right password is refused during the wait, so waiting cannot be skipped by guessing faster.
     assert!(matches!(
-        s.unlock(PW, 100),
+        s.unlock(PW, 100, &mut rng()),
         Err(UnlockError::LockedOut { retry_in_secs: 1 })
     ));
     assert!(!s.is_unlocked());
     // Another wrong guess once allowed doubles the wait.
     assert!(matches!(
-        s.unlock("bad", 101),
+        s.unlock("bad", 101, &mut rng()),
         Err(UnlockError::WrongPassword {
             failures: 4,
             retry_in_secs: 2
         })
     ));
     assert!(matches!(
-        s.unlock(PW, 102),
+        s.unlock(PW, 102, &mut rng()),
         Err(UnlockError::LockedOut { retry_in_secs: 1 })
     ));
-    s.unlock(PW, 103).unwrap();
+    s.unlock(PW, 103, &mut rng()).unwrap();
     assert_eq!(s.retry_in(103), 0);
 }
 
@@ -139,7 +139,10 @@ fn only_a_wrong_password_counts_as_a_failed_attempt() {
     // A store with no vault in it gives a different error, which must not feed the lockout.
     let mut s = Session::new(MemoryStore::new(), Settings::default());
     for _ in 0..5 {
-        assert!(matches!(s.unlock("x", 0), Err(UnlockError::Failed(_))));
+        assert!(matches!(
+            s.unlock("x", 0, &mut rng()),
+            Err(UnlockError::Failed(_))
+        ));
     }
     assert_eq!(s.failed_attempts(), 0);
 }
@@ -150,7 +153,7 @@ fn the_vault_locks_itself_after_the_idle_time() {
         idle_lock_secs: 60,
         ..fast()
     });
-    s.unlock(PW, 1000).unwrap();
+    s.unlock(PW, 1000, &mut rng()).unwrap();
     assert_eq!(s.seconds_until_lock(1000), Some(60));
     assert!(!s.tick(1059).locked);
     assert_eq!(s.seconds_until_lock(1059), Some(1));
@@ -166,7 +169,7 @@ fn activity_postpones_the_lock_but_peeking_does_not() {
         idle_lock_secs: 60,
         ..fast()
     });
-    s.unlock(PW, 0).unwrap();
+    s.unlock(PW, 0, &mut rng()).unwrap();
     let _ = s.peek(); // drawing a screen is not activity
     assert_eq!(s.seconds_until_lock(50), Some(10));
     s.touch(50);
@@ -183,7 +186,7 @@ fn using_the_vault_after_the_timeout_locks_it_instead_of_serving_it() {
         idle_lock_secs: 60,
         ..fast()
     });
-    s.unlock(PW, 0).unwrap();
+    s.unlock(PW, 0, &mut rng()).unwrap();
     // Nobody called tick; the next action finds the timeout has passed.
     assert_eq!(s.vault(61).err(), Some(Locked));
     assert!(!s.is_unlocked());
@@ -196,7 +199,7 @@ fn an_idle_time_of_zero_never_locks() {
         idle_lock_secs: 0,
         ..fast()
     });
-    s.unlock(PW, 0).unwrap();
+    s.unlock(PW, 0, &mut rng()).unwrap();
     assert_eq!(s.seconds_until_lock(10), None);
     assert!(!s.tick(10_000_000).locked);
     assert!(s.vault(10_000_001).is_ok());
@@ -208,13 +211,13 @@ fn trash_older_than_the_retention_is_purged_on_unlock() {
         trash_retention_days: 30,
         ..fast()
     });
-    s.unlock(PW, 0).unwrap();
+    s.unlock(PW, 0, &mut rng()).unwrap();
     s.vault(1).unwrap().trash(id(1), 1, &mut rng()).unwrap();
     s.lock();
     let day = 86_400;
-    assert_eq!(s.unlock(PW, 29 * day).unwrap().purged, 0);
+    assert_eq!(s.unlock(PW, 29 * day, &mut rng()).unwrap().purged, 0);
     s.lock();
-    assert_eq!(s.unlock(PW, 31 * day).unwrap().purged, 1);
+    assert_eq!(s.unlock(PW, 31 * day, &mut rng()).unwrap().purged, 1);
     assert!(s.peek().unwrap().items(Scope::Any).is_empty());
 }
 
@@ -226,7 +229,7 @@ fn secrets_are_hidden_until_revealed_and_hide_again() {
         reveal_secs: 10,
         ..fast()
     });
-    s.unlock(PW, 0).unwrap();
+    s.unlock(PW, 0, &mut rng()).unwrap();
     assert!(!s.is_revealed(id(1), "password", 0), "hidden by default");
     s.reveal(id(1), "password", 100).unwrap();
     assert!(s.is_revealed(id(1), "password", 100));
@@ -248,7 +251,7 @@ fn revealing_again_restarts_the_timer_and_zero_means_until_hidden() {
         reveal_secs: 10,
         ..fast()
     });
-    s.unlock(PW, 0).unwrap();
+    s.unlock(PW, 0, &mut rng()).unwrap();
     s.reveal(id(1), "password", 0).unwrap();
     s.reveal(id(1), "password", 8).unwrap();
     assert!(s.is_revealed(id(1), "password", 17));
@@ -273,10 +276,10 @@ fn locking_forgets_what_was_revealed() {
         reveal_secs: 0,
         ..fast()
     });
-    s.unlock(PW, 0).unwrap();
+    s.unlock(PW, 0, &mut rng()).unwrap();
     s.reveal(id(1), "password", 0).unwrap();
     s.lock();
-    s.unlock(PW, 1).unwrap();
+    s.unlock(PW, 1, &mut rng()).unwrap();
     assert!(
         !s.is_revealed(id(1), "password", 1),
         "a new unlock starts with everything hidden"
@@ -291,7 +294,7 @@ fn a_copied_secret_is_due_for_clearing_once_after_the_delay() {
         clipboard_clear_secs: 20,
         ..fast()
     });
-    s.unlock(PW, 0).unwrap();
+    s.unlock(PW, 0, &mut rng()).unwrap();
     assert_eq!(s.copied("hunter2", 100), Some(120));
     assert!(s.has_pending_clipboard());
     assert!(s.clipboard_due(119).is_none());
@@ -310,7 +313,7 @@ fn a_newer_copy_replaces_the_pending_one_and_zero_disables_clearing() {
         clipboard_clear_secs: 20,
         ..fast()
     });
-    s.unlock(PW, 0).unwrap();
+    s.unlock(PW, 0, &mut rng()).unwrap();
     s.copied("first", 0);
     s.copied("second", 10);
     assert!(
@@ -333,7 +336,7 @@ fn locking_hands_back_the_secret_still_on_the_clipboard() {
         clipboard_clear_secs: 20,
         ..fast()
     });
-    s.unlock(PW, 0).unwrap();
+    s.unlock(PW, 0, &mut rng()).unwrap();
     s.copied("hunter2", 5);
     let pending = s.lock().expect("a secret was waiting to be cleared");
     assert_eq!(&*pending, "hunter2");
@@ -348,7 +351,7 @@ fn an_idle_lock_also_returns_the_clipboard_secret() {
         clipboard_clear_secs: 600,
         ..fast()
     });
-    s.unlock(PW, 0).unwrap();
+    s.unlock(PW, 0, &mut rng()).unwrap();
     s.copied("hunter2", 1);
     let tick = s.tick(30);
     assert!(tick.locked);
@@ -422,7 +425,7 @@ fn changing_settings_updates_the_open_vault() {
         history_limit: 10,
         ..fast()
     });
-    s.unlock(PW, 0).unwrap();
+    s.unlock(PW, 0, &mut rng()).unwrap();
     s.set_settings(Settings {
         history_limit: 1,
         ..fast()
@@ -493,7 +496,7 @@ mod model {
                     }
                     Op::UnlockRight | Op::UnlockWrong => {
                         let right = matches!(op, Op::UnlockRight);
-                        let result = s.unlock(if right { PW } else { "wrong" }, now);
+                        let result = s.unlock(if right { PW } else { "wrong" }, now, &mut rng());
                         if unlocked {
                             prop_assert!(matches!(result, Err(UnlockError::AlreadyUnlocked)));
                         } else if now < next_ok {

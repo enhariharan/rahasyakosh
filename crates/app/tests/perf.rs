@@ -120,7 +120,8 @@ fn ten_thousand_items_unlock_search_and_edit_quickly() {
     });
     assert!(took < Duration::from_secs(2), "{took:?}");
     assert_eq!(vault.items(Scope::Trashed).len(), 1);
-    assert_eq!(vault.store().list().unwrap().len(), 10_000);
+    // The sealed manifest is one more record in the store.
+    assert_eq!(vault.store().list().unwrap().len(), 10_001);
 }
 
 #[test]
@@ -157,11 +158,11 @@ fn listing_metadata_does_not_read_ciphertext() {
     let (metas, took) = timed("store.list() for 2,000 records", || {
         vault.store().list().unwrap()
     });
-    assert_eq!(metas.len(), 2_000);
+    assert_eq!(metas.len(), 2_001, "2,000 items and the manifest");
     let (all, took_all) = timed("store.all() for 2,000 records", || {
         vault.store().all().unwrap()
     });
-    assert_eq!(all.len(), 2_000);
+    assert_eq!(all.len(), 2_001);
     assert!(
         took <= took_all * 2,
         "list() should be no slower than all(): {took:?} vs {took_all:?}"

@@ -227,6 +227,9 @@ pub struct Unlocked {
     pub purged: usize,
     /// Stored items that could not be opened and were left out (see [`Vault::unreadable`]). Tell the user.
     pub unreadable: usize,
+    /// Things the vault's sealed manifest says are wrong (see [`Vault::warnings`]): a rolled-back, missing or
+    /// forged item. Tell the user.
+    pub warnings: usize,
 }
 
 struct Active<S: Store> {
@@ -263,9 +266,21 @@ pub struct Session<S: Store> {
     next_attempt_at: i64,
     revealed: Vec<(Uuid, String, i64)>,
     pending_clear: Option<PendingClear>,
+    /// Where this device remembers the newest write it has seen of each vault (see `HighWater`).
+    #[cfg(not(target_family = "wasm"))]
+    highwater_path: Option<std::path::PathBuf>,
 }
 
 impl<S: Store> Session<S> {
+    /// Remember, in the file at `path` (outside the vault folder), the newest write seen of each vault, and warn
+    /// at unlock when a vault is older than that. Audit finding P2-1.
+    #[cfg(not(target_family = "wasm"))]
+    #[must_use]
+    pub fn with_highwater(mut self, path: std::path::PathBuf) -> Self {
+        self.highwater_path = Some(path);
+        self
+    }
+
     /// A locked session over an existing vault.
     pub fn new(store: S, settings: Settings) -> Self {
         Self {
@@ -275,6 +290,8 @@ impl<S: Store> Session<S> {
             next_attempt_at: 0,
             revealed: Vec::new(),
             pending_clear: None,
+            #[cfg(not(target_family = "wasm"))]
+            highwater_path: None,
         }
     }
 
@@ -304,6 +321,8 @@ impl<S: Store> Session<S> {
             next_attempt_at: 0,
             revealed: Vec::new(),
             pending_clear: None,
+            #[cfg(not(target_family = "wasm"))]
+            highwater_path: None,
         })
     }
 
@@ -339,6 +358,7 @@ impl<S: Store> Session<S> {
         &mut self,
         password: &str,
         now: i64,
+        rng: &mut impl rand_core::CryptoRng,
     ) -> std::result::Result<Unlocked, UnlockError> {
         if self.is_unlocked() {
             return Err(UnlockError::AlreadyUnlocked);
@@ -352,9 +372,22 @@ impl<S: Store> Session<S> {
         let State::Locked(store) = std::mem::replace(&mut self.state, State::Moving) else {
             unreachable!("checked above");
         };
-        match Vault::try_unlock(store, password, self.settings.vault_config()) {
+        #[cfg(not(target_family = "wasm"))]
+        let mut highwater = self.highwater_path.as_ref().map(crate::HighWater::at);
+        #[cfg(not(target_family = "wasm"))]
+        let last_seen = highwater.as_ref().and_then(|h| {
+            let id = store.header().ok()?.vault_id;
+            h.last_seen(id)
+        });
+        #[cfg(target_family = "wasm")]
+        let last_seen = None;
+        match Vault::try_unlock_checked(store, password, self.settings.vault_config(), last_seen) {
             Ok(mut vault) => {
-                let purged = match vault.purge_expired(now) {
+                #[cfg(not(target_family = "wasm"))]
+                if let Some(h) = highwater.take() {
+                    vault.track(h);
+                }
+                let purged = match vault.purge_expired(now, rng) {
                     Ok(n) => n,
                     Err(e) => {
                         self.state = State::Locked(vault.into_store());
@@ -364,11 +397,16 @@ impl<S: Store> Session<S> {
                 self.failures = 0;
                 self.next_attempt_at = 0;
                 let unreadable = vault.unreadable().len();
+                let warnings = vault.warnings().len();
                 self.state = State::Unlocked(Box::new(Active {
                     vault,
                     last_activity: now,
                 }));
-                Ok(Unlocked { purged, unreadable })
+                Ok(Unlocked {
+                    purged,
+                    unreadable,
+                    warnings,
+                })
             }
             Err(failed) => {
                 self.state = State::Locked(failed.store);

@@ -23,7 +23,8 @@ Per vault, a store keeps:
 
 - the **header** (the readable, non-secret settings and the locked vault key),
 - one **record** per item (scrambled), with its id and a **revision** number,
-- a **tombstone** for each item that was deleted for good (just its id and the revision it was deleted at).
+- a **tombstone** for each item that was deleted for good (just its id and the revision it was deleted at),
+- one extra scrambled record, the **manifest**: a checklist of every item and its newest revision, plus a count of writes (see below).
 
 A thief who copies the storage learns how many items there are, their random ids, revision counts and rough sizes (rounded up to 64-byte
 groups). Titles, usernames, URLs, notes, timestamps and whether an item is in the trash are all inside the scrambled part.
@@ -60,6 +61,22 @@ the CLI that appears as an error; run the command again and you will see the new
 
 `rk rm` marks an item as deleted *inside* its scrambled data and keeps it; that is the **trash**. `rk restore` undoes it. `rk rm --purge` removes the record for
 good and leaves a **tombstone**, a tiny marker so that, once syncing exists, other devices can learn the item was deleted and not bring it back.
+
+### The manifest: noticing a swapped or missing record
+
+A scrambled record proves it is genuine, but not that it is the *newest* one, or that nothing else was taken away. Anyone who can write to the vault
+folder (a sync service, a shared drive) could put an old copy of an item back, so an old password returns, or remove an item. To notice this, every
+time you save, the program also writes the **manifest**, locked with the vault key like everything else. When you unlock, it compares what is in the
+folder with the manifest and tells you about anything that does not match: an item at an older version, an item that is missing, an item that was
+deleted for good but is back, or a deletion mark (tombstone) that the manifest does not know about. A deletion mark that nobody vouched for is removed, so it
+cannot hide an item.
+
+The manifest cannot spot a copy of the *whole* folder from an earlier day, because that copy, manifest included, is all genuine. For that, each computer
+keeps a small private file **outside** the vault folder (`~/.local/state/rahasyakosh/seen.json`) with the highest write count it has seen for each vault. A
+vault with a lower count than that is reported as older than last time. Losing the file loses this check, never your data.
+
+These are warnings: they tell you, they do not undo the change. Vaults made before this feature are accepted as they are; they get a manifest the first time you
+change something.
 
 Items left in the trash for **30 days** are deleted automatically. This happens whenever the vault is unlocked, and not inside the store, for a plain reason: the
 time an item was trashed is part of the scrambled data, so only the unlocked program can read it.

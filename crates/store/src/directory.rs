@@ -319,6 +319,11 @@ impl Store for DirectoryStore {
         self.remove(&Self::record_name(id))
     }
 
+    fn discard_tombstone(&mut self, id: Uuid) -> Result<()> {
+        self.require_vault()?;
+        self.remove(&Self::tombstone_name(id))
+    }
+
     fn tombstones(&self) -> Result<Vec<Tombstone>> {
         let records: BTreeMap<Uuid, u64> = self
             .ids_with_extension("rkr")?

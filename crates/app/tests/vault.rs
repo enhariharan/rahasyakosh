@@ -214,10 +214,10 @@ fn purging<S: Store>(store: S) {
         .add(login(1, "GitHub", "alice", "pw"), &mut rng())
         .unwrap();
     v.add(login(2, "Bank", "me", "pw"), &mut rng()).unwrap();
-    v.purge(a).unwrap();
+    v.purge(a, &mut rng()).unwrap();
     assert!(v.get(a).is_none());
     assert!(v.search("github").is_empty());
-    assert!(matches!(v.purge(a), Err(Error::NotFound(_))));
+    assert!(matches!(v.purge(a, &mut rng()), Err(Error::NotFound(_))));
     let tombs = v.store().tombstones().unwrap();
     assert_eq!(tombs.len(), 1);
     assert_eq!(tombs[0].id, a);
@@ -235,18 +235,18 @@ fn expiry<S: Store>(store: S) {
     v.trash(newer, t0 + 10 * DAY, &mut rng()).unwrap();
 
     assert_eq!(
-        v.purge_expired(t0 + 29 * DAY).unwrap(),
+        v.purge_expired(t0 + 29 * DAY, &mut rng()).unwrap(),
         0,
         "29 days: nothing yet"
     );
     assert_eq!(
-        v.purge_expired(t0 + 30 * DAY).unwrap(),
+        v.purge_expired(t0 + 30 * DAY, &mut rng()).unwrap(),
         1,
         "30 days: the old one goes"
     );
     assert!(v.get(old).is_none() && v.get(newer).is_some());
-    assert_eq!(v.purge_expired(t0 + 39 * DAY).unwrap(), 0);
-    assert_eq!(v.purge_expired(t0 + 40 * DAY).unwrap(), 1);
+    assert_eq!(v.purge_expired(t0 + 39 * DAY, &mut rng()).unwrap(), 0);
+    assert_eq!(v.purge_expired(t0 + 40 * DAY, &mut rng()).unwrap(), 1);
     assert_eq!(
         titles(v.items(Scope::Any)),
         ["Live"],
@@ -539,7 +539,7 @@ mod model {
                         if r1.is_ok() { model.get_mut(&x).unwrap().1 = false; }
                     },
                     Op::Purge(n) => if let Some(x) = pick(*n) {
-                        v.purge(x).unwrap();
+                        v.purge(x, &mut rng()).unwrap();
                         model.remove(&x);
                     },
                     Op::Revert(n) => if let Some(x) = pick(*n) {

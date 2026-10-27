@@ -122,6 +122,11 @@ pub trait Store {
     fn purge(&mut self, id: Uuid, rev: u64) -> Result<()>;
 
     fn tombstones(&self) -> Result<Vec<Tombstone>>;
+
+    /// Remove an item's tombstone and nothing else. For a tombstone that the vault's sealed manifest does not vouch
+    /// for (audit finding P2-2): it would hide a record and block every later write to the item. Not an error if
+    /// there is none.
+    fn discard_tombstone(&mut self, id: Uuid) -> Result<()>;
 }
 
 /// Shared by backends: checks a batch against the current state without writing anything.

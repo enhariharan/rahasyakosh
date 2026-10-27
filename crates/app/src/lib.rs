@@ -7,11 +7,15 @@
 //! Like `core`, it reads neither the clock nor a random generator: callers pass the time and an RNG.
 #![forbid(unsafe_code)]
 
+#[cfg(not(target_family = "wasm"))]
+mod highwater;
 mod index;
 mod profiles;
 mod session;
 mod vault;
 
+#[cfg(not(target_family = "wasm"))]
+pub use highwater::HighWater;
 pub use profiles::{
     new_profile_id, Profile, ProfileError, ProfileList, DEFAULT_FULL_NAME, DEFAULT_USERNAME,
 };
@@ -19,4 +23,4 @@ pub use session::{
     backoff_secs, should_clear, Language, Locked, Session, Settings, ThemeMode, Tick, ToolbarStyle,
     UnlockError, Unlocked,
 };
-pub use vault::{Config, Error, Result, Scope, Skipped, UnlockFailed, Vault};
+pub use vault::{Config, Error, Result, Scope, Skipped, UnlockFailed, Vault, Warning};

@@ -100,8 +100,8 @@ All seven phases are done (Phase 1 was finished last, on the same day). 52 findi
 ### Findings that matter most
 | ID | Severity | Finding | How found | Status |
 |---|---|---|---|---|
-| [P2-1](#p2-1) | High | Rollback and deletion of records are undetected (no high-water mark) | Confirmed | open |
-| [P2-2](#p2-2) | High | Tombstones are unauthenticated; any rev hides an item and blocks its id | Confirmed | open |
+| [P2-1](#p2-1) | High | Rollback and deletion of records are undetected (no high-water mark) | Confirmed | fixed 2026-10-27 |
+| [P2-2](#p2-2) | High | Tombstones are unauthenticated; any rev hides an item and blocks its id | Confirmed | fixed 2026-10-27 |
 | [P2-3](#p2-3) | Medium | One bad record makes the whole vault unopenable | Confirmed | fixed |
 | [P2-4](#p2-4) | Medium | Password change keeps the vault key; the old header stays in the WAL | Confirmed (WAL) | open |
 | [P1-1](#p1-1) | Medium | The master password is not Unicode-normalised before Argon2 (lock-out risk across keyboards and platforms; relevant to the Indic-language users) | From reading | open |
@@ -302,7 +302,7 @@ Files read: `store/{lib,directory,sqlite}.rs`, `app/vault.rs`. Four findings wer
 - **Evidence:** `docs/04` lists "rollback detection (HLC + local high-water mark)" as a mitigation; nothing implements it. The record AAD binds `rev`, but an older record is still a valid record. PoC: edit an item to rev 2, restore the old `.rkr` file, unlock. It succeeds and shows rev 1 with the old content. Deleting a record file is equally invisible.
 - **Impact:** A sync server or anyone with write access can silently revert a changed password to the old one, or remove items.
 - **Recommended fix:** Keep per-vault state outside the synced folder (item id to highest rev seen, and a record count) and refuse or warn on regression. Consider one sealed manifest record (id-to-rev map plus a counter, authenticated under the vault key) so deletion is detectable on a fresh device.
-- **Status:** open
+- **Status:** fixed, 2026-10-27: every write also seals a *manifest* (item id to newest revision, plus a write counter) under the vault key. Unlock compares the store with it and reports a `RolledBack`, `Missing` or `Resurrected` item (`Vault::warnings()`); a device-local file (`HighWater`, `$XDG_STATE_HOME/rahasyakosh/seen.json`) catches a whole-vault rollback (`OlderThanSeen`) and a removed manifest. Tests `crates/app/tests/integrity.rs`. Limits: the warnings inform, they do not restore the newer version; a vault from before this change is trusted as it stands until its first write (trust on first use); a device that never opened the vault has no high-water mark; two devices writing the same vault would disagree (sync is not built yet).
 
 [Top](#top)
 
@@ -315,7 +315,7 @@ Files read: `store/{lib,directory,sqlite}.rs`, `app/vault.rs`. Four findings wer
 - **Evidence:** `.rkt` files and the `tombstones` table hold a plain `{"rev": N}`. PoC: write `<id>.rkt` with rev `u64::MAX`. Unlock succeeds, the item is gone from the list with no warning, and writing that id again fails with `stale revision ... already at 18446744073709551615`.
 - **Impact:** Anyone who can write the store can hide any item and make its id permanently unusable.
 - **Recommended fix:** Seal tombstones under the vault key with the id and rev in the AAD; treat an unsealed or unverifiable tombstone as corrupt. Bound how far a rev may jump.
-- **Status:** open
+- **Status:** fixed, 2026-10-27: a tombstone counts only if the sealed manifest vouches for it (`gone`). Any other is reported as `ForgedTombstone` and removed (`Store::discard_tombstone`), so the item shows again and its id can be written. A purge seals the manifest first. Tests `crates/app/tests/integrity.rs`, conformance suite. Not done: the tombstone file itself is still unsealed, which only matters once sync trusts tombstones from other devices.
 
 [Top](#top)
 
@@ -328,7 +328,7 @@ Files read: `store/{lib,directory,sqlite}.rs`, `app/vault.rs`. Four findings wer
 - **Evidence:** `Vault::unlock_inner` uses `?` on every record. PoC: drop a `<uuid>.rkr` containing `{}` into the directory; unlock fails with `vault storage is corrupted`.
 - **Impact:** A sync peer or a sync conflict can lock the user out of everything until they delete the file by hand.
 - **Recommended fix:** Skip and report records that fail (a quarantine list the UI shows) and open the rest. A wrong password must still fail closed; that is decided by the header before any record is read.
-- **Status:** fixed, 2026-10-26: `Vault::unlock` skips unreadable and unopenable records and lists them in `Vault::unreadable()`; the CLI prints their ids and the desktop app shows a notice (tests `crates/app/tests/hostile_store.rs`, `crates/store/tests/directory.rs`). A skipped record is not detected as missing until P2-1 is fixed.
+- **Status:** fixed, 2026-10-26: `Vault::unlock` skips unreadable and unopenable records and lists them in `Vault::unreadable()`; the CLI prints their ids and the desktop app shows a notice (tests `crates/app/tests/hostile_store.rs`, `crates/store/tests/directory.rs`). A skipped record is also listed as missing by the manifest check (P2-1).
 
 [Top](#top)
 

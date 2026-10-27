@@ -41,7 +41,13 @@ impl Vault {
     /// Revision numbers of the stored records, read straight from the database.
     fn revs(&self) -> Vec<u64> {
         let store = SqliteStore::open(&self.0).unwrap();
-        store.list().unwrap().iter().map(|m| m.rev).collect()
+        store
+            .list()
+            .unwrap()
+            .iter()
+            .filter(|m| !m.id.is_nil()) // the sealed manifest is not an item
+            .map(|m| m.rev)
+            .collect()
     }
 }
 
@@ -55,6 +61,7 @@ fn run(vault: &Path, args: &[&str], stdin: &str) -> Output {
     let mut child = Command::new(env!("CARGO_BIN_EXE_rk"))
         .args(args)
         .env("RK_VAULT", vault)
+        .env("XDG_STATE_HOME", env!("CARGO_TARGET_TMPDIR"))
         .env("RK_PASSWORD", PW)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -212,6 +219,7 @@ fn wrong_master_password_cannot_edit() {
     let out = Command::new(env!("CARGO_BIN_EXE_rk"))
         .args(["edit", "site", "--notes", "x"])
         .env("RK_VAULT", &v.0)
+        .env("XDG_STATE_HOME", env!("CARGO_TARGET_TMPDIR"))
         .env("RK_PASSWORD", "not the password")
         .output()
         .unwrap();
@@ -230,6 +238,7 @@ fn cli_migrates_and_opens_the_golden_vault() {
         Command::new(env!("CARGO_BIN_EXE_rk"))
             .args(args)
             .env("RK_VAULT", &target)
+            .env("XDG_STATE_HOME", env!("CARGO_TARGET_TMPDIR"))
             .env("RK_PASSWORD", pw)
             .output()
             .unwrap()
@@ -368,6 +377,7 @@ impl FakeClipboard {
             .env("PATH", &self.bin)
             .env("WAYLAND_DISPLAY", "fake-0")
             .env("RK_VAULT", &v.0)
+            .env("XDG_STATE_HOME", env!("CARGO_TARGET_TMPDIR"))
             .env("RK_PASSWORD", PW)
             .stdin(Stdio::null())
             .output()
@@ -476,6 +486,7 @@ fn without_a_clipboard_tool_it_fails_helpfully_and_prints_nothing() {
         .env("PATH", &empty)
         .env("WAYLAND_DISPLAY", "fake-0")
         .env("RK_VAULT", &v.0)
+        .env("XDG_STATE_HOME", env!("CARGO_TARGET_TMPDIR"))
         .env("RK_PASSWORD", PW)
         .output()
         .unwrap();
@@ -585,6 +596,7 @@ fn migrate_loads_an_old_vault_file_and_refuses_bad_input() {
         Command::new(env!("CARGO_BIN_EXE_rk"))
             .args(args)
             .env("RK_VAULT", vault)
+            .env("XDG_STATE_HOME", env!("CARGO_TARGET_TMPDIR"))
             .env("RK_PASSWORD", pw)
             .output()
             .unwrap()

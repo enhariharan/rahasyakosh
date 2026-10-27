@@ -62,7 +62,7 @@ Use the directory store or SQLite vault as noted. Always copy the vault first (`
 
 ### P2-1 Rollback and deletion
 - [ ] Add item A (rev 1). Copy the vault folder. Edit A so its password changes (rev 2). Put the old copy of A's record back. Unlock.
-      Expected after fix: a warning or refusal ("this item went back to an older version"); the old password is **not** silently shown. (Today: the old version appears.)
+      Fixed 2026-10-27 (`crates/app/tests/integrity.rs`). Expected: a warning ("this item went back to an older version"); the old password is **not** silently shown. (Today: the old version appears.)
 - [ ] Delete one record file by hand and unlock. Expected: a warning that an item is missing.
 - [ ] Restore the whole vault from a backup that is older than this device's last state: a warning is shown, and the user can accept it knowingly.
 - [ ] On a second device or fresh profile that has never seen the vault, unlock works without a false alarm.

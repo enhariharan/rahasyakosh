@@ -5,7 +5,7 @@
 | Adversary | In scope? | Mitigation |
 |-----------|-----------|------------|
 | Thief with vault file / stolen cloud blob | Yes | Argon2id + XChaCha20-Poly1305; optional Secret Key |
-| Malicious/compromised sync server | Yes | E2EE; integrity via AEAD with id/version bound as AAD; rollback detection (HLC + local high-water mark) |
+| Malicious/compromised sync server | Yes | E2EE; integrity via AEAD with id/version bound as AAD; rollback detection (a sealed manifest of newest revisions, plus a local high-water mark of the highest write seen; see docs/book storage.md) |
 | Network attacker | Yes | TLS + E2EE; no secrets in requests (HIBP uses k-anonymity) |
 | Shoulder surfing / screen capture | Partly | Masked fields, FLAG_SECURE, clipboard auto-clear |
 | Malware running as user, while unlocked | **No** (documented) | Minimise key lifetime, auto-lock |

@@ -116,7 +116,13 @@ fn startup(path: &Path) -> Startup {
         }
     }
     match SqliteStore::open(path) {
-        Ok(store) => Startup::Ready(Box::new(make_model(Session::new(store, load_settings())))),
+        Ok(store) => {
+            let mut session = Session::new(store, load_settings());
+            if let Some(p) = rahasyakosh_app::HighWater::default_path() {
+                session = session.with_highwater(p);
+            }
+            Startup::Ready(Box::new(make_model(session)))
+        }
         Err(e) => Startup::Broken(trf(load_settings().language, Msg::CannotOpenVault, &[&e])),
     }
 }

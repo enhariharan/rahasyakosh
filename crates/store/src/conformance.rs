@@ -293,6 +293,14 @@ fn purge_and_tombstones<F: Fixture>(f: &F) {
         vec![Tombstone { id: id(9), rev: 4 }],
         "tombstone: cleared by newer write"
     );
+
+    // Discarding a tombstone lets an old write through again, leaves records alone, and is harmless when absent.
+    s.discard_tombstone(id(9)).unwrap();
+    s.discard_tombstone(id(9)).unwrap();
+    assert!(s.tombstones().unwrap().is_empty(), "discard: gone");
+    s.put(&record(9, 1, 10)).unwrap();
+    s.discard_tombstone(id(9)).unwrap();
+    assert!(s.get(id(9)).unwrap().is_some(), "discard: keeps the record");
 }
 
 fn survives_reopen<F: Fixture>(f: &F) {

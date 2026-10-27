@@ -410,7 +410,20 @@ fn open_vault(path: &Path) -> Result<Vault<SqliteStore>> {
     drop(file);
     let store = SqliteStore::open(path)?;
     let pw = read_password("Master password: ")?;
-    let mut vault = Vault::unlock(store, &pw, Config::default())?;
+    let mut highwater =
+        rahasyakosh_app::HighWater::default_path().map(rahasyakosh_app::HighWater::at);
+    let last_seen = highwater
+        .as_ref()
+        .and_then(|h| h.last_seen(store.header().ok()?.vault_id));
+    let mut vault =
+        Vault::try_unlock_checked(store, &pw, Config::default(), last_seen).map_err(|f| f.error)?;
+    for w in vault.warnings() {
+        // Warnings name item ids and numbers only, never text taken from the stored data.
+        eprintln!("Warning: {w}.");
+    }
+    if let Some(h) = highwater.take() {
+        vault.track(h);
+    }
     if !vault.unreadable().is_empty() {
         // Only ids are printed: the parser's reason can quote text from the damaged or planted data.
         let ids: Vec<String> = vault
@@ -424,7 +437,7 @@ fn open_vault(path: &Path) -> Result<Vault<SqliteStore>> {
             ids.join(", ")
         );
     }
-    let purged = vault.purge_expired(now())?;
+    let purged = vault.purge_expired(now(), &mut rand::rng())?;
     if purged > 0 {
         eprintln!(
             "Deleted {purged} item(s) that had been in the trash for {} days or more.",
@@ -822,7 +835,7 @@ fn main() -> Result<()> {
                 }
             };
             if purge {
-                vault.purge(id)?;
+                vault.purge(id, &mut rng)?;
             } else {
                 vault.trash(id, now(), &mut rng)?;
             }
