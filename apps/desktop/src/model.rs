@@ -602,6 +602,36 @@ impl<S: Store, C: Clipboard> Model<S, C> {
             .map_err(|_| t(lang, Msg::WrongPassword).to_string())
     }
 
+    /// Whether the open vault is also locked with a Secret Key.
+    pub fn has_secret_key(&self) -> bool {
+        self.session.peek().is_some_and(|v| v.has_secret_key())
+    }
+
+    /// Lock the open vault with a Secret Key as well, after checking the master password. Returns the key as text and
+    /// whether it could be kept on this device, for the one-time sheet. Audit finding P1-3.
+    pub fn add_secret_key(
+        &mut self,
+        password: &str,
+        now: i64,
+    ) -> Result<(zeroize::Zeroizing<String>, bool), String> {
+        self.activity(now);
+        let lang = self.lang();
+        if self.has_secret_key() {
+            return Err(t(lang, Msg::SecretKeyInUse).into());
+        }
+        let result = self
+            .session
+            .add_secret_key(password, now, &mut rand::rng())
+            .map_err(|e| match e {
+                rahasyakosh_app::Error::State(_) => e.to_string(),
+                _ => t(lang, Msg::WrongPassword).to_string(),
+            });
+        if let Err(e) = &result {
+            self.error(e.clone(), now);
+        }
+        result
+    }
+
     /// For deleting a profile: is `password` the master password of the open vault?
     pub fn confirm_password(&mut self, password: &str, now: i64) -> Result<(), String> {
         let lang = self.lang();

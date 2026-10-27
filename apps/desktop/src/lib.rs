@@ -1684,6 +1684,13 @@ fn SettingsView() -> Element {
     let mut new_pw = use_signal(String::new);
     let mut new_pw2 = use_signal(String::new);
     let mut pw_msg = use_signal(|| Option::<(bool, String)>::None);
+    let mut sk_pw = use_signal(String::new);
+    let mut sk_msg = use_signal(|| Option::<String>::None);
+    let has_key = ctx
+        .model
+        .read()
+        .as_ref()
+        .is_some_and(|m| m.has_secret_key());
     let mut export_pw = use_signal(String::new);
     let mut export_format = use_signal(model::ExportFormat::default);
     let mut export_path =
@@ -1784,6 +1791,35 @@ fn SettingsView() -> Element {
                 input { id: "p2", class: "ltr", dir: "ltr", r#type: "password", autocomplete: "off", value: "{new_pw2}", oninput: move |e| new_pw2.set(e.value()) }
                 if let Some((ok, text)) = pw_msg() { p { class: if ok { "ok" } else { "error" }, role: "status", "{text}" } }
                 button { class: "primary", r#type: "submit", {tr(lang, Msg::ChangeMasterButton)} }
+            }
+            h3 { {tr(lang, Msg::SecretKeyTitle)} }
+            if has_key {
+                p { class: "muted small", {tr(lang, Msg::SecretKeyInUse)} }
+            } else {
+                p { class: "muted small", id: "sk-hint", {tr(lang, Msg::SecretKeyOptionHint)} }
+                form {
+                    onsubmit: move |e| {
+                        e.prevent_default();
+                        let pw = sk_pw.read().clone();
+                        let r = ctx.model.write().as_mut().map(|m| m.add_secret_key(&pw, now()));
+                        sk_pw.set(String::new());
+                        match r {
+                            Some(Ok(sheet)) => {
+                                sk_msg.set(None);
+                                ctx.key_sheet.set(Some(sheet));
+                            }
+                            Some(Err(e)) => sk_msg.set(Some(e)),
+                            None => {}
+                        }
+                    },
+                    label { r#for: "sk-pw", {tr(lang, Msg::ExportMasterPassword)} }
+                    input {
+                        id: "sk-pw", class: "ltr", dir: "ltr", r#type: "password", autocomplete: "off", value: "{sk_pw}",
+                        aria_describedby: "sk-hint", oninput: move |e| sk_pw.set(e.value()),
+                    }
+                    if let Some(e) = sk_msg() { p { class: "error", role: "alert", "{e}" } }
+                    button { class: "primary", r#type: "submit", {tr(lang, Msg::SecretKeyAddButton)} }
+                }
             }
             h3 { {tr(lang, Msg::ExportTitle)} }
             p { class: "muted small", id: "export-warning", {tr(lang, Msg::ExportWarning)} }

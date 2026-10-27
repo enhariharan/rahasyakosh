@@ -1010,3 +1010,21 @@ fn a_settings_file_that_cannot_be_written_is_reported_not_called_saved() {
         "{text}"
     );
 }
+
+#[test]
+fn a_secret_key_can_be_added_to_an_open_vault_once_after_checking_the_password() {
+    let (mut m, _) = model(Settings {
+        idle_lock_secs: 0,
+        ..Settings::default()
+    });
+    assert!(!m.has_secret_key());
+    assert!(m.add_secret_key("wrong", 20).is_err());
+    assert!(!m.has_secret_key());
+    let (text, _kept) = m.add_secret_key(PW, 21).unwrap();
+    assert!(text.starts_with("RK1-"));
+    assert!(m.has_secret_key());
+    // A second one would replace the first and lock the user out of any copy they wrote down.
+    assert!(m.add_secret_key(PW, 22).is_err());
+    m.lock();
+    assert!(m.add_secret_key(PW, 23).is_err());
+}
