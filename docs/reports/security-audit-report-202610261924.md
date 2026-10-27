@@ -581,7 +581,7 @@ Files read: `transfer/src/{lib,bundle}.rs`, the import and export commands in `c
 - **Evidence:** For every new row `import_csv` scans the whole `seen` set (`seen.iter().any(...)`) to count similar logins: O(rows²). `rk import big.csv --dry-run`: 5.2 s for 20 000 rows, 25.7 s for 40 000.
 - **Impact:** The 50 MiB cap allows about 500 000 short rows, so a hostile or merely large file can hang the CLI and the desktop import for a very long time, with no progress shown.
 - **Recommended fix:** Index `seen` by (title, username, url), for example `HashMap<(String, String, String), HashSet<String>>` of passwords, so the check is one lookup. Add a large-file timing test.
-- **Status:** fixed 2026-10-27: `import_csv` keeps a map from (title, username, URL) to the passwords seen, so each row costs one lookup. 40 000 rows now take about 0.25 s in a debug build (26 s before). Tests `crates/transfer/tests/large_import.rs` (speed, and duplicates/changed passwords are still told apart). Not done: a progress display in the desktop import; with the fix it is no longer needed for files up to the 50 MiB cap.
+- **Status:** fixed 2026-10-27: `import_csv` keeps a map from (title, username, URL) to the passwords seen, so each row costs one lookup. 40 000 rows now take about 0.25 s in a debug build (26 s before). Tests `crates/transfer/tests/large_import.rs` (speed, and duplicates/changed passwords are still told apart). No progress display is needed: the desktop app has no import screen yet (import is `rk import` only; see `docs/11-next-steps.md`), and with the fix the library handles files up to the 50 MiB cap quickly. Add progress when that screen is built.
 
 [Top](#top)
 
