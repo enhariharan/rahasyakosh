@@ -43,6 +43,7 @@ fn header(vault: u128, salt_byte: u8) -> VaultHeader {
             nonce: [salt_byte; 24],
             ct: vec![salt_byte; 48],
         },
+        pw_norm: None,
     }
 }
 

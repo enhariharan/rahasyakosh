@@ -104,7 +104,7 @@ All seven phases are done (Phase 1 was finished last, on the same day). 52 findi
 | [P2-2](#p2-2) | High | Tombstones are unauthenticated; any rev hides an item and blocks its id | Confirmed | fixed 2026-10-27 |
 | [P2-3](#p2-3) | Medium | One bad record makes the whole vault unopenable | Confirmed | fixed |
 | [P2-4](#p2-4) | Medium | Password change keeps the vault key; the old header stays in the WAL | Confirmed (WAL) | open |
-| [P1-1](#p1-1) | Medium | The master password is not Unicode-normalised before Argon2 (lock-out risk across keyboards and platforms; relevant to the Indic-language users) | From reading | open |
+| [P1-1](#p1-1) | Medium | The master password is not Unicode-normalised before Argon2 (lock-out risk across keyboards and platforms; relevant to the Indic-language users) | From reading | fixed 2026-10-27 |
 | [P1-2](#p1-2) | Medium | The unauthenticated header drives Argon2: one unlock attempt with the allowed maximum took 10.8 s and 1 GiB | Measured | fixed in part |
 | [P1-3](#p1-3) | Medium | The design doc (`docs/04`) and the code disagree: no Secret Key, verifier blob, header magic or `mlock` | Confirmed | open |
 | [P6-1](#p6-1) | Medium | No core-dump, ptrace or `mlock` hardening | From reading | open |
@@ -171,7 +171,7 @@ Files read: all of `core/src/{crypto,vault,item,totp,generator}.rs`, the `argon2
 - **Evidence:** `derive_kek` passes `password.as_bytes()` to Argon2. The same visible password can be different bytes: `é` as one code point or `e` plus a combining accent, and many Devanagari, Tamil, Telugu, Malayalam and Urdu sequences (composed or decomposed, depending on the input method and platform). Nothing in the repo normalises text.
 - **Impact:** A password typed correctly on another keyboard, platform or future port gives "wrong password". The app offers seven languages, so non-Latin master passwords are a stated audience.
 - **Recommended fix:** Normalise to NFKC before deriving keys. Because this changes the key for existing non-ASCII passwords, use a format flag: new vaults record `"pw_norm": "nfkc"` in the authenticated header, and unlock of older vaults tries the raw bytes first, then the normalised form. Add golden vectors for both. The strength meter and the generator use the same form.
-- **Status:** open
+- **Status:** fixed, 2026-10-27: new vaults and every password change record `"pw_norm":"nfkc"` in the authenticated header and key the vault from the NFKC form (`PwNorm`, `VaultHeader::unlock`). A vault from before the change tries the typed bytes first, then the NFKC and NFKD forms, and moves to the new form on its next password change. Tests `crates/core/tests/password_normalisation.rs`, including a golden header written by the earlier code. Known limit: an older vault whose password mixed composed and decomposed characters opens only with exactly those bytes. The strength meter only reads the typed text and needs no change.
 
 [Top](#top)
 

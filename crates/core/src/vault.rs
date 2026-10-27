@@ -5,6 +5,7 @@ use crate::{Error, Result};
 use rand_core::CryptoRng;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use unicode_normalization::UnicodeNormalization;
 use uuid::Uuid;
 use zeroize::Zeroizing;
 
@@ -53,6 +54,16 @@ impl From<&SealedKey> for Sealed {
     }
 }
 
+/// How the master password was turned into bytes before key derivation (audit finding P1-1).
+///
+/// The same visible text can be different bytes (`é` as one character or as `e` plus an accent), depending on the
+/// keyboard and platform. NFKC is one agreed form, so the same password always gives the same key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PwNorm {
+    #[serde(rename = "nfkc")]
+    Nfkc,
+}
+
 /// Plaintext vault header. Every field is authenticated as AAD of `wrapped_vk`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VaultHeader {
@@ -62,11 +73,19 @@ pub struct VaultHeader {
     #[serde(with = "b64")]
     pub salt: [u8; SALT_LEN],
     pub wrapped_vk: SealedKey,
+    /// `None` in vaults made before the password was normalised: those were keyed from the raw bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pw_norm: Option<PwNorm>,
 }
 
 impl VaultHeader {
     fn aad(&self) -> Vec<u8> {
-        header_aad(self.format_version, &self.vault_id, &self.kdf, &self.salt)
+        let mut a = header_aad(self.format_version, &self.vault_id, &self.kdf, &self.salt);
+        // Appended only when set, so the AAD of an older header is byte for byte what it always was.
+        if let Some(PwNorm::Nfkc) = self.pw_norm {
+            a.extend_from_slice(b"pw:nfkc");
+        }
+        a
     }
 
     /// Derive keys from `password` and unwrap the vault key.
@@ -75,13 +94,40 @@ impl VaultHeader {
             return Err(Error::UnsupportedVersion(self.format_version));
         }
         check_kdf(&self.kdf)?;
-        let kek = derive_kek(password, &self.salt, &self.kdf)?;
-        let vk_bytes = crypto::open(&kek, &(&self.wrapped_vk).into(), &self.aad())?;
-        let vk: [u8; 32] = vk_bytes.as_slice().try_into().map_err(|_| Error::Decrypt)?;
-        Ok(UnlockedVault {
-            header: self.clone(),
-            vk: Zeroizing::new(vk),
-        })
+        let mut last = Error::Decrypt;
+        for candidate in self.password_forms(password) {
+            let kek = derive_kek(&candidate, &self.salt, &self.kdf)?;
+            match crypto::open(&kek, &(&self.wrapped_vk).into(), &self.aad()) {
+                Ok(vk_bytes) => {
+                    let vk: [u8; 32] =
+                        vk_bytes.as_slice().try_into().map_err(|_| Error::Decrypt)?;
+                    return Ok(UnlockedVault {
+                        header: self.clone(),
+                        vk: Zeroizing::new(vk),
+                    });
+                }
+                Err(e) => last = e,
+            }
+        }
+        Err(last)
+    }
+
+    /// The forms of `password` to try, in order. A vault with `pw_norm` set uses only the normalised form. An older
+    /// vault was keyed from whatever bytes the user's keyboard produced, so it tries the typed bytes first, then
+    /// the two standard forms (composed and decomposed). Text that is the same in all of them costs one attempt.
+    fn password_forms(&self, password: &str) -> Vec<Zeroizing<String>> {
+        let nfkc = Zeroizing::new(password.nfkc().collect::<String>());
+        if self.pw_norm.is_some() {
+            return vec![nfkc];
+        }
+        let mut forms = vec![Zeroizing::new(password.to_owned())];
+        let nfkd = Zeroizing::new(password.nfkd().collect::<String>());
+        for f in [nfkc, nfkd] {
+            if !forms.iter().any(|g| **g == *f) {
+                forms.push(f);
+            }
+        }
+        forms
     }
 }
 
@@ -148,6 +194,17 @@ pub struct UnlockedVault {
 
 impl UnlockedVault {
     pub fn create(password: &str, kdf: KdfParams, rng: &mut impl CryptoRng) -> Result<Self> {
+        Self::create_with(password, kdf, Some(PwNorm::Nfkc), rng)
+    }
+
+    /// `norm = None` makes a header in the format before password normalisation. For tests of that format only.
+    #[doc(hidden)]
+    pub fn create_with(
+        password: &str,
+        kdf: KdfParams,
+        norm: Option<PwNorm>,
+        rng: &mut impl CryptoRng,
+    ) -> Result<Self> {
         check_kdf(&kdf)?;
         let salt = crypto::random_bytes::<SALT_LEN>(rng);
         let vault_id = Uuid::from_bytes(crypto::random_bytes::<16>(rng));
@@ -161,6 +218,7 @@ impl UnlockedVault {
                 nonce: [0; NONCE_LEN],
                 ct: vec![],
             },
+            pw_norm: norm,
         };
         header.wrapped_vk = Self::wrap(password, &header, &vk, rng)?;
         Ok(Self { header, vk })
@@ -172,7 +230,9 @@ impl UnlockedVault {
         vk: &Key,
         rng: &mut impl CryptoRng,
     ) -> Result<SealedKey> {
-        let kek = derive_kek(password, &h.salt, &h.kdf)?;
+        // The form of the password is the header's: `pw_norm` set means normalised, unset means the typed bytes.
+        let form = h.password_forms(password).swap_remove(0);
+        let kek = derive_kek(&form, &h.salt, &h.kdf)?;
         Ok(crypto::seal(&kek, vk.as_slice(), &h.aad(), rng).into())
     }
 
@@ -190,6 +250,8 @@ impl UnlockedVault {
         check_kdf(&kdf)?;
         let mut h = self.header.clone();
         h.kdf = kdf;
+        // A password change moves an older vault to the normalised form.
+        h.pw_norm = Some(PwNorm::Nfkc);
         h.salt = crypto::random_bytes::<SALT_LEN>(rng);
         h.wrapped_vk = Self::wrap(new_password, &h, &self.vk, rng)?;
         self.header = h;

@@ -67,6 +67,7 @@ fn header() -> VaultHeader {
             nonce: [2; 24],
             ct: vec![3; 48],
         },
+        pw_norm: None,
     }
 }
 

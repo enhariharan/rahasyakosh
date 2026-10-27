@@ -22,7 +22,7 @@ Most checks are also worth turning into automated tests when the fix is written.
 ### P1-1 Unicode normalisation of the master password
 | Step | Expected after fix | Result |
 |---|---|---|
-| Create a vault whose master password is `café` typed with the single character `é` (U+00E9). Unlock it with `cafe` followed by a combining accent (U+0301). | Unlocks. (Today: "wrong password".) | |
+| Create a vault whose master password is `café` typed with the single character `é` (U+00E9). Unlock it with `cafe` followed by a combining accent (U+0301). | Unlocks. Fixed 2026-10-27 (`crates/core/tests/password_normalisation.rs`). | |
 | Repeat with a Devanagari password that has a nukta, once composed and once decomposed (for example `क़` U+0958 vs `क` + `़` U+0915 U+093C). | Both forms unlock. | |
 | Take a vault created **before** the fix with a non-ASCII password. | Still unlocks (raw bytes tried first) and is upgraded or flagged. | |
 | Type the same password on another keyboard layout or input method (for example Indic input method vs copy and paste). | Unlocks either way. | |

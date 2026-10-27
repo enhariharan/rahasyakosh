@@ -28,6 +28,12 @@ master key ──HKDF "rk/kek/v1"──► KEK  (key-encrypting key)
 we re-wrap the small vault key under a new KEK. We do **not** need to re-encrypt every item. That
 is `UnlockedVault::change_password`.
 
+**Why is the password "normalised"?** The same word can be stored as different bytes. An `é` can be one
+character, or an `e` followed by a separate accent mark, and many Hindi, Tamil, Telugu, Malayalam and Urdu letters can be built in more
+than one way too. Which one you get depends on the keyboard or input method. Before the password is turned into a key, the program
+converts it to one standard form (called NFKC), so the same password you can see always opens the vault. The header records this
+(`pw_norm`). Vaults made earlier still open: the program tries your typed bytes first, then the standard forms.
+
 **Why a key per item?** If something ever went wrong with one item's key, only that item is
 affected. It also means a record is meaningless without its own id.
 
