@@ -15,7 +15,7 @@ use crate::{
 };
 use std::collections::BTreeMap;
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 /// A file larger than this is treated as corrupt rather than read into memory.
@@ -57,37 +57,68 @@ impl DirectoryStore {
     /// Whole file contents, or `None` if it does not exist.
     fn read(&self, name: &str) -> Result<Option<Vec<u8>>> {
         let path = self.file(name);
-        let meta = match fs::metadata(&path) {
+        // A link is not followed and only a plain file is read: a planted link to `/dev/zero` or a named pipe would
+        // otherwise report a small size and then supply bytes without end (audit finding P2-5).
+        let meta = match fs::symlink_metadata(&path) {
             Ok(m) => m,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(e) => return Err(io(e)),
         };
+        if !meta.is_file() {
+            return Err(Error::Corrupt(format!("{name} is not a regular file")));
+        }
         if meta.len() > MAX_FILE {
             return Err(Error::Corrupt(format!("{name} is implausibly large")));
         }
-        match fs::read(&path) {
-            Ok(b) => Ok(Some(b)),
+        // The size can change between the check and the read, so the read has its own limit too.
+        let mut bytes = Vec::new();
+        match fs::File::open(&path).and_then(|f| f.take(MAX_FILE + 1).read_to_end(&mut bytes)) {
+            Ok(_) if bytes.len() as u64 > MAX_FILE => {
+                Err(Error::Corrupt(format!("{name} is implausibly large")))
+            }
+            Ok(_) => Ok(Some(bytes)),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
             Err(e) => Err(io(e)),
         }
     }
 
     fn write(&self, name: &str, bytes: &[u8]) -> Result<()> {
-        let tmp = self.file(&format!(".{name}.tmp"));
+        // Through a fresh temporary file (a leftover or planted one of that name is removed, never written through).
+        crate::private_fs::write_private_atomic(&self.file(name), bytes).map_err(io)?;
+        self.sync_dir();
+        Ok(())
+    }
+
+    /// Make a rename durable. Best effort: not every filesystem allows syncing a directory.
+    fn sync_dir(&self) {
+        if let Ok(d) = fs::File::open(&self.dir) {
+            let _ = d.sync_all();
+        }
+    }
+
+    /// Write `name` only if it does not exist yet, as one step: the file is made in full under a temporary name and
+    /// then linked into place, which fails if another process got there first (audit finding P2-5).
+    fn write_new(&self, name: &str, bytes: &[u8]) -> Result<()> {
+        let tmp = self.file(&format!(".{name}.new"));
+        let _ = fs::remove_file(&tmp);
         let mut opts = fs::OpenOptions::new();
-        opts.write(true).create(true).truncate(true);
+        opts.write(true).create_new(true);
         #[cfg(unix)]
         std::os::unix::fs::OpenOptionsExt::mode(&mut opts, 0o600);
         let mut f = opts.open(&tmp).map_err(io)?;
         f.write_all(bytes).map_err(io)?;
         f.sync_all().map_err(io)?;
         drop(f);
-        fs::rename(&tmp, self.file(name)).map_err(io)?;
-        // Make the rename itself durable. Best effort: not every filesystem allows syncing a directory.
-        if let Ok(d) = fs::File::open(&self.dir) {
-            let _ = d.sync_all();
+        let linked = fs::hard_link(&tmp, self.file(name));
+        let _ = fs::remove_file(&tmp);
+        match linked {
+            Ok(()) => {
+                self.sync_dir();
+                Ok(())
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Err(Error::AlreadyExists),
+            Err(e) => Err(io(e)),
         }
-        Ok(())
     }
 
     fn remove(&self, name: &str) -> Result<()> {
@@ -183,16 +214,16 @@ fn io(e: std::io::Error) -> Error {
 
 impl Store for DirectoryStore {
     fn create(&mut self, header: &VaultHeader) -> Result<()> {
-        if self.file(HEADER).exists() {
+        if fs::symlink_metadata(self.file(HEADER)).is_ok() {
             return Err(Error::AlreadyExists);
         }
-        fs::create_dir_all(&self.dir).map_err(io)?;
+        crate::private_fs::create_private_dir(&self.dir).map_err(io)?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(&self.dir, fs::Permissions::from_mode(0o700)).map_err(io)?;
         }
-        self.write(
+        self.write_new(
             HEADER,
             &serde_json::to_vec_pretty(header).map_err(|e| Error::Io(e.to_string()))?,
         )

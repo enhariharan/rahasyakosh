@@ -75,7 +75,7 @@ records(id BLOB(16) PRIMARY KEY, rev INTEGER NOT NULL, record_version INTEGER NO
         nonce BLOB NOT NULL, ct BLOB NOT NULL)
 tombstones(id BLOB(16) PRIMARY KEY, rev INTEGER NOT NULL)
 ```
-- WAL mode, `foreign_keys` on, file created `0600`, new parent folders `0700` (`private_fs::create_private_dir`). `private_fs` also has `write_private_atomic` (temp file 0600 + fsync + rename) and `tighten_tree` (repair old modes under a folder the program owns).
+- Defensive mode on, `trusted_schema`, triggers and views off (a vault file may come from someone else; our schema needs none of them). WAL mode, `foreign_keys` on, file created `0600`, new parent folders `0700` (`private_fs::create_private_dir`). `private_fs` also has `write_private_atomic` (temp file 0600 + fsync + rename) and `tighten_tree` (repair old modes under a folder the program owns).
 - **`PRAGMA secure_delete = ON`** so purged ciphertext is zeroed out of free pages rather than lingering in the file.
 - Every write is one transaction. A second `rk` process waits on the SQLite lock (busy timeout) instead of corrupting anything.
 

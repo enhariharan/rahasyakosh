@@ -421,3 +421,41 @@ fn concurrent_writers_do_not_lose_updates() {
     let s = SqliteStore::open(&path).unwrap();
     assert_eq!(s.list().unwrap().len(), 100);
 }
+
+// ---- audit finding P2-5 ------------------------------------------------------------------------------------
+
+#[test]
+fn a_trigger_or_view_planted_in_a_vault_file_is_not_run() {
+    let dir = TempDir::new("trigger");
+    {
+        let mut s = SqliteStore::open(dir.db()).unwrap();
+        s.create(&sample_header(1, 1)).unwrap();
+    }
+    {
+        // Someone who can edit the file adds a trigger that would fail every write, and a view.
+        let c = Connection::open(dir.db()).unwrap();
+        c.execute_batch(
+            "CREATE TRIGGER evil BEFORE INSERT ON records BEGIN SELECT RAISE(ABORT, 'planted'); END;
+             CREATE VIEW looks_harmless AS SELECT id FROM records;",
+        )
+        .unwrap();
+    }
+    let mut s = SqliteStore::open(dir.db()).unwrap();
+    s.put(&sample_record(1, 1, 64))
+        .expect("the planted trigger must not fire");
+    assert!(s.get(sample_id(1)).unwrap().is_some());
+}
+
+#[test]
+fn the_connection_is_hardened() {
+    let s = SqliteStore::open_in_memory().unwrap();
+    assert_eq!(s.pragma("trusted_schema").unwrap(), "0");
+}
+
+#[test]
+fn the_setting_name_given_to_pragma_cannot_carry_sql() {
+    let s = SqliteStore::open_in_memory().unwrap();
+    assert!(s.pragma("user_version; DROP TABLE records").is_err());
+    assert!(s.pragma("").is_err());
+    assert!(s.pragma("secure_delete").is_ok());
+}

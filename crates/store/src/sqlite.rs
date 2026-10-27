@@ -84,6 +84,7 @@ impl SqliteStore {
 
     fn init(mut conn: Connection, steps: &[Migration], path: Option<&Path>) -> Result<Self> {
         conn.busy_timeout(Duration::from_secs(5)).map_err(db)?;
+        harden(&conn)?;
         conn.pragma_update(None, "foreign_keys", "ON").map_err(db)?;
         conn.pragma_update(None, "secure_delete", "ON")
             .map_err(db)?;
@@ -108,6 +109,10 @@ impl SqliteStore {
     /// Value of a connection setting such as `secure_delete`. For tests.
     #[doc(hidden)]
     pub fn pragma(&self, name: &str) -> Result<String> {
+        // Letters and underscores only: the name becomes part of the statement.
+        if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphabetic() || c == '_') {
+            return Err(Error::Io(format!("not a setting name: {name}")));
+        }
         self.conn
             .query_row(&format!("PRAGMA {name}"), [], |r| {
                 r.get::<_, rusqlite::types::Value>(0)
@@ -135,6 +140,41 @@ impl SqliteStore {
 
 /// Bring `conn` from its stored version up to `steps.len()`. Each step and the version bump commit together;
 /// a failing step leaves the database exactly as it was. A database from the future is refused, never touched.
+/// A vault file may come from someone else. Our schema has no triggers, views or functions, so switch off everything
+/// in a database file that could run code of the file's own choosing, and the SQL features meant for repairing a
+/// broken file (audit finding P2-5).
+fn harden(conn: &Connection) -> Result<()> {
+    use rusqlite::config::DbConfig::{
+        SQLITE_DBCONFIG_DEFENSIVE, SQLITE_DBCONFIG_ENABLE_TRIGGER, SQLITE_DBCONFIG_ENABLE_VIEW,
+        SQLITE_DBCONFIG_TRUSTED_SCHEMA,
+    };
+    for (option, on) in [
+        (SQLITE_DBCONFIG_DEFENSIVE, true),
+        (SQLITE_DBCONFIG_TRUSTED_SCHEMA, false),
+        (SQLITE_DBCONFIG_ENABLE_TRIGGER, false),
+        (SQLITE_DBCONFIG_ENABLE_VIEW, false),
+    ] {
+        conn.set_db_config(option, on).map_err(db)?;
+    }
+    Ok(())
+}
+
+/// The two tables [`stored_rev`] reads, so a table name is never built from text.
+#[derive(Clone, Copy)]
+enum Table {
+    Records,
+    Tombstones,
+}
+
+impl Table {
+    fn select_rev(self) -> &'static str {
+        match self {
+            Table::Records => "SELECT rev FROM records WHERE id = ?1",
+            Table::Tombstones => "SELECT rev FROM tombstones WHERE id = ?1",
+        }
+    }
+}
+
 fn migrate(conn: &mut Connection, steps: &[Migration]) -> Result<()> {
     let supported = steps.len() as u32;
     let found = user_version(conn)?;
@@ -248,12 +288,10 @@ fn write_header(conn: &Connection, header: &VaultHeader) -> Result<()> {
     Ok(())
 }
 
-fn stored_rev(conn: &Connection, table: &str, id: Uuid) -> Result<Option<u64>> {
-    conn.query_row(
-        &format!("SELECT rev FROM {table} WHERE id = ?1"),
-        params![id.as_bytes().as_slice()],
-        |r| r.get::<_, i64>(0),
-    )
+fn stored_rev(conn: &Connection, table: Table, id: Uuid) -> Result<Option<u64>> {
+    conn.query_row(table.select_rev(), params![id.as_bytes().as_slice()], |r| {
+        r.get::<_, i64>(0)
+    })
     .optional()
     .map(|r| r.map(from_db_rev))
     .map_err(db)
@@ -361,8 +399,8 @@ impl Store for SqliteStore {
             current.insert(
                 r.item_id,
                 (
-                    stored_rev(&tx, "records", r.item_id)?,
-                    stored_rev(&tx, "tombstones", r.item_id)?,
+                    stored_rev(&tx, Table::Records, r.item_id)?,
+                    stored_rev(&tx, Table::Tombstones, r.item_id)?,
                 ),
             );
         }
@@ -385,7 +423,7 @@ impl Store for SqliteStore {
     fn purge(&mut self, id: Uuid, rev: u64) -> Result<()> {
         let tx = self.tx()?;
         read_header(&tx)?.ok_or(Error::NotInitialised)?;
-        if let Some(stored) = stored_rev(&tx, "records", id)? {
+        if let Some(stored) = stored_rev(&tx, Table::Records, id)? {
             if rev <= stored {
                 return Err(Error::StaleRevision {
                     id,
@@ -394,7 +432,7 @@ impl Store for SqliteStore {
                 });
             }
         }
-        let rev = rev.max(stored_rev(&tx, "tombstones", id)?.unwrap_or(0));
+        let rev = rev.max(stored_rev(&tx, Table::Tombstones, id)?.unwrap_or(0));
         let key = id.as_bytes().as_slice();
         tx.execute("DELETE FROM records WHERE id = ?1", params![key])
             .map_err(db)?;

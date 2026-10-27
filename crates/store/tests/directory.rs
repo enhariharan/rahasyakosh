@@ -255,3 +255,62 @@ fn all_readable_skips_and_reports_bad_files_instead_of_failing() {
     assert_eq!(bad, vec![Some(id(1)), Some(id(9))]);
     assert!(r.unreadable.iter().all(|u| !u.reason.is_empty()));
 }
+
+// ---- audit finding P2-5 ------------------------------------------------------------------------------------
+
+#[test]
+fn a_link_to_an_endless_device_is_refused_not_read() {
+    let t = TempDir::new("devzero");
+    let mut s = ready(&t);
+    s.put(&record(1, 1)).unwrap();
+    std::fs::remove_file(t.0.join(format!("{}.rkr", id(1)))).unwrap();
+    std::os::unix::fs::symlink("/dev/zero", t.0.join(format!("{}.rkr", id(1)))).unwrap();
+    // Must return at once with an error, not read until memory runs out.
+    let e = s.get(id(1)).unwrap_err();
+    assert!(matches!(e, Error::Corrupt(m) if m.contains("not a regular file")));
+}
+
+#[test]
+fn a_planted_link_in_the_temporary_name_is_not_written_through() {
+    let t = TempDir::new("plantedtmp");
+    let mut s = ready(&t);
+    let victim = t.0.join("victim");
+    std::fs::write(&victim, b"keep me").unwrap();
+    std::os::unix::fs::symlink(&victim, t.0.join(format!(".{}.rkr.tmp", id(1)))).unwrap();
+    s.put(&record(1, 1)).unwrap();
+    assert_eq!(std::fs::read(&victim).unwrap(), b"keep me");
+    assert!(s.get(id(1)).unwrap().is_some());
+}
+
+#[test]
+fn creating_over_an_existing_vault_is_refused_even_through_a_link() {
+    let t = TempDir::new("createtwice");
+    let mut s = ready(&t);
+    assert!(matches!(s.create(&header()), Err(Error::AlreadyExists)));
+    // A dangling link in the header's place counts as "something is there".
+    let t = TempDir::new("createlink");
+    std::fs::create_dir_all(&t.0).unwrap();
+    std::os::unix::fs::symlink(t.0.join("nowhere"), t.0.join("header.json")).unwrap();
+    assert!(matches!(
+        t.store().create(&header()),
+        Err(Error::AlreadyExists)
+    ));
+    assert!(!t.0.join("nowhere").exists());
+}
+
+#[test]
+fn creating_leaves_no_temporary_file_and_a_private_header() {
+    use std::os::unix::fs::PermissionsExt;
+    let t = TempDir::new("createclean");
+    let _s = ready(&t);
+    let names: Vec<_> = std::fs::read_dir(&t.0)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .collect();
+    assert_eq!(names, ["header.json"]);
+    let mode = std::fs::metadata(t.0.join("header.json"))
+        .unwrap()
+        .permissions()
+        .mode();
+    assert_eq!(mode & 0o777, 0o600);
+}

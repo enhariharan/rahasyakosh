@@ -89,6 +89,7 @@ Use the directory store or SQLite vault as noted. Always copy the vault first (`
 - [ ] Make a symlink `<id>.rkr -> /dev/zero` in a directory store. Unlock. Expected: skipped or refused at once, no memory growth (watch with `top`).
 - [ ] Open a SQLite file with a trigger or view added with the `sqlite3` tool. Expected: the app does not run it, and does not crash.
 - [ ] `ls -ld` on the vault's parent folder created by the app is `drwx------` (0700).
+- [ ] Automated 2026-10-27 (`crates/store/tests`): the `/dev/zero` link, the planted trigger, the planted temporary name and the create race (header is linked in, not overwritten).
 
 ## 3. Session and lock (Phase 3)
 
