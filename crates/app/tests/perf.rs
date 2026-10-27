@@ -106,7 +106,8 @@ fn ten_thousand_items_unlock_search_and_edit_quickly() {
     assert_eq!(hits.len(), 10_000);
     assert!(took < Duration::from_secs(2), "{took:?}");
 
-    // One edit must not depend on how many items there are: one record is re-sealed and written.
+    // One edit re-seals one record, and also the manifest (P2-1), whose size grows with the item count: about 0.3 s
+    // at 10,000 items in a debug build. Still well inside the limit, but no longer independent of the vault size.
     let id = Uuid::from_u128(0x0190_0000_0000_7000_8000_0000_0000_0000 + 5_000);
     let mut rng = ChaCha20Rng::seed_from_u64(9);
     let (_, took) = timed("edit one item in a 10,000-item vault", || {
