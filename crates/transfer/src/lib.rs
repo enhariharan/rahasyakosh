@@ -8,7 +8,7 @@ pub use bundle::{Bundle, MAX_BUNDLE_BYTES};
 
 use rahasyakosh_core::item::{Field, Item, ITEM_SCHEMA};
 use rahasyakosh_core::totp::Totp;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 use zeroize::Zeroizing;
 
@@ -184,11 +184,16 @@ pub fn import_csv(
         detected,
         ..Default::default()
     };
-    let mut seen: HashSet<(String, String, String, String)> = existing
+    // Passwords already seen for each (title, username, URL): one lookup per row, however many rows there are
+    // (audit finding P5-1; scanning every earlier row made a large file take quadratic time).
+    let mut seen: HashMap<LoginKey, HashSet<String>> = HashMap::new();
+    for (login, password) in existing
         .iter()
         .filter(|i| i.deleted_at.is_none())
         .map(dedupe_key)
-        .collect();
+    {
+        seen.entry(login).or_default().insert(password);
+    }
     let mut similar = 0usize;
     let mut bad_totp = 0usize;
 
@@ -242,18 +247,16 @@ pub fn import_csv(
             .map(String::from)
             .collect();
 
-        let key = dedupe_key(&item);
-        if seen.contains(&key) {
+        let (login, password) = dedupe_key(&item);
+        let passwords = seen.entry(login).or_default();
+        if passwords.contains(&password) {
             report.skipped_duplicates += 1;
             continue;
         }
-        if seen
-            .iter()
-            .any(|k| k.0 == key.0 && k.1 == key.1 && k.2 == key.2)
-        {
+        if !passwords.is_empty() {
             similar += 1;
         }
-        seen.insert(key);
+        passwords.insert(password);
         report.items.push(item);
     }
 
@@ -270,16 +273,21 @@ pub fn import_csv(
     Ok(report)
 }
 
-/// Identity of a login for duplicate detection: title, username, first URL, password.
-fn dedupe_key(i: &Item) -> (String, String, String, String) {
+/// Which login a row is about: title, username, first URL.
+type LoginKey = (String, String, String);
+
+/// Identity of a login for duplicate detection: the [`LoginKey`] and the password.
+fn dedupe_key(i: &Item) -> (LoginKey, String) {
     let value = |n: &str| i.field(n).map(|f| f.value.clone()).unwrap_or_default();
     (
-        i.title.trim().to_lowercase(),
-        value("username").to_lowercase(),
-        i.urls
-            .first()
-            .map(|u| u.trim().trim_end_matches('/').to_lowercase())
-            .unwrap_or_default(),
+        (
+            i.title.trim().to_lowercase(),
+            value("username").to_lowercase(),
+            i.urls
+                .first()
+                .map(|u| u.trim().trim_end_matches('/').to_lowercase())
+                .unwrap_or_default(),
+        ),
         value("password"),
     )
 }

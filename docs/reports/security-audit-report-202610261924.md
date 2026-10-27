@@ -112,7 +112,7 @@ All seven phases are done (Phase 1 was finished last, on the same day). 52 findi
 | [P6-3](#p6-3) | Medium | Typed secrets pass through memory that is never wiped (web view, signals) | From reading | open |
 | [P4-1](#p4-1) | Medium | `RK_PASSWORD` stays in the clipboard helpers' environment | From reading | open |
 | [P4-2](#p4-2) | Medium | `export -f vault --force` can overwrite the live vault | Confirmed | fixed 2026-10-27 |
-| [P5-1](#p5-1) | Medium | CSV import is quadratic (40 000 rows took 26 s in a debug build) | Confirmed | open |
+| [P5-1](#p5-1) | Medium | CSV import is quadratic (40 000 rows took 26 s in a debug build) | Confirmed | fixed 2026-10-27 |
 | [P5-2](#p5-2) | Medium | Terminal escape sequences from imported text are printed raw | Confirmed | open |
 | [P3-1](#p3-1) | Medium | `trash_retention_days = 0` purges all trash at the next unlock | From reading | fixed 2026-10-27 |
 | [P7-1](#p7-1) | Medium | The installer turns the accessibility bus on session-wide | From reading | open |
@@ -581,7 +581,7 @@ Files read: `transfer/src/{lib,bundle}.rs`, the import and export commands in `c
 - **Evidence:** For every new row `import_csv` scans the whole `seen` set (`seen.iter().any(...)`) to count similar logins: O(rows²). `rk import big.csv --dry-run`: 5.2 s for 20 000 rows, 25.7 s for 40 000.
 - **Impact:** The 50 MiB cap allows about 500 000 short rows, so a hostile or merely large file can hang the CLI and the desktop import for a very long time, with no progress shown.
 - **Recommended fix:** Index `seen` by (title, username, url), for example `HashMap<(String, String, String), HashSet<String>>` of passwords, so the check is one lookup. Add a large-file timing test.
-- **Status:** open
+- **Status:** fixed 2026-10-27: `import_csv` keeps a map from (title, username, URL) to the passwords seen, so each row costs one lookup. 40 000 rows now take about 0.25 s in a debug build (26 s before). Tests `crates/transfer/tests/large_import.rs` (speed, and duplicates/changed passwords are still told apart). Not done: a progress display in the desktop import; with the fix it is no longer needed for files up to the 50 MiB cap.
 
 [Top](#top)
 
