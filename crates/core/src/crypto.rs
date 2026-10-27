@@ -47,12 +47,6 @@ impl KdfParams {
         t: 3,
         p: 1,
     };
-    /// Cheap parameters for unit tests only; rejected by `validate`.
-    pub const INSECURE_TEST: Self = Self {
-        m_kib: 8,
-        t: 1,
-        p: 1,
-    };
 
     /// Whether unlocking costs clearly more than the app's own default (twice the memory or twice the passes), so a
     /// front-end can tell the user before it starts (audit finding P1-2). A forged header can ask for this much.

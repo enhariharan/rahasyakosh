@@ -223,7 +223,7 @@ Files read: all of `core/src/{crypto,vault,item,totp,generator}.rs`, the `argon2
 - **Evidence:** `cfg!(test)` is true only when `rahasyakosh-core` itself is compiled for its own unit tests. Other crates' tests, integration tests, the fuzz crate and every release build validate normally.
 - **Impact:** Safe today. Fragile: a core unit test can never reach the validation path through `unlock`, and a later build change (a test-only feature, `--cfg test`) could silently switch validation off.
 - **Recommended fix:** Pass the check as an argument (`unlock_with(policy)`), or put the cheap parameters behind a `test-kdf` cargo feature that `deny` and CI keep out of releases.
-- **Status:** open
+- **Status:** fixed 2026-10-27: `check_kdf` always validates. The core unit tests now use the cheapest parameters the real validation accepts (`CHEAP`), and the test-only `KdfParams::INSECURE_TEST` is gone.
 
 [Top](#top)
 

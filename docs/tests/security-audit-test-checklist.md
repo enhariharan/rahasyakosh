@@ -42,7 +42,7 @@ Most checks are also worth turning into automated tests when the fix is written.
 - [ ] `core/Cargo.toml` enables the `zeroize` feature for `argon2`, and `cargo build --target wasm32-unknown-unknown -p rahasyakosh-core` (or the CI wasm job) still passes. Checked 2026-10-27.
 
 ### P1-5 No test-only switch in release code
-- [ ] `grep -rn "cfg!(test)" crates/` finds no check that changes security behaviour. `cargo build --release` of every crate, with `cargo tree -e features`, shows no test-only feature turned on.
+- [ ] `grep -rn "cfg!(test)" crates/` finds no check that changes security behaviour. `cargo build --release` of every crate, with `cargo tree -e features`, shows no test-only feature turned on. Checked 2026-10-27 (`cfg!(test)` removed; `INSECURE_TEST` removed).
 
 ### P1-6 Old secrets are wiped
 - [ ] Run the desktop app under `gdb` or use a core dump of a throwaway process: add an item with the sentinel password `SENTINEL-OLD-PW`, edit it to `SENTINEL-NEW-PW`, lock, then search the process memory (`gcore`, then `strings core | grep SENTINEL`). Expected after fix: the old value is not found in the `rk` process. (For the web view see P6-3.)

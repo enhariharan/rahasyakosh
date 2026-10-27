@@ -155,10 +155,6 @@ impl VaultHeader {
 }
 
 fn check_kdf(p: &KdfParams) -> Result<()> {
-    // Unit tests use deliberately cheap parameters.
-    if cfg!(test) {
-        return Ok(());
-    }
     p.validate()
 }
 
@@ -494,6 +490,13 @@ mod tests {
     use crate::item::Item;
     use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
 
+    /// The cheapest parameters the real validation accepts.
+    const CHEAP: KdfParams = KdfParams {
+        m_kib: KdfParams::MIN_M_KIB,
+        t: KdfParams::MIN_T,
+        p: 1,
+    };
+
     fn new_id(r: &mut ChaCha20Rng) -> Uuid {
         Uuid::from_bytes(crypto::random_bytes::<16>(r))
     }
@@ -505,7 +508,7 @@ mod tests {
     #[test]
     fn create_unlock_roundtrip() {
         let mut r = rng();
-        let v = UnlockedVault::create("hunter2", KdfParams::INSECURE_TEST, &mut r).unwrap();
+        let v = UnlockedVault::create("hunter2", CHEAP, &mut r).unwrap();
         let item = Item::login("GitHub", "alice", "s3cret", 1, new_id(&mut r));
         let rec = v.seal_item(&item, 1, &mut r).unwrap();
 
@@ -517,13 +520,13 @@ mod tests {
 
     #[test]
     fn wrong_password_fails() {
-        let v = UnlockedVault::create("a", KdfParams::INSECURE_TEST, &mut rng()).unwrap();
+        let v = UnlockedVault::create("a", CHEAP, &mut rng()).unwrap();
         assert!(matches!(v.header().unlock("b"), Err(Error::Decrypt)));
     }
 
     #[test]
     fn header_tamper_detected() {
-        let v = UnlockedVault::create("a", KdfParams::INSECURE_TEST, &mut rng()).unwrap();
+        let v = UnlockedVault::create("a", CHEAP, &mut rng()).unwrap();
         let mut h = v.header().clone();
         h.kdf.t += 1;
         assert!(h.unlock("a").is_err());
@@ -532,7 +535,7 @@ mod tests {
     #[test]
     fn record_tamper_and_swap_detected() {
         let mut r = rng();
-        let v = UnlockedVault::create("a", KdfParams::INSECURE_TEST, &mut r).unwrap();
+        let v = UnlockedVault::create("a", CHEAP, &mut r).unwrap();
         let a = Item::login("a", "u", "p", 1, new_id(&mut r));
         let b = Item::login("b", "u", "p", 1, new_id(&mut r));
         let ra = v.seal_item(&a, 1, &mut r).unwrap();
@@ -553,11 +556,10 @@ mod tests {
     #[test]
     fn change_password_keeps_items() {
         let mut r = rng();
-        let mut v = UnlockedVault::create("old", KdfParams::INSECURE_TEST, &mut r).unwrap();
+        let mut v = UnlockedVault::create("old", CHEAP, &mut r).unwrap();
         let item = Item::login("x", "u", "p", 1, new_id(&mut r));
         let rec = v.seal_item(&item, 1, &mut r).unwrap();
-        v.change_password("new", KdfParams::INSECURE_TEST, &mut r)
-            .unwrap();
+        v.change_password("new", CHEAP, &mut r).unwrap();
         assert!(v.header().unlock("old").is_err());
         let v2 = v.header().unlock("new").unwrap();
         assert_eq!(v2.open_record(&rec).unwrap(), item);
@@ -566,7 +568,7 @@ mod tests {
     #[test]
     fn padding_hides_small_length_differences() {
         let mut r = rng();
-        let v = UnlockedVault::create("a", KdfParams::INSECURE_TEST, &mut r).unwrap();
+        let v = UnlockedVault::create("a", CHEAP, &mut r).unwrap();
         let id = new_id(&mut r);
         let r1 = v
             .seal_item(&Item::login("t", "u", "p", 1, id), 1, &mut r)
