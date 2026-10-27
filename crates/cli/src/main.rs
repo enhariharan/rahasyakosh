@@ -253,7 +253,7 @@ struct MasterOpts {
     /// Generate a random master passphrase (EFF large wordlist) instead of typing a password
     #[arg(short, long)]
     passphrase: bool,
-    /// Number of words in the generated passphrase
+    /// Number of words in the generated passphrase (at least 5)
     #[arg(short, long, default_value_t = 6, requires = "passphrase")]
     words: usize,
     /// Accept a master password the strength meter rates below "fair"
@@ -281,6 +281,9 @@ fn read_password(prompt: &str) -> Result<zeroize::Zeroizing<String>> {
     Ok(zeroize::Zeroizing::new(rpassword::prompt_password(prompt)?))
 }
 
+/// Fewest words `--passphrase` will make for a master passphrase: 5 words of the EFF list are about 64 bits.
+const MIN_PASSPHRASE_WORDS: usize = 5;
+
 /// New master password: typed twice, or generated (shown once, then re-typed to confirm it was saved).
 fn new_master(
     opts: &MasterOpts,
@@ -288,6 +291,12 @@ fn new_master(
 ) -> Result<zeroize::Zeroizing<String>> {
     if !opts.passphrase {
         return new_password(opts.allow_weak);
+    }
+    if opts.words < MIN_PASSPHRASE_WORDS {
+        bail!(
+            "a master passphrase needs at least {MIN_PASSPHRASE_WORDS} words (about 64 bits); {} would be too easy to guess",
+            opts.words
+        );
     }
     if std::env::var("RK_PASSWORD").is_ok() {
         bail!("--passphrase cannot be combined with RK_PASSWORD");

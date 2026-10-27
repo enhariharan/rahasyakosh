@@ -55,7 +55,7 @@ Most checks are also worth turning into automated tests when the fix is written.
 (Automated 2026-10-27: `crates/app/tests/item_size.rs`. The limit is 4 MiB, so use a 5 MB note for the manual check.)
 
 ### P1-8 Short generated master passphrase
-- [ ] `rk init --passphrase --words 3` (on a scratch vault). Expected: refused, or the entropy is shown and confirmation is required. The default (6 words) works without a prompt.
+- [ ] `rk init --passphrase --words 3` (on a scratch vault). Expected: refused, or the entropy is shown and confirmation is required. The default (6 words) works without a prompt. Decision 2026-10-27: refused below 5 words; automated in `crates/cli/tests/cli.rs`.
 
 ### P1-9 Generator and TOTP
 - [ ] Generate 10 000 passwords of length 20 with all classes: every one has at least one character of each class, and the character counts look even (no digit appears twice as often as another). `cargo test -p rahasyakosh-core` passes the TOTP RFC 6238 vectors.

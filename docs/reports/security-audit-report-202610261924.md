@@ -262,7 +262,7 @@ Files read: all of `core/src/{crypto,vault,item,totp,generator}.rs`, the `argon2
 - **Evidence:** `rk init --passphrase --words 3` generates about 39 bits (EFF large list, 12.9 bits a word) and skips the strength check that typed passwords go through. The default is 6 words (about 77 bits).
 - **Impact:** A weak master passphrase that the tool itself produced and approved.
 - **Recommended fix:** Require at least 5 or 6 words for a master passphrase, or show the bits and ask for confirmation.
-- **Status:** open
+- **Status:** fixed 2026-10-27: `rk init --passphrase` and `rk passwd --passphrase` refuse fewer than 5 words (about 64 bits). Test `a_short_generated_master_passphrase_is_refused`. `rk gen` is unchanged: a site password may be short on purpose.
 
 [Top](#top)
 

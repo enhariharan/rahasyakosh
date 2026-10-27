@@ -28,7 +28,7 @@ To update later, `git pull` and run the same `cargo install` command again.
 rk init --passphrase
 ```
 
-This creates a vault and generates a **master passphrase** of six random words. It is shown **once**: write it on paper, then type it again when
+This creates a vault and generates a **master passphrase** of six random words (`--words N` changes that, but `rk` refuses fewer than five: three words are only about 39 bits, too easy to guess for a master password). It is shown **once**: write it on paper, then type it again when
 asked. If you prefer to choose your own master password, run `rk init`; it shows a strength rating and refuses anything rated below
 "fair" unless you add `--allow-weak`.
 

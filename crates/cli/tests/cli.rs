@@ -859,3 +859,16 @@ fn an_unusually_costly_vault_is_announced_before_unlocking() {
     assert!(err.contains("asks for 140 MiB"), "{err}");
     let _ = std::fs::remove_file(&path);
 }
+
+#[test]
+fn a_short_generated_master_passphrase_is_refused() {
+    let path = Path::new(env!("CARGO_TARGET_TMPDIR")).join("short_passphrase.db");
+    let _ = std::fs::remove_file(&path);
+    let data = Path::new(env!("CARGO_TARGET_TMPDIR")).join("short-passphrase-data");
+
+    let out = run_with(&path, &["init", "--passphrase", "--words", "3"], &[], &data);
+    assert!(!out.status.success());
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("at least 5 words"), "{err}");
+    assert!(!path.exists(), "no vault should have been made");
+}
