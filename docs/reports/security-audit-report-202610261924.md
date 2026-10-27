@@ -10,6 +10,7 @@
 | **Manual re-test list** | [`../tests/security-audit-test-checklist.md`](../tests/security-audit-test-checklist.md) |
 
 How to read the findings:
+- **Issue** (the first item of each finding in section 4) says in plain English what the problem is, and explains any technical word it uses. The items after it give the details for people who want to check the work.
 - **Severity** is the auditor's judgement for a local-first app whose main risks are a copied vault file and a hostile sync folder: High, Medium, Low, Info.
 - **How found:** *Confirmed* = reproduced with a test or command; *Measured* = reproduced and timed; *From reading* = found by reading the code, not run; *Checked* = a suspicion that was looked at and judged.
 - **Status:** `open` = not fixed. The report records the audit as it stood on 2026-10-26; fixes are noted in this column as they land (with the date and the test), and re-run the matching section of the test checklist.
@@ -163,6 +164,7 @@ Files read: all of `core/src/{crypto,vault,item,totp,generator}.rs`, the `argon2
 <a id="p1-1"></a>
 #### P1-1 — The master password is used as raw bytes (Medium)
 
+- **Issue:** The same password can be stored as different bytes inside the computer, depending on how it was typed. For example, é can be one character, or the letter e followed by a separate accent mark; many Hindi, Tamil, Telugu, Malayalam and Urdu letters can be written in more than one way too. The app feeds those raw bytes into its key-making step, so a password you typed correctly on another keyboard or another system can be rejected as "wrong". The fix is *normalisation*: converting text to one agreed standard form (NFKC, a Unicode standard) before use.
 - **Severity:** Medium
 - **How found:** From reading
 - **Evidence:** `derive_kek` passes `password.as_bytes()` to Argon2. The same visible password can be different bytes: `é` as one code point or `e` plus a combining accent, and many Devanagari, Tamil, Telugu, Malayalam and Urdu sequences (composed or decomposed, depending on the input method and platform). Nothing in the repo normalises text.
@@ -175,6 +177,7 @@ Files read: all of `core/src/{crypto,vault,item,totp,generator}.rs`, the `argon2
 <a id="p1-2"></a>
 #### P1-2 — A tampered header makes unlock run a huge Argon2 before anything is authenticated (Medium)
 
+- **Issue:** A vault file says in its header how much work (memory and time) the *Argon2* step must do when you unlock it. Argon2 is the deliberately slow, memory-hungry function that turns your master password into the encryption key, so that guessing passwords is expensive. The header is read before it can be checked for tampering, so someone who can edit the file can ask for an enormous amount of work (1 GiB of memory, about 11 seconds) and make every unlock attempt slow or crash a small machine. It cannot reveal your data; it only wastes your time and memory.
 - **Severity:** Medium
 - **How found:** Measured
 - **Evidence:** `unlock` calls `check_kdf` and then `derive_kek` first; the header (including `kdf`) is authenticated only by the decryption that follows. `KdfParams::validate` allows `m_kib` up to 1 GiB, `t` up to 20, `p` up to 16. One derivation with `m = 1 GiB, t = 20, p = 1` took 10.8 s and 1 GiB (debug profile, optimised dependencies).
@@ -187,6 +190,7 @@ Files read: all of `core/src/{crypto,vault,item,totp,generator}.rs`, the `argon2
 <a id="p1-3"></a>
 #### P1-3 — `docs/04` promises things the code does not do (Medium)
 
+- **Issue:** The design document (`docs/04`) describes protections that the code does not have yet: a *Secret Key* (a second long random secret, kept apart from your master password, that must be combined with it to open the vault), a *verifier* (a small check value used to test a password), a *magic* field (a fixed marker at the start of the file that says what kind of file it is) and *`mlock`* (a request to the operating system never to copy the program's memory to disk). A reader would trust a stronger design than the one that exists. Today, a stolen vault file is protected only by your master password and the cost of Argon2.
 - **Severity:** Medium
 - **How found:** Confirmed
 - **Evidence:** The design doc describes a Secret Key (two-secret key derivation), a `verifier` blob, a header `magic` field and `mlock`ed memory. `VaultHeader` has `format_version`, `vault_id`, `kdf`, `salt`, `wrapped_vk` only; `MAGIC` is only mixed into the AAD; there is no Secret Key and no memory locking.
@@ -199,6 +203,7 @@ Files read: all of `core/src/{crypto,vault,item,totp,generator}.rs`, the `argon2
 <a id="p1-4"></a>
 #### P1-4 — The Argon2 `zeroize` feature is off (Low)
 
+- **Issue:** Argon2 (the slow password-to-key function) has an optional setting that wipes its temporary working values when it finishes. It is switched off here. One of those leftover values is a quick fingerprint of your password and salt; if someone obtains a copy of the program's memory while it is there, they can test password guesses against it far faster than against the full Argon2. The risk is small, because anyone who can read that memory can find your keys directly anyway.
 - **Severity:** Low
 - **How found:** Confirmed
 - **Evidence:** `core/Cargo.toml`: `argon2 = { default-features = false, features = ["alloc"] }`. So `initial_hash` (line 389) and the `blockhash` temporaries (lines 570-573) are not wiped. The large memory matrix is not wiped even with the feature on.
@@ -211,6 +216,7 @@ Files read: all of `core/src/{crypto,vault,item,totp,generator}.rs`, the `argon2
 <a id="p1-5"></a>
 #### P1-5 — `check_kdf` skips validation with `cfg!(test)` (Low)
 
+- **Issue:** To keep unit tests fast, the code skips a safety check on the Argon2 settings when it is compiled for the library's own tests (`cfg!(test)` is a compile-time switch for "this is a test build"). Real builds still run the check, so nothing is wrong today. The risk is that a future build change could turn the check off by accident without anyone noticing.
 - **Severity:** Low
 - **How found:** Checked
 - **Evidence:** `cfg!(test)` is true only when `rahasyakosh-core` itself is compiled for its own unit tests. Other crates' tests, integration tests, the fuzz crate and every release build validate normally.
@@ -223,6 +229,7 @@ Files read: all of `core/src/{crypto,vault,item,totp,generator}.rs`, the `argon2
 <a id="p1-6"></a>
 #### P1-6 — Old secrets are dropped without being wiped (Low)
 
+- **Issue:** The app is careful to *zeroise* secrets (overwrite them with zeros) when it is done with them. But in several places it replaces or copies a secret without wiping the old copy first, so the old password stays in the computer's memory until something else happens to overwrite it. For example, after you change a password, the previous one can linger in freed memory.
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** `Item`, `Field` and `ItemVersion` are `ZeroizeOnDrop` (history included). But `set_field` (`f.value = value.into()`), `revert_to` for `title` and `notes`, and the UI `Form`/signal copies drop the old `String` as plain memory. `UnlockedVault::unlock` copies the key into a stack array before wrapping it in `Zeroizing`; the generator builds the password in a plain `Vec<char>`; `base32_decode` fills a plain `Vec<u8>`.
@@ -235,6 +242,7 @@ Files read: all of `core/src/{crypto,vault,item,totp,generator}.rs`, the `argon2
 <a id="p1-7"></a>
 #### P1-7 — No limit on the size of an item (Low)
 
+- **Issue:** There is no maximum size for an item. You can save a huge note, or import a spreadsheet with one enormous cell, and the app accepts it. Later, the storage code refuses to read any file over 64 MiB, so that one oversized item can make the vault fail to open.
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** Nothing in `core` or `app` caps an item. `pad` stores the length as `u32` (`data.len() as u32` would wrap above 4 GiB), and `DirectoryStore` refuses to read any file over 64 MiB (`MAX_FILE`).
@@ -247,6 +255,7 @@ Files read: all of `core/src/{crypto,vault,item,totp,generator}.rs`, the `argon2
 <a id="p1-8"></a>
 #### P1-8 — A generated master passphrase can be very short (Low)
 
+- **Issue:** `rk init --passphrase` makes a master passphrase from random words. If you ask for only 3 words, it makes one with about 39 bits of randomness (*bits of entropy* measure how many guesses an attacker would need; each bit doubles the count) and does not warn you, although it warns about weak typed passwords. 39 bits is weak for a master password. The default of 6 words is fine.
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** `rk init --passphrase --words 3` generates about 39 bits (EFF large list, 12.9 bits a word) and skips the strength check that typed passwords go through. The default is 6 words (about 77 bits).
@@ -259,6 +268,7 @@ Files read: all of `core/src/{crypto,vault,item,totp,generator}.rs`, the `argon2
 <a id="p1-9"></a>
 #### P1-9 — Generator and TOTP details (Info)
 
+- **Issue:** This is a note, not a problem. The password generator and the two-factor code maker (*TOTP*, the 6-digit codes that change every 30 seconds) were checked. The generator is fair (no character is favoured) and the codes match the official test values. One small, harmless effect: for very short generated passwords the real randomness is slightly lower than the figure shown.
 - **Severity:** Info
 - **How found:** From reading
 - **Evidence:** `uniform` is correct rejection sampling (`zone = u32::MAX - (2^32 mod n)`), so no modulo bias. The generator draws one character per selected class and fills the rest from the union before shuffling: slightly less entropy than "uniform over all strings that contain every class", negligible at length 20, visible below about 6 characters (`entropy_bits` is documented as an upper bound). TOTP matches RFC 6238 (Appendix B vectors for SHA-1, SHA-256, SHA-512), checks digits 6 to 8 and period > 0, secret is `ZeroizeOnDrop`, `otpauth://hotp` is refused.
@@ -285,6 +295,7 @@ Files read: `store/{lib,directory,sqlite}.rs`, `app/vault.rs`. Four findings wer
 <a id="p2-1"></a>
 #### P2-1 — Rollback, deletion and resurrection are undetected (High)
 
+- **Issue:** The vault is stored as many separate encrypted records, one per item. The app checks that each record is genuine, but not that it is the *latest* one, or that no record has been removed. So anyone who can write to the vault folder (a sync service, a shared drive, a person with access to it) can swap a record for an older copy, which silently brings back a password you already changed, or delete a record and the item just vanishes. This is called a *rollback*. The design document claims this is detected; it is not.
 - **Severity:** High
 - **How found:** Confirmed
 - **Evidence:** `docs/04` lists "rollback detection (HLC + local high-water mark)" as a mitigation; nothing implements it. The record AAD binds `rev`, but an older record is still a valid record. PoC: edit an item to rev 2, restore the old `.rkr` file, unlock. It succeeds and shows rev 1 with the old content. Deleting a record file is equally invisible.
@@ -297,6 +308,7 @@ Files read: `store/{lib,directory,sqlite}.rs`, `app/vault.rs`. Four findings wer
 <a id="p2-2"></a>
 #### P2-2 — Tombstones are unauthenticated (High)
 
+- **Issue:** When you delete an item, the app leaves a small marker file called a *tombstone*, so that sync tools know the item was deleted on purpose. The marker is plain text with no protection, so anyone who can write to the folder can create one for any item, saying it was deleted at an absurdly high revision number. The item then disappears from the list without a warning, and the app can never save that item again.
 - **Severity:** High
 - **How found:** Confirmed
 - **Evidence:** `.rkt` files and the `tombstones` table hold a plain `{"rev": N}`. PoC: write `<id>.rkt` with rev `u64::MAX`. Unlock succeeds, the item is gone from the list with no warning, and writing that id again fails with `stale revision ... already at 18446744073709551615`.
@@ -309,6 +321,7 @@ Files read: `store/{lib,directory,sqlite}.rs`, `app/vault.rs`. Four findings wer
 <a id="p2-3"></a>
 #### P2-3 — One bad record makes the whole vault unopenable (Medium)
 
+- **Issue:** Opening the vault used to be all-or-nothing: if even one stored record was damaged or unreadable (a half-synced file, a sync conflict, or a file someone planted), the whole vault refused to open until the user found and deleted that file by hand. This has since been fixed: the bad record is now skipped and reported, and the rest opens.
 - **Severity:** Medium
 - **How found:** Confirmed
 - **Evidence:** `Vault::unlock_inner` uses `?` on every record. PoC: drop a `<uuid>.rkr` containing `{}` into the directory; unlock fails with `vault storage is corrupted`.
@@ -321,6 +334,7 @@ Files read: `store/{lib,directory,sqlite}.rs`, `app/vault.rs`. Four findings wer
 <a id="p2-4"></a>
 #### P2-4 — Changing the password does not change the vault key, and the old header stays on disk (Medium)
 
+- **Issue:** Your master password protects a *vault key*, and that vault key encrypts everything. Changing the master password only re-wraps the same vault key with the new password; the vault key itself stays the same. So if someone kept an old copy of the vault (a backup, sync history) and knows the old password, they can still open every later item. Also, the database's write-ahead log (a scratch file SQLite keeps for crash safety) can still hold a copy of the old header after a change.
 - **Severity:** Medium
 - **How found:** Confirmed (WAL part)
 - **Evidence:** `change_password` re-wraps the same VK; there is no VK rotation, although `docs/04` mentions one. After a password change the SQLite `-wal` file still holds both header copies; `secure_delete` does not cover WAL frames.
@@ -333,6 +347,7 @@ Files read: `store/{lib,directory,sqlite}.rs`, `app/vault.rs`. Four findings wer
 <a id="p2-5"></a>
 #### P2-5 — Hardening gaps in the stores (Low)
 
+- **Issue:** A group of small weaknesses in how the storage code touches files and the database: it does not turn off some database features that a vault file from a stranger could abuse (such as triggers, small programs stored inside the file), it follows *symlinks* (shortcut files that point elsewhere, so a planted one could point at a never-ending device such as `/dev/zero`), it checks that a file does not exist and then creates it in two steps (a race, where another program can slip in between), it builds some database commands from text, and it creates folders that other users can list. Each is minor on its own.
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** (a) `SqliteStore::open` does not set `trusted_schema=OFF` or defensive mode, and trusts `user_version`. (b) `DirectoryStore::read` follows symlinks: `fs::metadata` reports a small length for a device such as `/dev/zero`, then `fs::read` reads without limit; the temp name `.{name}.tmp` is fixed and opened without `O_NOFOLLOW`. (c) `DirectoryStore::create` checks `exists()` then writes (a race). (d) `stored_rev(table)` and the public `SqliteStore::pragma(name)` build queries with `format!` (safe today: literals only). (e) `SqliteStore::open` creates parent directories with the default umask.
@@ -360,6 +375,7 @@ Files read: `app/session.rs`, and how `apps/desktop/src/{model,lib}.rs` drive it
 <a id="p3-1"></a>
 #### P3-1 — A settings value of 0 days for the trash deletes every trashed item at the next unlock (Medium)
 
+- **Issue:** The setting *trash retention days* says how long deleted items stay in the trash before being erased for good. It has an upper limit but no lower limit, and 0 means "erase immediately". The app erases expired trash right after every unlock, so if the plain settings file is set to 0 (by mistake, by a bad import or on purpose), all trashed items are permanently deleted at the next unlock, with no question asked.
 - **Severity:** Medium
 - **How found:** From reading
 - **Evidence:** `Settings::validated` only caps `trash_retention_days` (max 3650), with no minimum. `purge_expired` computes `keep_for = 0`, so `now - d >= 0` holds for every trashed item, and `Session::unlock` runs it right after each successful unlock.
@@ -372,6 +388,7 @@ Files read: `app/session.rs`, and how `apps/desktop/src/{model,lib}.rs` drive it
 <a id="p3-2"></a>
 #### P3-2 — `settings.json` is written without care (Low)
 
+- **Issue:** The settings file (`settings.json`) is saved carelessly: not in a way that survives a crash half-way, with permissions that let other users read it, and any error is ignored. If the file is damaged, the app quietly falls back to defaults. Anyone who can edit the file can also turn off the idle lock, the clipboard clearing and the reveal timeout (0 means off for all three).
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** `save_settings` uses `fs::write` with the default umask (likely 0644), is not atomic and ignores errors. `from_json` turns any parse error into the defaults.
@@ -384,6 +401,7 @@ Files read: `app/session.rs`, and how `apps/desktop/src/{model,lib}.rs` drive it
 <a id="p3-3"></a>
 #### P3-3 — Idle lock and throttle trust the wall clock (Low)
 
+- **Issue:** The auto-lock and the wait after wrong passwords depend on the computer's clock. If the clock is set back, the idle timer never fires and the wait gets longer. This needs administrator rights, so the real risk is low. (A "monotonic" clock, one that only ever counts forward, is no better here because on Linux it stops while the computer is asleep.)
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** `now()` is `SystemTime` in both front-ends. A plain `Instant` is no better: on Linux `CLOCK_MONOTONIC` stops during suspend.
@@ -396,6 +414,7 @@ Files read: `app/session.rs`, and how `apps/desktop/src/{model,lib}.rs` drive it
 <a id="p3-4"></a>
 #### P3-4 — The unlock throttle is in memory only, and the re-auth check has none (Low)
 
+- **Issue:** After a few wrong master passwords, the app makes you wait before trying again (*throttling*). That counter lives only in memory, so closing and reopening the app, or switching profile, resets it. The export and delete-profile dialogs also check the master password but do not count failures, so someone sitting at an unlocked screen could keep guessing there. Someone with a copy of the vault file is not slowed at all, because the throttle is in the app, not in the file.
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** `failures` and `next_attempt_at` live in `Session`; restarting the app or opening a profile (`open_profile` builds a new `Session`) resets them. `Model::check_password` (export, delete profile) runs a full Argon2 check without counting failures.
@@ -408,6 +427,7 @@ Files read: `app/session.rs`, and how `apps/desktop/src/{model,lib}.rs` drive it
 <a id="p3-5"></a>
 #### P3-5 — `peek()` does not check the idle time (Info)
 
+- **Issue:** A note, not a problem. The "peek" function (a quick read of the unlocked vault) does not check how long you have been idle; it relies on a timer that ticks every second. If the screen is frozen for a while (for example while another profile is being unlocked), the lock may come a little late. This is acceptable.
 - **Severity:** Info
 - **How found:** From reading
 - **Evidence:** `peek` gives read access until the next `tick`, at most one second away. If the UI thread blocks (for example on Argon2 during the unlock of another profile) the window is longer.
@@ -435,6 +455,7 @@ Files read: `clipboard/src/lib.rs`, `cli/src/{main,clipboard,file}.rs`. [P4-2](#
 <a id="p4-1"></a>
 #### P4-1 — `RK_PASSWORD` outlives the command inside the clipboard helpers (Medium)
 
+- **Issue:** For scripts, the command-line tool can read the master password from an *environment variable* (a named setting that every program started from it inherits), called `RK_PASSWORD`. When the tool starts a helper program to copy something to the clipboard or to clear it later, that helper inherits the variable too and keeps the master password in its environment for as long as it runs, up to the whole clipboard delay. The same user, or an administrator, can read it from `/proc` (a view of every running program's details).
 - **Severity:** Medium
 - **How found:** From reading
 - **Evidence:** `read_password` takes the master password from `$RK_PASSWORD`. `spawn_clearer` (`cli/src/clipboard.rs`) and the `wl-copy`/`xclip`/`xsel` spawns (`clipboard/src/lib.rs`) never clear the environment, so every child inherits it.
@@ -447,6 +468,7 @@ Files read: `clipboard/src/lib.rs`, `cli/src/{main,clipboard,file}.rs`. [P4-2](#
 <a id="p4-2"></a>
 #### P4-2 — `rk export -f vault --force` can overwrite the live vault (Medium)
 
+- **Issue:** `rk export -f vault --force` is meant to write a backup copy. If you give it the live vault file as the output name, it overwrites the live vault with the backup format. The safety check compares the *text* of the two paths, so a different spelling of the same file (such as `./v.db` and `v.db`) gets past it. The vault is then unreadable until you run the `rk migrate` command to convert it.
 - **Severity:** Medium
 - **How found:** Confirmed
 - **Evidence:** The guard `out == path` compares path text. PoC: `rk --vault ./v.db export -f vault -o v.db --force` exits 0 and `file::save` renames the JSON bundle over the open SQLite vault; the next `rk --vault v.db list` says the file is "in the old vault file format".
@@ -459,6 +481,7 @@ Files read: `clipboard/src/lib.rs`, `cli/src/{main,clipboard,file}.rs`. [P4-2](#
 <a id="p4-3"></a>
 #### P4-3 — Secrets in the command line (Low)
 
+- **Issue:** The command-line tool accepts the two-factor secret (the *TOTP seed*, which makes the 6-digit codes) and notes as part of the command typed on the line. Anything typed on a command line can be seen by other programs through `ps` (a list of running programs and their arguments) and is stored in the shell history file.
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** `rk add --totp <secret>` and `rk edit --totp <secret>` take the TOTP seed as an argument; `--notes` the same. Passwords do not (`--password` is a switch, `--password-stdin` exists).
@@ -471,6 +494,7 @@ Files read: `clipboard/src/lib.rs`, `cli/src/{main,clipboard,file}.rs`. [P4-2](#
 <a id="p4-4"></a>
 #### P4-4 — The clipboard clear is best effort and the messages promise more (Low)
 
+- **Issue:** After you copy a password, the app says the clipboard will be cleared in 20 seconds. That is a best effort, not a promise: the small helper that does the clearing can be killed, the clipboard tool may be gone, two copies in a row can shorten the second wait, and *clipboard managers* (tools that remember everything you copied) keep their own history that the app cannot clear.
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** (a) The helper prints nothing; if it is killed or the tool is missing at clear time the secret stays. (b) Two copies of the same value in a row: the first helper clears early, shortening the second. (c) Clipboard managers (GNOME, Klipper, `cliphist`) keep their own history and no "sensitive" hint is set. (d) The helper reads the secret with `read_to_string` into a plain `String`.
@@ -483,6 +507,7 @@ Files read: `clipboard/src/lib.rs`, `cli/src/{main,clipboard,file}.rs`. [P4-2](#
 <a id="p4-5"></a>
 #### P4-5 — Clipboard tools are found through `PATH` (Low)
 
+- **Issue:** To copy to the clipboard, the app runs tools such as `wl-copy` by bare name and finds them by searching the folders listed in `PATH` (the list of places where the system looks for programs). If an early folder in that list is writable by the user (such as `~/.local/bin`), another program running as the same user can put a fake `wl-copy` there and receive every password you copy.
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** `on_path` checks `is_file` only (not executable) and the command runs by bare name. The re-spawn through `std::env::current_exe()` is not a hijack risk by itself: it uses `/proc/self/exe`, and replacing that binary already gives the attacker everything.
@@ -495,6 +520,7 @@ Files read: `clipboard/src/lib.rs`, `cli/src/{main,clipboard,file}.rs`. [P4-2](#
 <a id="p4-6"></a>
 #### P4-6 — `rk passwd` with `RK_PASSWORD` set (Low)
 
+- **Issue:** `rk passwd` changes the master password. If the `RK_PASSWORD` environment variable (see P4-1) is set, the tool reads the "new" password from the same variable, so the new password equals the old one, and the "type it again" prompt is skipped. The command says "Master password changed" but changed nothing. It is misleading, but nothing leaks.
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** `new_master` reads the new password through the same `read_password`, so with the variable set the "new" password equals the current one and the repeat prompt is skipped.
@@ -507,6 +533,7 @@ Files read: `clipboard/src/lib.rs`, `cli/src/{main,clipboard,file}.rs`. [P4-2](#
 <a id="p4-7"></a>
 #### P4-7 — Plaintext export file handling (Low)
 
+- **Issue:** When you export your passwords as plain text, the file is meant to be private (readable only by you). With `--force` on a file that already exists, the tool keeps that file's old permissions, which may let others read it, and it follows a *symlink* (a shortcut file) at the target, so the export can be written to a different file than the one you named.
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** `write_private` opens with mode 0600 only when it creates the file. With `--force` on an existing file it keeps that file's old mode and follows a symlink at the target. Without `--force`, `create_new` is correct.
@@ -519,6 +546,7 @@ Files read: `clipboard/src/lib.rs`, `cli/src/{main,clipboard,file}.rs`. [P4-2](#
 <a id="p4-8"></a>
 #### P4-8 — Read-only commands delete data (Info)
 
+- **Issue:** A note. Every command, even `rk list` that only shows items, quietly erases trash items older than 30 days first. The 30 days is a default for the command line and may not match what you set in the desktop app. It does print a message when it does so.
 - **Severity:** Info
 - **How found:** From reading
 - **Evidence:** `open_vault` calls `purge_expired` with the default 30-day retention for every command, using CLI defaults instead of the desktop settings.
@@ -546,6 +574,7 @@ Files read: `transfer/src/{lib,bundle}.rs`, the import and export commands in `c
 <a id="p5-1"></a>
 #### P5-1 — CSV import time grows with the square of the row count (Medium)
 
+- **Issue:** Importing a CSV (a spreadsheet saved as plain text) compares each new row with all rows seen so far to find similar logins. That makes the work grow with the *square* of the row count: 20 000 rows took about 5 seconds, and 40 000 about 26 seconds. The size cap allows about 500 000 rows, so a large or hostile file can freeze the import for a very long time with no progress shown.
 - **Severity:** Medium
 - **How found:** Confirmed
 - **Evidence:** For every new row `import_csv` scans the whole `seen` set (`seen.iter().any(...)`) to count similar logins: O(rows²). `rk import big.csv --dry-run`: 5.2 s for 20 000 rows, 25.7 s for 40 000.
@@ -558,6 +587,7 @@ Files read: `transfer/src/{lib,bundle}.rs`, the import and export commands in `c
 <a id="p5-2"></a>
 #### P5-2 — Imported text can carry terminal escape sequences (Medium)
 
+- **Issue:** Imported text (titles, usernames, web addresses) is printed to the terminal exactly as it is. A terminal obeys hidden *escape sequences*, special character codes, such as "clear the screen" or, in some terminals, "put this text on the clipboard" (the code called OSC 52). So a crafted CSV could make the import preview look different from what is really in the file, or change your clipboard. The same applies to items that arrive through sync or sharing.
 - **Severity:** Medium
 - **How found:** Confirmed
 - **Evidence:** `rk import --dry-run`, the confirmation listing and `rk list` print titles, usernames and URLs with `println!` unchanged. A CSV title holding `ESC ] 52 ; c ; … BEL` or `ESC [ 2 J` reaches the terminal as written.
@@ -570,6 +600,7 @@ Files read: `transfer/src/{lib,bundle}.rs`, the import and export commands in `c
 <a id="p5-3"></a>
 #### P5-3 — The JSON export includes the history of old passwords (Low)
 
+- **Issue:** The JSON export includes each item's *history*, which holds the old passwords you replaced. The warning only says the file contains "every password". If you changed a leaked password, the export still carries the leaked one.
 - **Severity:** Low
 - **How found:** Confirmed
 - **Evidence:** `export_json` serialises each `Item`, history included. After `rk edit H --password-stdin`, `rk export -f json` contains the old password as well as the new one. The `txt` and `csv` exports do not.
@@ -582,6 +613,7 @@ Files read: `transfer/src/{lib,bundle}.rs`, the import and export commands in `c
 <a id="p5-4"></a>
 #### P5-4 — CSV export writes cells verbatim (Low)
 
+- **Issue:** In the CSV export, a cell that starts with `=`, `+`, `-` or `@` is treated by spreadsheet programs as a *formula*, a small program, such as one that opens a web link. If an imported item holds such text, opening your export in a spreadsheet can run it. The code comment mentions this, but the messages shown to the user do not.
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** A title, note or username beginning with `=`, `+`, `-` or `@` becomes a formula when opened in a spreadsheet (for example `=HYPERLINK(...)`, or a DDE call in old versions). The doc comment warns, but the CLI and desktop messages do not.
@@ -594,6 +626,7 @@ Files read: `transfer/src/{lib,bundle}.rs`, the import and export commands in `c
 <a id="p5-5"></a>
 #### P5-5 — Whole files are read before the size limit is checked (Low)
 
+- **Issue:** When you import a file, the app first reads the whole file into memory and only then checks whether it is over the size limit (50 MiB for CSV, 256 MiB for a bundle). A giant file, or a special file such as `/dev/zero` that never ends, can use up all memory before the check runs. This would normally be a mistake by the user, not an attack, because the user names the file.
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** `rk import` and `file::load` call `std::fs::read` and only then compare with `MAX_IMPORT_BYTES` (50 MiB) or `MAX_BUNDLE_BYTES` (256 MiB).
@@ -606,6 +639,7 @@ Files read: `transfer/src/{lib,bundle}.rs`, the import and export commands in `c
 <a id="p5-6"></a>
 #### P5-6 — Imported data is not zeroised once parsed (Low)
 
+- **Issue:** The raw imported file is wiped from memory after use, but the parsed copies made by the CSV reader are not. Passwords from an import can stay in freed memory afterwards. The file on disk is the bigger exposure; the tool already tells you to delete it.
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** The input bytes are `Zeroizing`, but the `csv` reader's buffers and `StringRecord`s are plain memory, and `Item::login(...)` copies each value.
@@ -618,6 +652,7 @@ Files read: `transfer/src/{lib,bundle}.rs`, the import and export commands in `c
 <a id="p5-7"></a>
 #### P5-7 — Text export labels (Info)
 
+- **Issue:** A note. In the plain-text export, long multi-line values are indented so a note cannot pretend to start a new item. But a custom field's *name* is written as it is, and could contain a line break. The effect is cosmetic, because the file is meant for people to read.
 - **Severity:** Info
 - **How found:** From reading
 - **Evidence:** `export_txt` indents multi-line values so a note cannot forge a new block, but custom field names are written without escaping and can contain newlines.
@@ -630,6 +665,7 @@ Files read: `transfer/src/{lib,bundle}.rs`, the import and export commands in `c
 <a id="p5-8"></a>
 #### P5-8 — The `csv_import` fuzz target never passes `existing` items (Low)
 
+- **Issue:** *Fuzzing* means feeding a program huge numbers of random or damaged inputs to see if it breaks. The fuzz test for CSV import never supplies any existing items, so it never reaches the slow part described in P5-1. Its small default input size (4 KiB) is also too small to show a slowdown.
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** libFuzzer's default input size (4 KiB) also cannot show [P5-1](#p5-1).
@@ -642,6 +678,7 @@ Files read: `transfer/src/{lib,bundle}.rs`, the import and export commands in `c
 <a id="p5-9"></a>
 #### P5-9 — The `bundle` fuzz target stops at the store (Low)
 
+- **Issue:** The fuzz test for vault bundle files checks that reading them is safe, but it never goes on to unlock the vault from them. The unlock step is where a bad record used to block everything (P2-3), so fuzzing could not have found it.
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** It never calls `Vault::unlock` on the records, which is where [P2-3](#p2-3) lives.
@@ -654,6 +691,7 @@ Files read: `transfer/src/{lib,bundle}.rs`, the import and export commands in `c
 <a id="p5-10"></a>
 #### P5-10 — Several readers of untrusted input are not fuzzed (Low)
 
+- **Issue:** Several places that read untrusted input have no fuzz test: the settings file, the profile list file, the text and JSON exports, and the command-line query and column-mapping options. A bug in any of them would go unnoticed.
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** Not fuzzed: `Settings::from_json` (a user-writable file; see [P3-1](#p3-1)), the profile index file parser, `export_txt`/`export_json` with arbitrary items, the CLI's `--map` and query parsing.
@@ -666,6 +704,7 @@ Files read: `transfer/src/{lib,bundle}.rs`, the import and export commands in `c
 <a id="p5-11"></a>
 #### P5-11 — Only `item_json` has a `regressions` directory (Low)
 
+- **Issue:** A *regression* is a bug that comes back after it was fixed. Only one fuzz test has a folder for saving inputs that once crashed the program (a `regressions` directory). For the others, a fixed crash could return and nobody would notice.
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** Other targets have no place for saved crash inputs.
@@ -694,6 +733,7 @@ Files read: `apps/desktop/src/{lib,model,profiles}.rs`, `platform/linux.rs`, `cr
 <a id="p6-1"></a>
 #### P6-1 — No process hardening: core dumps, ptrace, swap (Medium)
 
+- **Issue:** The app does not use any of the operating system's tools to limit what can be extracted from a running program. If the program crashes, the system may write a *core file* (a snapshot of its memory) or send a crash report that contains the vault key and your decrypted items. Memory can also be copied to the *swap* (the disk space used when RAM is full), and other programs of the same user may be allowed to attach to it with `ptrace` (a debugging feature that can read another program's memory). The design document promises locked memory; there is none.
 - **Severity:** Medium
 - **How found:** From reading
 - **Evidence:** Nothing in the repo calls `prctl`, `setrlimit`, `mlock` or `madvise`, although `docs/04` promises locked memory.
@@ -706,6 +746,7 @@ Files read: `apps/desktop/src/{lib,model,profiles}.rs`, `platform/linux.rs`, `cr
 <a id="p6-2"></a>
 #### P6-2 — The data and config folders are readable by other users (Medium)
 
+- **Issue:** The folders where the app keeps its data and settings can be listed by other users on the same computer, and the profile list and settings files can be read by them. The vault files themselves are private. The profile list holds each profile's real full name and username, and shows how many vaults exist.
 - **Severity:** Medium
 - **How found:** Confirmed
 - **Evidence:** `~/.local/share/rahasyakosh` is mode 775, `profiles/` 775, `profiles.json` 664, `~/.config/rahasyakosh/settings.json` 664 (vault files and `-wal`/`-shm` are 600). `profiles::save`, `save_settings` and `create_dir_all` use the default umask.
@@ -718,6 +759,7 @@ Files read: `apps/desktop/src/{lib,model,profiles}.rs`, `platform/linux.rs`, `cr
 <a id="p6-3"></a>
 #### P6-3 — Typed secrets pass through memory that is never wiped (Medium)
 
+- **Issue:** Whatever you type into a password box passes through places the app cannot wipe: the web view (the built-in browser that draws the window), the messages sent between the window and the program on each key press, and ordinary text variables that are dropped without being overwritten. So the master password and other typed secrets stay in memory after use. This cannot be fully fixed while the window is a web view.
 - **Severity:** Medium
 - **How found:** From reading
 - **Evidence:** Unwiped places: the `<input>` inside the WebKit web process; the event messages Dioxus sends on each keystroke (the whole value each time); the `String`s in the signals `pw`, `pw2`, `new_pw`, `new_pw2`, `export_pw`, `del_pw` and the edit-form fields. `submit()` ends with `pw.set(String::new())`, which drops the old `String` without wiping it. Revealed values are copied into `FieldView` and page text. `Form` wipes only its own copy.
@@ -730,6 +772,7 @@ Files read: `apps/desktop/src/{lib,model,profiles}.rs`, `platform/linux.rs`, `cr
 <a id="p6-4"></a>
 #### P6-4 — The edit form shows the password in clear (Low)
 
+- **Issue:** In the form for adding or editing an item, the password field shows the password as plain text, not as dots, and it never hides again while the form is open. The item detail page hides secrets until you ask, so the form is inconsistent. Anyone looking at your screen, or at a screen share, can read it.
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** `f-pw` in the add/edit form is a normal text input, not `type=password`, with no reveal timeout. The detail pane hides secrets until revealed, so this is inconsistent.
@@ -742,6 +785,7 @@ Files read: `apps/desktop/src/{lib,model,profiles}.rs`, `platform/linux.rs`, `cr
 <a id="p6-5"></a>
 #### P6-5 — The web view keeps its own files on disk (Low)
 
+- **Issue:** The built-in web view (the browser engine that draws the window) creates its own folders of cache and storage on disk. The app does not use browser storage, so little should be there, but nobody has checked whether any text you typed ends up in those files.
 - **Severity:** Low
 - **How found:** Checked (partly)
 - **Evidence:** `~/.local/share/rahasyakosh-desktop` (`storage`, `mediakeys`, `hsts-storage.sqlite`) and `~/.cache/rahasyakosh-desktop` (`CacheStorage`, `WebKitCache`) exist. The page is local and the code uses no browser storage, so little should be there, but contents were not verified.
@@ -754,6 +798,7 @@ Files read: `apps/desktop/src/{lib,model,profiles}.rs`, `platform/linux.rs`, `cr
 <a id="p6-6"></a>
 #### P6-6 — Anything that reads the accessibility tree sees revealed values (Low)
 
+- **Issue:** Screen readers such as Orca, and any other program allowed to use the *accessibility tree* (the structured description of the window that assistive technology reads), can read everything shown on screen. That includes revealed passwords and the current two-factor code. This is a deliberate trade-off to make the app usable by blind people, so it is documented rather than "fixed".
 - **Severity:** Low
 - **How found:** From reading (by design)
 - **Evidence:** Revealed secrets, the live two-factor code and the edit form values are page text; the code of the selected item is shown without a reveal step.
@@ -766,6 +811,7 @@ Files read: `apps/desktop/src/{lib,model,profiles}.rs`, `platform/linux.rs`, `cr
 <a id="p6-7"></a>
 #### P6-7 — Switching profile resets the unlock throttle (Low)
 
+- **Issue:** After wrong passwords, the unlock wait grows (see P3-4). Choosing another profile builds a new session, which resets that counter. Someone at the keyboard can try profile A, switch to B and back, and A's counter starts again at zero.
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** Choosing a profile calls `open_profile`, which builds a new `Session` (adds to [P3-4](#p3-4)).
@@ -778,6 +824,7 @@ Files read: `apps/desktop/src/{lib,model,profiles}.rs`, `platform/linux.rs`, `cr
 <a id="p6-8"></a>
 #### P6-8 — To check in a release build (Info)
 
+- **Issue:** A note, and a to-do. Developer tools (the "Inspect Element" panel) are on in debug builds of the toolkit the desktop app uses. The audit found nothing to worry about in the code, but nobody has yet checked that they are really off in the release build.
 - **Severity:** Info
 - **How found:** Not run
 - **Evidence:** Dioxus enables developer tools in debug builds. The code has no `dangerous_inner_html`, no links and no external requests.
@@ -805,6 +852,7 @@ Files read: `.github/workflows/{ci,fuzz}.yml`, `deny.toml`, `apps/desktop/deny.t
 <a id="p7-1"></a>
 #### P7-1 — The installer switches the desktop accessibility bus on for the whole session (Medium)
 
+- **Issue:** To make the Orca screen reader work, the installed launcher switches on the desktop's *accessibility bus* (the system through which programs talk to screen readers) every time the app starts, if it was off. This changes a setting for the whole login session, not just this app. With the bus on, any program in the session can read other programs' text and watch key presses, which includes passwords you type elsewhere.
 - **Severity:** Medium
 - **How found:** From reading
 - **Evidence:** The launcher written by `install-local.sh` sets `org.a11y.Status IsEnabled` to true at every start when it is off, so that Orca works (the project's priority).
@@ -817,6 +865,7 @@ Files read: `.github/workflows/{ci,fuzz}.yml`, `deny.toml`, `apps/desktop/deny.t
 <a id="p7-2"></a>
 #### P7-2 — GitHub Actions are pinned by tag, not by commit (Low)
 
+- **Issue:** The project's automatic build and test service (*GitHub Actions*, "CI") uses ready-made helper steps from other people. They are named by a *tag* (like `v2`) that the owner can move to different code at any time, rather than by an exact *commit* (a fixed snapshot). If one of those helpers were hijacked, it would run inside the project's build. The default access it gets is read-only, which limits the damage.
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** Moving tags: `actions/checkout@v7`, `actions/upload-artifact@v7`, `Swatinem/rust-cache@v2`, `EmbarkStudios/cargo-deny-action@v2`, `taiki-e/install-action@v2`, `bytecodealliance/actions/wasmtime/setup@v1`, and `dtolnay/rust-toolchain@stable`/`@nightly` (a branch name). `ci.yml` has no `permissions:` block (`fuzz.yml` does). The default token is read-only, which limits the harm.
@@ -829,6 +878,7 @@ Files read: `.github/workflows/{ci,fuzz}.yml`, `deny.toml`, `apps/desktop/deny.t
 <a id="p7-3"></a>
 #### P7-3 — Builds are not locked or reproducible yet (Low)
 
+- **Issue:** Someone who downloads the app cannot yet check that it is the genuine one. The builds do not all insist on the exact library versions in the lock file (`--locked`), the compiler is "whatever is latest", and there is no release process that publishes a *checksum* (a fingerprint of the file), a *signature* (proof of who made it) or an *SBOM* (a list of everything inside the app). This is on the to-do list in `docs/12`.
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** The root jobs run `cargo clippy/test` without `--locked` (the desktop job uses it); the toolchain is "latest stable"; there is no release workflow, checksum, signature or SBOM yet (all listed as to-do in `docs/12`). `install-local.sh` uses `--locked`.
@@ -841,6 +891,7 @@ Files read: `.github/workflows/{ci,fuzz}.yml`, `deny.toml`, `apps/desktop/deny.t
 <a id="p7-4"></a>
 #### P7-4 — Release profile differs between the two workspaces (Low)
 
+- **Issue:** The command-line tool and the desktop app are built with different settings. The command-line tool stops the program immediately on a crash (`panic = "abort"`), which skips the code that wipes secrets from memory. The desktop app does run that cleanup. Neither turns on *overflow checks*, which catch arithmetic that goes past the largest number a variable can hold.
 - **Severity:** Low
 - **How found:** From reading
 - **Evidence:** The root `[profile.release]` sets `panic = "abort"` (applies to `rk`). `apps/desktop` has `lto = "thin"` and `strip` only, so it unwinds on panic and does run `Drop` (and zeroization). Neither profile sets `overflow-checks = true`.
@@ -853,6 +904,7 @@ Files read: `.github/workflows/{ci,fuzz}.yml`, `deny.toml`, `apps/desktop/deny.t
 <a id="p7-5"></a>
 #### P7-5 — Deny policy and advisory exceptions (Info)
 
+- **Issue:** A note. The project checks its dependencies (other people's code) with `cargo deny` (a rules checker) and `cargo audit` (a check against known security warnings). Both pass. A few warnings are accepted, each with a written reason. One of them may be out of date and should be removed when no longer needed.
 - **Severity:** Info
 - **How found:** From reading
 - **Evidence:** Root policy is strict (no OpenSSL, `ring` banned, wildcards denied, unknown registries and git sources denied) and passes. The desktop policy allows OpenSSL only through `native-tls`, each exception has a written reason, and it passes. `RUSTSEC-2026-0097` (`rand` 0.7.3 unsound with a custom logger) is an accepted warning whose reason holds (no `tracing-subscriber` or `dioxus-logger` in the tree); `cargo deny` reports that ignore as "no crate matched", so it may be stale for deny while `cargo audit` still shows it. `cargo audit` in the desktop reports 5 allowed warnings (unmaintained or unsound crates inside the GUI toolkit), all listed in `deny.toml`.
@@ -865,6 +917,7 @@ Files read: `.github/workflows/{ci,fuzz}.yml`, `deny.toml`, `apps/desktop/deny.t
 <a id="p7-6"></a>
 #### P7-6 — Install script details (Info)
 
+- **Issue:** A note. The install script only changes files under `~/.local` and does not touch your vault when uninstalling. It does build the launcher file with text substitution that breaks if your home folder name contains a `|` or `&`. The effect is cosmetic.
 - **Severity:** Info
 - **How found:** From reading
 - **Evidence:** It touches only `~/.local`, builds with `--locked`, installs with explicit modes, and `--uninstall` leaves the vault alone. The `.desktop` file is made with `sed` using the pipe character as delimiter, which breaks for a home directory containing it or `&`; the launcher embeds `$bin` in double quotes.
