@@ -210,7 +210,7 @@ Files read: all of `core/src/{crypto,vault,item,totp,generator}.rs`, the `argon2
 - **Evidence:** `core/Cargo.toml`: `argon2 = { default-features = false, features = ["alloc"] }`. So `initial_hash` (line 389) and the `blockhash` temporaries (lines 570-573) are not wiped. The large memory matrix is not wiped even with the feature on.
 - **Impact:** `initial_hash` is a plain Blake2b of password and salt; a memory image that contains it lets someone test guesses with one cheap hash instead of a full Argon2. Low, because an attacker who can read this memory also finds the key and the password buffers ([P6-3](#p6-3)).
 - **Recommended fix:** Enable the `zeroize` feature (check it still builds for `wasm32`) and state the limit in `docs/04`.
-- **Status:** open
+- **Status:** fixed 2026-10-27: `argon2` is built with its `zeroize` feature (the wasm builds still pass). The large memory matrix is still not wiped; `docs/04` says so.
 
 [Top](#top)
 

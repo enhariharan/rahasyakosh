@@ -9,7 +9,7 @@
 | Network attacker | Yes | TLS + E2EE; no secrets in requests (HIBP uses k-anonymity) |
 | Shoulder surfing / screen capture | Partly | Masked fields, FLAG_SECURE, clipboard auto-clear |
 | Malware running as user, while unlocked | **No** (documented) | Minimise key lifetime, auto-lock |
-| Cold-boot / memory forensics on locked device | Partly | zeroize on lock. `mlock` is **not built** (needs `unsafe`; see audit finding P6-1) |
+| Cold-boot / memory forensics on locked device | Partly | zeroize on lock (Argon2's small temporary values are wiped too; its large memory matrix is not). `mlock` is **not built** (needs `unsafe`; see audit finding P6-1) |
 | Malicious web page (extension) | Yes | Strict origin matching (eTLD+1 via PSL), no autofill in iframes cross-origin by default, user gesture for fill |
 | Supply-chain | Yes | cargo-deny/audit, pinned lockfile, minimal deps, reproducible builds |
 

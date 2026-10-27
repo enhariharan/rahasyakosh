@@ -39,7 +39,7 @@ Most checks are also worth turning into automated tests when the fix is written.
 - [ ] Fixed 2026-10-27 for the Secret Key (`crates/core/tests/secret_key.rs`, `crates/cli/tests/cli.rs`): `rk init --secret-key` shows a key once; the vault file alone does not open; a new device asks for the key. `verifier`, a header `magic` field and `mlock` are documented as not built.
 
 ### P1-4 Argon2 working memory
-- [ ] `core/Cargo.toml` enables the `zeroize` feature for `argon2`, and `cargo build --target wasm32-unknown-unknown -p rahasyakosh-core` (or the CI wasm job) still passes.
+- [ ] `core/Cargo.toml` enables the `zeroize` feature for `argon2`, and `cargo build --target wasm32-unknown-unknown -p rahasyakosh-core` (or the CI wasm job) still passes. Checked 2026-10-27.
 
 ### P1-5 No test-only switch in release code
 - [ ] `grep -rn "cfg!(test)" crates/` finds no check that changes security behaviour. `cargo build --release` of every crate, with `cargo tree -e features`, shows no test-only feature turned on.
