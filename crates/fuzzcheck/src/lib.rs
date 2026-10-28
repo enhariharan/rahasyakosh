@@ -13,7 +13,9 @@ use rahasyakosh_core::totp::Totp;
 use rahasyakosh_core::vault::{Record, UnlockedVault, VaultHeader};
 use rahasyakosh_store::conformance::{sample_header, sample_record};
 use rahasyakosh_store::{DirectoryStore, MemoryStore, SqliteStore, Store, Uuid};
-use rahasyakosh_transfer::{export_csv, import_csv, Bundle};
+use rahasyakosh_transfer::{
+    csv_columns, export_csv, import_bitwarden_json, import_csv, import_file, Bundle,
+};
 use rand_chacha::{rand_core::SeedableRng, ChaCha20Rng};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -166,7 +168,8 @@ pub fn item_json(data: &[u8]) {
     }
 }
 
-/// CSV import: any bytes, with and without a column mapping. What comes back must itself export and re-import.
+/// File import: any bytes, read as CSV (with and without a column mapping) and as a Bitwarden JSON export. What comes
+/// back must itself export and re-import.
 pub fn csv_import(data: &[u8]) {
     let mut n = 0u128;
     let mut ids = || {
@@ -174,6 +177,9 @@ pub fn csv_import(data: &[u8]) {
         Uuid::from_u128(n)
     };
     let _ = import_csv(data, &[], &[], 0, &mut ids);
+    let _ = import_bitwarden_json(data, &[], 0, &mut ids);
+    let _ = import_file(data, &[], &[], 0, &mut ids);
+    let _ = csv_columns(data, &[]);
     // Also exercise explicit column mapping, using the file's own first header names.
     let first_line: &[u8] = data.split(|b| *b == b'\n').next().unwrap_or(&[]);
     let names: Vec<String> = String::from_utf8_lossy(first_line)

@@ -199,13 +199,17 @@ pub enum View {
 /// What reading an import file found. Nothing is stored until the user confirms.
 pub struct ImportPlan {
     pub file: std::path::PathBuf,
-    /// "chrome", "firefox" or "generic".
+    /// "chrome", "firefox", "bitwarden", "keepass", "1password" or "generic".
     pub detected: &'static str,
     pub items: Vec<Item>,
     pub skipped_duplicates: usize,
     pub skipped_empty: usize,
     /// Notes from the reader. They never contain passwords.
     pub warnings: Vec<String>,
+    /// For a CSV: which column of the file is read for each field, so the user can change it. `None` for JSON.
+    pub columns: Option<rahasyakosh_transfer::CsvColumns>,
+    /// True when the file has no password column yet: nothing was read, and the user must choose one.
+    pub needs_password_column: bool,
 }
 
 /// One line in the item list.
@@ -495,6 +499,12 @@ impl<S: Store, C: Clipboard> Model<S, C> {
         };
     }
 
+    /// Have a screen reader say `text` politely, with nothing shown on screen (for events that happen outside the
+    /// vault, such as a profile being deleted).
+    pub fn announce(&mut self, text: impl Into<String>) {
+        self.say(text, false);
+    }
+
     fn info(&mut self, text: impl Into<String>, now: i64) {
         let text = text.into();
         self.say(text.clone(), false);
@@ -601,19 +611,31 @@ impl<S: Store, C: Clipboard> Model<S, C> {
 
     // ---- import ---------------------------------------------------------------------------------------
 
-    /// Read the CSV at `path` (`~/` means the home folder) and keep what it would add, for the user to look at. Stores
-    /// nothing. Items already in the vault (even in the trash) are not added again.
-    pub fn import_preview(&mut self, path: &str, now: i64) -> Result<(), String> {
+    /// Read the file at `path` (`~/` means the home folder) and keep what it would add, for the user to look at. Stores
+    /// nothing. Items already in the vault (even in the trash) are not added again. The file is a CSV (from a browser,
+    /// Bitwarden, KeePassXC, 1Password...) or a Bitwarden JSON export. `columns` picks CSV columns the reader did not
+    /// find by itself: (our field name, the file's header), an empty header meaning "none".
+    pub fn import_preview(
+        &mut self,
+        path: &str,
+        columns: &[(String, String)],
+        now: i64,
+    ) -> Result<(), String> {
         self.activity(now);
         self.import = None;
-        let result = self.try_import_preview(path, now);
+        let result = self.try_import_preview(path, columns, now);
         if let Err(e) = &result {
             self.error(e.clone(), now);
         }
         result
     }
 
-    fn try_import_preview(&mut self, path: &str, now: i64) -> Result<(), String> {
+    fn try_import_preview(
+        &mut self,
+        path: &str,
+        columns: &[(String, String)],
+        now: i64,
+    ) -> Result<(), String> {
         use std::io::Read;
         let lang = self.lang();
         let path = path.trim();
@@ -639,8 +661,34 @@ impl<S: Store, C: Clipboard> Model<S, C> {
             .vault(now)
             .map_err(|Locked| t(lang, Msg::VaultIsLocked).to_string())?;
         let existing: Vec<Item> = vault.items(Scope::Any).into_iter().cloned().collect();
-        let report = rahasyakosh_transfer::import_csv(&data, &[], &existing, now, Uuid::now_v7)
-            .map_err(|e| trf(lang, Msg::ImportCannotRead, &[&e]))?;
+        let cannot_read = |e: rahasyakosh_transfer::Error| trf(lang, Msg::ImportCannotRead, &[&e]);
+        let csv_columns = if rahasyakosh_transfer::is_json(&data) {
+            None
+        } else {
+            Some(rahasyakosh_transfer::csv_columns(&data, columns).map_err(cannot_read)?)
+        };
+        // A CSV with no password column cannot be read yet; show its columns so the user can pick one.
+        let password_found = csv_columns.as_ref().is_none_or(|c| {
+            c.assigned
+                .iter()
+                .any(|(field, at)| *field == "password" && at.is_some())
+        });
+        if !password_found {
+            self.import = Some(ImportPlan {
+                file,
+                detected: "generic",
+                items: Vec::new(),
+                skipped_duplicates: 0,
+                skipped_empty: 0,
+                warnings: Vec::new(),
+                columns: csv_columns,
+                needs_password_column: true,
+            });
+            return Ok(());
+        }
+        let report =
+            rahasyakosh_transfer::import_file(&data, columns, &existing, now, Uuid::now_v7)
+                .map_err(cannot_read)?;
         self.import = Some(ImportPlan {
             file,
             detected: report.detected,
@@ -648,6 +696,8 @@ impl<S: Store, C: Clipboard> Model<S, C> {
             skipped_duplicates: report.skipped_duplicates,
             skipped_empty: report.skipped_empty,
             warnings: report.warnings,
+            columns: csv_columns,
+            needs_password_column: false,
         });
         Ok(())
     }
@@ -656,7 +706,7 @@ impl<S: Store, C: Clipboard> Model<S, C> {
     pub fn import_confirm(&mut self, now: i64) -> Result<usize, String> {
         self.activity(now);
         let lang = self.lang();
-        let Some(plan) = self.import.take() else {
+        let Some(plan) = self.import.take().filter(|p| !p.items.is_empty()) else {
             return Err(t(lang, Msg::ImportNothing).into());
         };
         let count = plan.items.len();

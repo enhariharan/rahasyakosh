@@ -1049,3 +1049,99 @@ fn the_clipboard_helpers_do_not_inherit_the_master_password() {
     );
     assert!(!seen.contains("RK_SECRET_KEY"), "{seen}");
 }
+
+/// A data folder with a profile list naming two vaults (the vault files themselves are made by the tests).
+fn profile_folder(name: &str) -> PathBuf {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("profiles-{name}"));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("profiles")).unwrap();
+    let mut list = rahasyakosh_app::ProfileList::new();
+    list.add(
+        uuid::Uuid::from_u128(1),
+        "Default user",
+        "defaultuser",
+        "vault.db",
+    )
+    .unwrap();
+    list.add(
+        uuid::Uuid::from_u128(2),
+        "Asha Rao",
+        "Asha",
+        "profiles/asha.db",
+    )
+    .unwrap();
+    rahasyakosh_app::profile_files::save_list(&dir, &list).unwrap();
+    dir
+}
+
+#[test]
+fn profile_picks_the_vault_listed_for_that_username() {
+    let dir = profile_folder("pick");
+    let (main, asha) = (dir.join("vault.db"), dir.join("profiles/asha.db"));
+    assert!(run(&main, &["init"], "").status.success());
+    assert!(run(&asha, &["init"], "").status.success());
+    assert!(run(
+        &asha,
+        &["add", "OnlyAsha", "-u", "a", "--password-stdin"],
+        "pw-1\n"
+    )
+    .status
+    .success());
+
+    // RK_VAULT names the main vault; --profile (any case) switches to Asha's.
+    let out = run(&main, &["--profile", "ASHA", "list"], "");
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(String::from_utf8_lossy(&out.stdout).contains("OnlyAsha"));
+    let out = run(&main, &["list"], "");
+    assert!(!String::from_utf8_lossy(&out.stdout).contains("OnlyAsha"));
+}
+
+#[test]
+fn profiles_lists_usernames_and_unknown_or_missing_lists_are_explained() {
+    let dir = profile_folder("list");
+    let main = dir.join("vault.db");
+    let out = run(&main, &["profiles"], "");
+    assert!(out.status.success());
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(text.contains("defaultuser\tDefault user"), "{text}");
+    assert!(text.contains("Asha\tAsha Rao"), "{text}");
+
+    let out = run(&main, &["--profile", "nobody", "list"], "");
+    assert!(!out.status.success());
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        err.contains("nobody") && err.contains("defaultuser, Asha"),
+        "{err}"
+    );
+
+    let empty = Path::new(env!("CARGO_TARGET_TMPDIR")).join("no-profile-list/vault.db");
+    std::fs::create_dir_all(empty.parent().unwrap()).unwrap();
+    let _ = std::fs::remove_file(empty.parent().unwrap().join("profiles.json"));
+    let out = run(&empty, &["--profile", "x", "list"], "");
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("no profile list"));
+}
+
+#[test]
+fn import_reads_a_bitwarden_json_export() {
+    let v = Vault::new("import-bitwarden-json");
+    let file = v.0.with_extension("json");
+    std::fs::write(
+        &file,
+        r#"{"encrypted":false,"folders":[],"items":[
+            {"type":1,"name":"Forum","login":{"username":"carol","password":"pw-2","uris":[{"uri":"https://forum.example"}]}},
+            {"type":2,"name":"A note"}]}"#,
+    )
+    .unwrap();
+    let out = v.rk(&["import", file.to_str().unwrap(), "--yes"], "");
+    let err = String::from_utf8_lossy(&out.stderr).into_owned();
+    assert!(out.status.success(), "{err}");
+    assert!(err.contains("Detected format: bitwarden"), "{err}");
+    assert!(v.ok(&["list"], "").contains("Forum"));
+    assert!(!v.ok(&["list"], "").contains("A note"));
+    let _ = std::fs::remove_file(&file);
+}

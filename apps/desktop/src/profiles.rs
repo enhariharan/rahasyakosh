@@ -1,20 +1,11 @@
 //! Where the profile list and the profiles' vault files live on disk (E13). The rules about names and usernames
 //! are in `rahasyakosh_app::ProfileList`; this file only reads and writes.
-use rahasyakosh_app::{new_profile_id, Profile, ProfileList, DEFAULT_FULL_NAME, DEFAULT_USERNAME};
+use rahasyakosh_app::{new_profile_id, ProfileList, DEFAULT_FULL_NAME, DEFAULT_USERNAME};
 use rahasyakosh_store::{private_fs, Uuid};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
-fn list_path(dir: &Path) -> PathBuf {
-    dir.join("profiles.json")
-}
-
-/// The vault file of `profile`. `None` if the list names a path that leaves the data folder.
-pub fn vault_file(dir: &Path, profile: &Profile) -> Option<PathBuf> {
-    let rel = Path::new(&profile.file);
-    rel.components()
-        .all(|c| matches!(c, Component::Normal(_)))
-        .then(|| dir.join(rel))
-}
+pub use rahasyakosh_app::profile_files::vault_file;
+use rahasyakosh_app::profile_files::{read_list, save_list};
 
 /// The vault file name for a new profile (the first one keeps the old single-vault name).
 pub fn new_vault_file(first: Option<&str>, id: Uuid) -> String {
@@ -24,35 +15,27 @@ pub fn new_vault_file(first: Option<&str>, id: Uuid) -> String {
 /// Reads the profile list. When there is none yet but a vault file already exists (made before profiles
 /// existed), that vault becomes the default profile, in place: same file, same master password.
 pub fn load(dir: &Path, legacy_vault: &Path) -> Result<ProfileList, String> {
-    match std::fs::read(list_path(dir)) {
-        Ok(bytes) => ProfileList::from_json(&bytes)
-            .ok_or_else(|| format!("{} is damaged.", list_path(dir).display())),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            let has_vault = std::fs::metadata(legacy_vault).is_ok_and(|m| m.len() > 0);
-            let mut list = ProfileList::new();
-            if has_vault {
-                let file = legacy_vault
-                    .file_name()
-                    .and_then(|f| f.to_str())
-                    .unwrap_or("vault.db");
-                let id = new_profile_id(&mut rand::rng());
-                list.add(id, DEFAULT_FULL_NAME, DEFAULT_USERNAME, file)
-                    .map_err(|e| e.to_string())?;
-                save(dir, &list)?;
-            }
-            Ok(list)
-        }
-        Err(e) => Err(format!("Cannot read {}: {e}", list_path(dir).display())),
+    if let Some(list) = read_list(dir)? {
+        return Ok(list);
     }
+    let has_vault = std::fs::metadata(legacy_vault).is_ok_and(|m| m.len() > 0);
+    let mut list = ProfileList::new();
+    if has_vault {
+        let file = legacy_vault
+            .file_name()
+            .and_then(|f| f.to_str())
+            .unwrap_or("vault.db");
+        let id = new_profile_id(&mut rand::rng());
+        list.add(id, DEFAULT_FULL_NAME, DEFAULT_USERNAME, file)
+            .map_err(|e| e.to_string())?;
+        save(dir, &list)?;
+    }
+    Ok(list)
 }
 
 /// Writes the list through a temporary file so a crash cannot leave half of it.
 pub fn save(dir: &Path, list: &ProfileList) -> Result<(), String> {
-    let write = || -> std::io::Result<()> {
-        private_fs::create_private_dir(dir)?;
-        private_fs::write_private_atomic(&list_path(dir), &list.to_json())
-    };
-    write().map_err(|e| e.to_string())
+    save_list(dir, list)
 }
 
 /// Makes sure the folder for a new vault file exists.
@@ -75,6 +58,7 @@ pub fn delete_vault(vault: &Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rahasyakosh_app::profile_files::list_path;
 
     fn scratch(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("rk-profiles-{name}-{}", std::process::id()));
@@ -116,21 +100,6 @@ mod tests {
             .unwrap_err()
             .contains("damaged"));
         assert_eq!(std::fs::read(list_path(&dir)).unwrap(), b"garbage");
-    }
-
-    #[test]
-    fn a_vault_path_cannot_leave_the_data_folder() {
-        let dir = scratch("escape");
-        let mut list = ProfileList::new();
-        for (i, file) in ["../x.db", "/etc/x.db", "profiles/a.db"]
-            .into_iter()
-            .enumerate()
-        {
-            list.add(Uuid::from_u128(i as u128 + 1), "N", &format!("u{i}"), file)
-                .unwrap();
-        }
-        let got: Vec<_> = list.all().iter().map(|p| vault_file(&dir, p)).collect();
-        assert_eq!(got, [None, None, Some(dir.join("profiles/a.db"))]);
     }
 
     #[cfg(unix)]

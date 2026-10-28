@@ -103,7 +103,8 @@ impl Col {
 /// Result of [`import_csv`]. Nothing has been stored yet; the caller decides what to do with `items`.
 #[derive(Debug, Default)]
 pub struct ImportReport {
-    /// Source flavour guessed from the headers: `"chrome"`, `"firefox"` or `"generic"`.
+    /// Source flavour guessed from the file: `"chrome"`, `"firefox"`, `"bitwarden"`, `"keepass"`, `"1password"` or
+    /// `"generic"`.
     pub detected: &'static str,
     /// New items, ready to be sealed into the vault.
     pub items: Vec<Item>,
@@ -115,30 +116,29 @@ pub struct ImportReport {
     pub warnings: Vec<String>,
 }
 
-/// Parse a CSV of logins.
-///
-/// Columns are recognised by header name (case-insensitive) using the aliases of Chrome, Firefox and other
-/// managers. `overrides` maps one of our column names (`title url username password notes totp tags`) to
-/// an exact header in the file, for files the aliases do not cover. `existing` is used to skip duplicates.
-pub fn import_csv(
-    data: &[u8],
-    overrides: &[(String, String)],
-    existing: &[Item],
-    now: i64,
-    mut new_id: impl FnMut() -> Uuid,
-) -> Result<ImportReport> {
-    if data.len() > MAX_IMPORT_BYTES {
-        return Err(Error::Csv("file is too large".into()));
-    }
-    let data = data.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(data);
-    let mut rdr = csv::ReaderBuilder::new().flexible(true).from_reader(data);
-    let headers: Vec<String> = rdr
-        .headers()
-        .map_err(|e| Error::Csv(e.to_string()))?
-        .iter()
-        .map(|h| h.trim().to_lowercase())
-        .collect();
+/// Which of the file's columns hold our fields, as [`import_csv`] would read them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CsvColumns {
+    /// The header of every column, as written in the file (trimmed).
+    pub headers: Vec<String>,
+    /// For each of our fields (`title url username password notes totp tags`), the index into `headers`, if found.
+    pub assigned: Vec<(&'static str, Option<usize>)>,
+}
 
+/// Our column names, in the order of [`CsvColumns::assigned`].
+pub fn csv_field_names() -> [&'static str; 7] {
+    Col::ALL.map(Col::name)
+}
+
+fn lowered(headers: &csv::StringRecord) -> Vec<String> {
+    headers.iter().map(|h| h.trim().to_lowercase()).collect()
+}
+
+/// Matches headers to our columns: by alias first, then by the caller's `overrides` (one of our names, an exact header).
+fn resolve_columns(
+    headers: &[String],
+    overrides: &[(String, String)],
+) -> Result<[Option<usize>; 7]> {
     let mut map: [Option<usize>; 7] = [None; 7];
     for (i, col) in Col::ALL.into_iter().enumerate() {
         map[i] = headers
@@ -152,12 +152,153 @@ pub fn import_csv(
                 Col::ALL.map(Col::name).join(", ")
             ))
         })?;
+        let slot = Col::ALL.iter().position(|c| *c == col).unwrap();
+        // An empty header means "this field is not in the file", even if an alias would have matched.
+        if header.trim().is_empty() {
+            map[slot] = None;
+            continue;
+        }
         let idx = headers
             .iter()
             .position(|h| *h == header.trim().to_lowercase())
             .ok_or_else(|| Error::Mapping(format!("no column named '{header}' in the file")))?;
-        map[Col::ALL.iter().position(|c| *c == col).unwrap()] = Some(idx);
+        map[slot] = Some(idx);
     }
+    Ok(map)
+}
+
+/// Reads only the header line of a CSV and says which column would be used for each of our fields. A screen can show
+/// this, let the user change it, and pass the changes back as `overrides`.
+pub fn csv_columns(data: &[u8], overrides: &[(String, String)]) -> Result<CsvColumns> {
+    if data.len() > MAX_IMPORT_BYTES {
+        return Err(Error::Csv("file is too large".into()));
+    }
+    let data = data.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(data);
+    let mut rdr = csv::ReaderBuilder::new().flexible(true).from_reader(data);
+    let record = rdr.headers().map_err(|e| Error::Csv(e.to_string()))?;
+    let map = resolve_columns(&lowered(record), overrides)?;
+    Ok(CsvColumns {
+        headers: record.iter().map(|h| h.trim().to_string()).collect(),
+        assigned: Col::ALL.into_iter().map(Col::name).zip(map).collect(),
+    })
+}
+
+/// Collects imported items, skipping the ones already in the vault or earlier in the file.
+struct Collector {
+    report: ImportReport,
+    /// Passwords already seen for each (title, username, URL): one lookup per row, however many rows there are
+    /// (audit finding P5-1; scanning every earlier row made a large file take quadratic time).
+    seen: HashMap<LoginKey, HashSet<String>>,
+    similar: usize,
+    bad_totp: usize,
+    not_logins: usize,
+}
+
+impl Collector {
+    fn new(detected: &'static str, existing: &[Item]) -> Self {
+        let mut seen: HashMap<LoginKey, HashSet<String>> = HashMap::new();
+        for (login, password) in existing
+            .iter()
+            .filter(|i| i.deleted_at.is_none())
+            .map(dedupe_key)
+        {
+            seen.entry(login).or_default().insert(password);
+        }
+        Self {
+            report: ImportReport {
+                detected,
+                ..Default::default()
+            },
+            seen,
+            similar: 0,
+            bad_totp: 0,
+            not_logins: 0,
+        }
+    }
+
+    /// Adds `totp` to `item` if it is a readable secret or `otpauth://` link; otherwise counts it as unreadable.
+    fn add_totp(&mut self, item: &mut Item, totp: &str) {
+        if totp.is_empty() {
+            return;
+        }
+        let ok = if totp.starts_with("otpauth://") {
+            Totp::from_uri(totp).is_ok()
+        } else {
+            Totp::from_base32(totp).is_ok()
+        };
+        if ok {
+            item.fields.push(Field::secret("totp", totp));
+        } else {
+            self.bad_totp += 1;
+        }
+    }
+
+    fn push(&mut self, item: Item) {
+        let (login, password) = dedupe_key(&item);
+        let passwords = self.seen.entry(login).or_default();
+        if passwords.contains(&password) {
+            self.report.skipped_duplicates += 1;
+            return;
+        }
+        if !passwords.is_empty() {
+            self.similar += 1;
+        }
+        passwords.insert(password);
+        self.report.items.push(item);
+    }
+
+    fn finish(mut self) -> ImportReport {
+        if self.similar > 0 {
+            self.report.warnings.push(format!(
+                "{} row(s) match an existing login but have a different password; imported as new items",
+                self.similar
+            ));
+        }
+        if self.bad_totp > 0 {
+            self.report.warnings.push(format!(
+                "{} row(s) had an unreadable TOTP secret; imported without it",
+                self.bad_totp
+            ));
+        }
+        if self.not_logins > 0 {
+            self.report.warnings.push(format!(
+                "{} entry(ies) that are not logins (secure notes, cards, identities) were not imported",
+                self.not_logins
+            ));
+        }
+        self.report
+    }
+}
+
+/// Splits a tags or folder cell on `;` and `,`.
+fn split_tags(s: &str) -> Vec<String> {
+    s.split([';', ','])
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .map(String::from)
+        .collect()
+}
+
+/// Parse a CSV of logins.
+///
+/// Columns are recognised by header name (case-insensitive) using the aliases of Chrome, Firefox, Bitwarden,
+/// KeePassXC, 1Password and other managers. `overrides` maps one of our column names (`title url username password
+/// notes totp tags`) to an exact header in the file, for files the aliases do not cover. `existing` is used to skip
+/// duplicates.
+pub fn import_csv(
+    data: &[u8],
+    overrides: &[(String, String)],
+    existing: &[Item],
+    now: i64,
+    mut new_id: impl FnMut() -> Uuid,
+) -> Result<ImportReport> {
+    if data.len() > MAX_IMPORT_BYTES {
+        return Err(Error::Csv("file is too large".into()));
+    }
+    let data = data.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(data);
+    let mut rdr = csv::ReaderBuilder::new().flexible(true).from_reader(data);
+    let headers = lowered(rdr.headers().map_err(|e| Error::Csv(e.to_string()))?);
+    let map = resolve_columns(&headers, overrides)?;
     let at = |c: Col| map[Col::ALL.iter().position(|x| *x == c).unwrap()];
     if at(Col::Password).is_none() {
         return Err(Error::Mapping(format!(
@@ -165,40 +306,38 @@ pub fn import_csv(
             headers.join(", ")
         )));
     }
-
-    let detected = if headers
-        .iter()
-        .any(|h| h == "httprealm" || h == "formactionorigin")
-    {
+    let has = |name: &str| headers.iter().any(|h| h == name);
+    let detected = if has("httprealm") || has("formactionorigin") {
         "firefox"
+    } else if has("login_uri") || has("login_username") || has("login_password") {
+        "bitwarden"
+    } else if has("group") && has("title") && has("url") {
+        "keepass"
+    } else if has("otpauth") || (has("title") && has("website")) {
+        "1password"
     } else if ["name", "url", "username", "password"]
         .iter()
-        .all(|h| headers.iter().any(|x| x == h))
+        .all(|h| has(h))
     {
         "chrome"
     } else {
         "generic"
     };
+    // Bitwarden and 1Password write secure notes, cards and identities into the same file as logins.
+    let type_col = (detected == "bitwarden" || detected == "1password")
+        .then(|| headers.iter().position(|h| h == "type"))
+        .flatten();
 
-    let mut report = ImportReport {
-        detected,
-        ..Default::default()
-    };
-    // Passwords already seen for each (title, username, URL): one lookup per row, however many rows there are
-    // (audit finding P5-1; scanning every earlier row made a large file take quadratic time).
-    let mut seen: HashMap<LoginKey, HashSet<String>> = HashMap::new();
-    for (login, password) in existing
-        .iter()
-        .filter(|i| i.deleted_at.is_none())
-        .map(dedupe_key)
-    {
-        seen.entry(login).or_default().insert(password);
-    }
-    let mut similar = 0usize;
-    let mut bad_totp = 0usize;
-
+    let mut out = Collector::new(detected, existing);
     for (n, rec) in rdr.records().enumerate() {
         let rec = rec.map_err(|e| Error::Csv(format!("row {}: {e}", n + 2)))?;
+        if let Some(kind) = type_col.and_then(|i| rec.get(i)) {
+            let kind = kind.trim().to_lowercase();
+            if !matches!(kind.as_str(), "" | "login" | "password") {
+                out.not_logins += 1;
+                continue;
+            }
+        }
         // Titles, URLs, TOTP secrets and tags are tidied. Username, password and notes are kept exactly as
         // they are in the file: altering a secret on import (even stray spaces) would be a silent bug.
         let raw = |c: Col| -> String {
@@ -210,7 +349,7 @@ pub fn import_csv(
         let get = |c: Col| -> String { raw(c).trim().to_string() };
         let (url, mut title) = (get(Col::Url), get(Col::Title));
         if title.is_empty() && url.is_empty() {
-            report.skipped_empty += 1;
+            out.report.skipped_empty += 1;
             continue;
         }
         if title.is_empty() {
@@ -227,50 +366,123 @@ pub fn import_csv(
             item.urls.push(url);
         }
         item.notes = raw(Col::Notes);
-        let totp = get(Col::Totp);
-        if !totp.is_empty() {
-            let ok = if totp.starts_with("otpauth://") {
-                Totp::from_uri(&totp).is_ok()
-            } else {
-                Totp::from_base32(&totp).is_ok()
-            };
-            if ok {
-                item.fields.push(Field::secret("totp", &totp));
-            } else {
-                bad_totp += 1;
-            }
-        }
-        item.tags = get(Col::Tags)
-            .split([';', ','])
-            .map(str::trim)
-            .filter(|t| !t.is_empty())
-            .map(String::from)
-            .collect();
+        out.add_totp(&mut item, &get(Col::Totp));
+        item.tags = split_tags(&get(Col::Tags));
+        out.push(item);
+    }
+    Ok(out.finish())
+}
 
-        let (login, password) = dedupe_key(&item);
-        let passwords = seen.entry(login).or_default();
-        if passwords.contains(&password) {
-            report.skipped_duplicates += 1;
+/// Parse a Bitwarden JSON export (not the "encrypted" kind). Only logins are read; secure notes, cards and identities
+/// are counted in a warning. Folders become tags.
+pub fn import_bitwarden_json(
+    data: &[u8],
+    existing: &[Item],
+    now: i64,
+    mut new_id: impl FnMut() -> Uuid,
+) -> Result<ImportReport> {
+    if data.len() > MAX_IMPORT_BYTES {
+        return Err(Error::Bundle("file is too large".into()));
+    }
+    let root: serde_json::Value =
+        serde_json::from_slice(data).map_err(|e| Error::Bundle(e.to_string()))?;
+    if root.get("encrypted").and_then(|v| v.as_bool()) == Some(true) {
+        return Err(Error::Mapping(
+            "this Bitwarden export is encrypted; export it again as an unencrypted .json file"
+                .into(),
+        ));
+    }
+    let list = |key: &str| root.get(key).and_then(|v| v.as_array());
+    let entries = list("items").ok_or_else(|| {
+        Error::Bundle(
+            "this JSON file has no \"items\" list, so it is not a Bitwarden export".into(),
+        )
+    })?;
+    let folders: HashMap<&str, &str> = list("folders")
+        .into_iter()
+        .flatten()
+        .filter_map(|f| Some((f.get("id")?.as_str()?, f.get("name")?.as_str()?)))
+        .collect();
+    let text = |v: &serde_json::Value, key: &str| -> String {
+        v.get(key)
+            .and_then(|x| x.as_str())
+            .unwrap_or_default()
+            .to_string()
+    };
+
+    let mut out = Collector::new("bitwarden", existing);
+    for entry in entries {
+        // Type 1 is a login; 2 is a secure note, 3 a card and 4 an identity.
+        let login = entry
+            .get("login")
+            .filter(|_| entry.get("type").and_then(|t| t.as_u64()).unwrap_or(1) == 1);
+        let Some(login) = login else {
+            out.not_logins += 1;
+            continue;
+        };
+        let uris: Vec<String> = login
+            .get("uris")
+            .and_then(|u| u.as_array())
+            .into_iter()
+            .flatten()
+            .map(|u| text(u, "uri").trim().to_string())
+            .filter(|u| !u.is_empty())
+            .collect();
+        let mut title = text(entry, "name").trim().to_string();
+        if title.is_empty() && uris.is_empty() {
+            out.report.skipped_empty += 1;
             continue;
         }
-        if !passwords.is_empty() {
-            similar += 1;
+        if title.is_empty() {
+            title = host_of(&uris[0]);
         }
-        passwords.insert(password);
-        report.items.push(item);
+        let mut item = Item::login(
+            &title,
+            &text(login, "username"),
+            &text(login, "password"),
+            now,
+            new_id(),
+        );
+        item.urls = uris;
+        item.notes = text(entry, "notes");
+        out.add_totp(&mut item, text(login, "totp").trim());
+        if let Some(folder) = entry
+            .get("folderId")
+            .and_then(|f| f.as_str())
+            .and_then(|id| folders.get(id))
+        {
+            item.tags = split_tags(folder);
+        }
+        out.push(item);
     }
+    Ok(out.finish())
+}
 
-    if similar > 0 {
-        report.warnings.push(format!(
-            "{similar} row(s) match an existing login but have a different password; imported as new items"
-        ));
+/// Does this file look like JSON (so [`import_file`] will read it as a Bitwarden export, not a CSV)?
+pub fn is_json(data: &[u8]) -> bool {
+    let body = data.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(data);
+    body.iter().find(|b| !b.is_ascii_whitespace()) == Some(&b'{')
+}
+
+/// Reads an import file of either kind: a Bitwarden JSON export if it starts with `{`, else a CSV.
+/// `overrides` only matters for CSV.
+pub fn import_file(
+    data: &[u8],
+    overrides: &[(String, String)],
+    existing: &[Item],
+    now: i64,
+    new_id: impl FnMut() -> Uuid,
+) -> Result<ImportReport> {
+    if is_json(data) {
+        import_bitwarden_json(
+            data.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(data),
+            existing,
+            now,
+            new_id,
+        )
+    } else {
+        import_csv(data, overrides, existing, now, new_id)
     }
-    if bad_totp > 0 {
-        report.warnings.push(format!(
-            "{bad_totp} row(s) had an unreadable TOTP secret; imported without it"
-        ));
-    }
-    Ok(report)
 }
 
 /// Which login a row is about: title, username, first URL.
@@ -420,6 +632,126 @@ mod tests {
 
     fn run(csv: &str, existing: &[Item]) -> ImportReport {
         import_csv(csv.as_bytes(), &[], existing, 100, ids()).unwrap()
+    }
+
+    #[test]
+    fn bitwarden_keepass_and_1password_csv_are_recognised() {
+        let bw = run(
+            "folder,favorite,type,name,notes,fields,reprompt,login_uri,login_username,login_password,login_totp\n\
+             Work,,login,GitHub,,,0,https://github.com,alice,pw1,JBSWY3DPEHPK3PXP\n\
+             ,,note,A secure note,secret text,,0,,,,\n",
+            &[],
+        );
+        assert_eq!(bw.detected, "bitwarden");
+        assert_eq!(bw.items.len(), 1, "the note is not a login");
+        assert_eq!(bw.items[0].tags, ["Work"]);
+        assert!(bw.items[0].field("totp").is_some());
+        assert!(bw.warnings.iter().any(|w| w.contains("not logins")));
+
+        let kp = run(
+            "\"Group\",\"Title\",\"Username\",\"Password\",\"URL\",\"Notes\",\"TOTP\"\n\
+             \"Root/Web\",\"Bank\",\"me\",\"pw2\",\"https://bank.example\",\"n\",\"\"\n",
+            &[],
+        );
+        assert_eq!(kp.detected, "keepass");
+        assert_eq!(kp.items[0].title, "Bank");
+        assert_eq!(kp.items[0].tags, ["Root/Web"]);
+
+        let op = run(
+            "Title,Website,Username,Password,OTPAuth,Favorite,Archived,Tags,Notes\n\
+             Mail,https://mail.example,bob,pw3,,0,0,home,hi\n",
+            &[],
+        );
+        assert_eq!(op.detected, "1password");
+        assert_eq!(op.items[0].urls, ["https://mail.example"]);
+        assert_eq!(op.items[0].notes, "hi");
+    }
+
+    #[test]
+    fn csv_columns_lists_headers_and_applies_overrides() {
+        let csv = "Site,Who,Secret,Misc\nx,y,z,w\n";
+        let c = csv_columns(csv.as_bytes(), &[]).unwrap();
+        assert_eq!(c.headers, ["Site", "Who", "Secret", "Misc"]);
+        assert!(c.assigned.iter().all(|(_, i)| i.is_none()));
+        let over = [
+            ("title".to_string(), "Site".to_string()),
+            ("username".to_string(), "who".to_string()),
+            ("password".to_string(), "Secret".to_string()),
+        ];
+        let c = csv_columns(csv.as_bytes(), &over).unwrap();
+        let find = |n: &str| c.assigned.iter().find(|(f, _)| *f == n).unwrap().1;
+        assert_eq!(
+            (find("title"), find("username"), find("password")),
+            (Some(0), Some(1), Some(2))
+        );
+        assert_eq!(find("notes"), None);
+        // An empty header clears a field an alias would have found.
+        let cleared = csv_columns(
+            b"name,url,username,password\nA,,b,c\n",
+            &[("url".to_string(), String::new())],
+        )
+        .unwrap();
+        assert_eq!(cleared.assigned[1], ("url", None));
+        assert!(is_json(b"  {\"items\":[]}") && !is_json(b"a,b\n"));
+        assert!(csv_columns(csv.as_bytes(), &[("title".into(), "nope".into())]).is_err());
+        // The same overrides let import_csv read a file it could not read before.
+        assert!(import_csv(csv.as_bytes(), &[], &[], 1, ids()).is_err());
+        let r = import_csv(csv.as_bytes(), &over, &[], 1, ids()).unwrap();
+        assert_eq!(r.items[0].field("password").unwrap().value, "z");
+    }
+
+    const BITWARDEN_JSON: &str = r#"{"encrypted":false,
+        "folders":[{"id":"f1","name":"Work"}],
+        "items":[
+          {"type":1,"name":"GitHub","notes":"n","folderId":"f1",
+           "login":{"username":"alice","password":"pw1","totp":"JBSWY3DPEHPK3PXP",
+                    "uris":[{"uri":"https://github.com"},{"uri":"https://gist.github.com"}]}},
+          {"type":1,"name":"","login":{"username":"u","password":"p","uris":[{"uri":"https://www.example.org/x"}]}},
+          {"type":2,"name":"Note","notes":"text","secureNote":{"type":0}},
+          {"type":3,"name":"Card","card":{"number":"4111"}},
+          {"type":1,"name":"","login":{"username":"","password":"","uris":[]}}
+        ]}"#;
+
+    #[test]
+    fn bitwarden_json_reads_logins_folders_and_skips_the_rest() {
+        let r = import_bitwarden_json(BITWARDEN_JSON.as_bytes(), &[], 5, ids()).unwrap();
+        assert_eq!(r.detected, "bitwarden");
+        assert_eq!(r.items.len(), 2);
+        assert_eq!(r.skipped_empty, 1);
+        let gh = &r.items[0];
+        assert_eq!(gh.title, "GitHub");
+        assert_eq!(gh.urls.len(), 2);
+        assert_eq!(gh.tags, ["Work"]);
+        assert_eq!(gh.notes, "n");
+        assert!(gh.field("totp").is_some());
+        assert_eq!(r.items[1].title, "example.org");
+        assert!(r.warnings.iter().any(|w| w.starts_with("2 entry(ies)")));
+        // A second read against what was just imported adds nothing.
+        let again = import_bitwarden_json(BITWARDEN_JSON.as_bytes(), &r.items, 6, ids()).unwrap();
+        assert_eq!((again.items.len(), again.skipped_duplicates), (0, 2));
+    }
+
+    #[test]
+    fn bitwarden_json_errors_are_explained_and_import_file_picks_the_reader() {
+        let enc = br#"{"encrypted":true,"data":"x"}"#;
+        assert!(import_bitwarden_json(enc, &[], 1, ids())
+            .unwrap_err()
+            .to_string()
+            .contains("encrypted"));
+        assert!(import_bitwarden_json(b"{}", &[], 1, ids()).is_err());
+        assert!(import_bitwarden_json(b"[1,2]", &[], 1, ids()).is_err());
+        let json = import_file(BITWARDEN_JSON.as_bytes(), &[], &[], 1, ids()).unwrap();
+        assert_eq!(json.items.len(), 2);
+        let with_bom = [b"\xEF\xBB\xBF".as_slice(), BITWARDEN_JSON.as_bytes()].concat();
+        assert_eq!(
+            import_file(&with_bom, &[], &[], 1, ids())
+                .unwrap()
+                .items
+                .len(),
+            2
+        );
+        let csv = import_file(b"name,url,username,password\nA,,b,c\n", &[], &[], 1, ids()).unwrap();
+        assert_eq!(csv.detected, "chrome");
     }
 
     #[test]

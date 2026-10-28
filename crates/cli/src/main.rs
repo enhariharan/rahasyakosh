@@ -29,12 +29,18 @@ struct Cli {
     /// Vault file (default: $RK_VAULT or ~/.local/share/rahasyakosh/vault.db)
     #[arg(long, global = true, env = "RK_VAULT")]
     vault: Option<PathBuf>,
+    /// Use the vault of this profile (its username), as listed in profiles.json next to the vault file. Profiles are
+    /// made in the desktop app.
+    #[arg(long, global = true, env = "RK_PROFILE")]
+    profile: Option<String>,
     #[command(subcommand)]
     cmd: Cmd,
 }
 
 #[derive(Subcommand)]
 enum Cmd {
+    /// List the profiles (usernames and full names) that have a vault here
+    Profiles,
     /// Create a new vault
     Init {
         #[command(flatten)]
@@ -174,7 +180,7 @@ enum Cmd {
     },
     /// Change the master password
     Passwd(MasterOpts),
-    /// Import logins from a CSV file (generic, Chrome or Firefox export)
+    /// Import logins from a CSV file (Chrome, Firefox, Bitwarden, KeePassXC, 1Password or generic) or a Bitwarden JSON export
     Import {
         file: PathBuf,
         /// Map one of our fields to a column header, e.g. --map password=pwd (fields: title, url,
@@ -270,6 +276,35 @@ struct MasterOpts {
     /// Accept a master password the strength meter rates below "fair"
     #[arg(long, conflicts_with = "passphrase")]
     allow_weak: bool,
+}
+
+/// The profile list kept next to the vault file `path` (the desktop app makes it).
+fn read_profiles(path: &Path) -> Result<rahasyakosh_app::ProfileList> {
+    let dir = path.parent().unwrap_or_else(|| Path::new("."));
+    match rahasyakosh_app::profile_files::read_list(dir) {
+        Ok(Some(list)) => Ok(list),
+        Ok(None) => bail!(
+            "there is no profile list ({}); profiles are made in the desktop app. Use --vault to name a vault file",
+            rahasyakosh_app::profile_files::list_path(dir).display()
+        ),
+        Err(e) => bail!("{e}"),
+    }
+}
+
+/// The vault file of the profile with this username, from the list next to the vault file `path`.
+fn profile_vault(path: &Path, username: &str) -> Result<PathBuf> {
+    let list = read_profiles(path)?;
+    let dir = path.parent().unwrap_or_else(|| Path::new("."));
+    let Some(profile) = list.find_by_username(username) else {
+        let known: Vec<&str> = list.all().iter().map(|p| p.username.as_str()).collect();
+        bail!(
+            "no profile with the username {username:?}; the profiles here are: {}",
+            known.join(", ")
+        );
+    };
+    rahasyakosh_app::profile_files::vault_file(dir, profile).with_context(|| {
+        format!("the vault file listed for {username:?} is outside the data folder")
+    })
 }
 
 fn now() -> i64 {
@@ -670,6 +705,21 @@ fn run() -> Result<()> {
             }
             p
         }
+    };
+    if matches!(cli.cmd, Cmd::Profiles) {
+        let list = read_profiles(&path)?;
+        for p in list.all() {
+            println!(
+                "{}\t{}",
+                safe::line(&p.username),
+                safe::line(&list.display_name(p.id))
+            );
+        }
+        return Ok(());
+    }
+    let path = match &cli.profile {
+        Some(name) => profile_vault(&path, name)?,
+        None => path,
     };
     let mut rng = rand::rng();
 
@@ -1100,7 +1150,7 @@ fn run() -> Result<()> {
                 std::fs::read(&file).with_context(|| format!("reading {}", file.display()))?,
             );
             let existing: Vec<Item> = vault.items(Scope::Any).into_iter().cloned().collect();
-            let report = transfer::import_csv(&data, &overrides, &existing, now(), Uuid::now_v7)?;
+            let report = transfer::import_file(&data, &overrides, &existing, now(), Uuid::now_v7)?;
             eprintln!(
                 "Detected format: {}. {} to import, {} duplicate(s) skipped, {} empty row(s) skipped.",
                 report.detected,
@@ -1179,7 +1229,11 @@ fn run() -> Result<()> {
                 None => print!("{}", *text),
             }
         }
-        Cmd::Init { .. } | Cmd::Gen { .. } | Cmd::ClipboardClear { .. } | Cmd::Migrate { .. } => {
+        Cmd::Profiles
+        | Cmd::Init { .. }
+        | Cmd::Gen { .. }
+        | Cmd::ClipboardClear { .. }
+        | Cmd::Migrate { .. } => {
             unreachable!()
         }
     }

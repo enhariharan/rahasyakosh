@@ -153,7 +153,36 @@ fn open_profile(profile: &Profile) -> Startup {
     if !path.exists() {
         return Startup::Broken(trf(lang, Msg::ProfileFileMissing, &[&path.display()]));
     }
-    startup(&path)
+    match startup(&path) {
+        // An empty file is as good as missing: the profile exists, so this is not first run.
+        Startup::NeedsSetup => {
+            Startup::Broken(trf(lang, Msg::ProfileFileMissing, &[&path.display()]))
+        }
+        other => other,
+    }
+}
+
+/// Makes `profile` the active one: opens its vault (locked) and remembers it as the one to start on next time. A vault
+/// that cannot be opened leaves no model and sets `problem`, which the profile screen shows above the picker.
+fn select_profile(ctx: &mut Ctx, profile: &Profile) {
+    match open_profile(profile) {
+        Startup::Ready(m) => {
+            ctx.model.set(Some(*m));
+            ctx.problem.set(None);
+        }
+        Startup::NeedsSetup => unreachable!("open_profile reports an empty file as missing"),
+        Startup::Broken(msg) => {
+            ctx.model.set(None);
+            ctx.problem.set(Some(msg));
+        }
+    }
+    ctx.active.set(Some(profile.id));
+    let mut list = ctx.profiles.read().clone();
+    if list.set_last_used(profile.id) && list != *ctx.profiles.read() {
+        // Only a convenience: if it cannot be saved the app still works, it just starts on another profile.
+        let _ = profiles::save(&data_dir(), &list);
+        ctx.profiles.set(list);
+    }
 }
 
 // ---- shared state -----------------------------------------------------------------------------------------
@@ -176,6 +205,9 @@ struct Ctx {
     /// Everyone who has a vault here, and which of them is open or being unlocked.
     profiles: Signal<ProfileList>,
     active: Signal<Option<Uuid>>,
+    /// Why the chosen profile's vault could not be opened (a missing or damaged file). The profile picker stays on
+    /// screen with it, so the user can choose another profile.
+    problem: Signal<Option<String>>,
     /// True while the "add a profile" page is showing.
     adding: Signal<bool>,
     /// Set while the "screen reader started or stopped" dialog is showing.
@@ -432,6 +464,7 @@ fn app() -> Element {
     let clock = use_signal(now);
     let mut profiles: Signal<ProfileList> = use_signal(ProfileList::new);
     let mut active: Signal<Option<Uuid>> = use_signal(|| None);
+    let mut problem: Signal<Option<String>> = use_signal(|| None);
     let adding = use_signal(|| false);
     let last_input = use_hook(|| Rc::new(Cell::new(now())));
     use_hook(|| {
@@ -443,13 +476,13 @@ fn app() -> Element {
         match profiles::load(&data_dir(), &vault_path()) {
             Err(msg) => broken.set(Some(msg)),
             Ok(list) => {
-                if let Some(first) = list.all().first() {
-                    match open_profile(first) {
+                if let Some(start) = list.start_profile() {
+                    match open_profile(start) {
                         Startup::Ready(m) => model.set(Some(*m)),
                         Startup::NeedsSetup => {}
-                        Startup::Broken(msg) => broken.set(Some(msg)),
+                        Startup::Broken(msg) => problem.set(Some(msg)),
                     }
-                    active.set(Some(first.id));
+                    active.set(Some(start.id));
                 }
                 profiles.set(list);
             }
@@ -469,6 +502,7 @@ fn app() -> Element {
         notice,
         profiles,
         active,
+        problem,
         adding,
         reader_notice,
     });
@@ -634,6 +668,9 @@ fn screen(ctx: Ctx) -> Element {
     if (ctx.adding)() {
         return rsx! { Setup {} };
     }
+    if let Some(msg) = (ctx.problem)() {
+        return rsx! { ProfileProblem { msg } };
+    }
     let state = {
         let m = ctx.model.read();
         m.as_ref().map(|m| m.is_unlocked())
@@ -744,6 +781,7 @@ fn Setup() -> Element {
                         }
                     }
                 }
+                list.set_last_used(id);
                 if let Err(e) = profiles::save(&dir, &list) {
                     error.set(Some(trf(lang, Msg::CouldNotCreateVault, &[&e])));
                     return;
@@ -751,6 +789,7 @@ fn Setup() -> Element {
                 let settings_error = save_settings(session.settings()).err();
                 ctx.profiles.set(list);
                 ctx.active.set(Some(id));
+                ctx.problem.set(None);
                 ctx.adding.set(false);
                 ctx.model.set(Some(make_model(session)));
                 ctx.key_sheet.set(sheet);
@@ -924,6 +963,19 @@ fn KeySheet() -> Element {
     }
 }
 
+/// The label for one of the import file's columns (our field names, as `rahasyakosh_transfer` spells them).
+fn column_label(field: &str) -> Msg {
+    match field {
+        "title" => Msg::FieldTitle,
+        "url" => Msg::Website,
+        "username" => Msg::FieldUsername,
+        "password" => Msg::FieldPassword,
+        "notes" => Msg::Notes,
+        "totp" => Msg::TwoFactorCode,
+        _ => Msg::Tags,
+    }
+}
+
 /// The message for a refused profile change.
 fn profile_error_msg(e: ProfileError) -> Msg {
     match e {
@@ -978,6 +1030,55 @@ fn CheckIcon() -> Element {
     }
 }
 
+/// The drop-down for choosing whose vault to unlock (nothing when there are no profiles).
+#[component]
+fn ProfilePicker() -> Element {
+    let mut ctx = use_context::<Ctx>();
+    let lang = lang_of(&ctx);
+    let list = ctx.profiles.read().clone();
+    let active_id = (ctx.active)();
+    if list.is_empty() {
+        return rsx! {};
+    }
+    rsx! {
+        div { class: "profile-pick",
+            label { r#for: "profile", {tr(lang, Msg::ProfilePick)} }
+            select { id: "profile",
+                onchange: move |e| {
+                    let chosen = ctx.profiles.read().all().iter().find(|p| p.id.to_string() == e.value()).cloned();
+                    if let Some(p) = chosen { select_profile(&mut ctx, &p); }
+                },
+                for p in list.all().iter() {
+                    option { key: "{p.id}", value: "{p.id}", selected: Some(p.id) == active_id, "{list.display_name(p.id)}" }
+                }
+            }
+        }
+    }
+}
+
+/// Shown when the chosen profile's vault cannot be opened: says why, and lets the user pick another profile or add one.
+#[component]
+fn ProfileProblem(msg: String) -> Element {
+    let mut ctx = use_context::<Ctx>();
+    let lang = lang_of(&ctx);
+    rsx! {
+        main { class: "centre landing",
+            Logo {}
+            h1 { {tr(lang, Msg::AppName)} }
+            ProfilePicker {}
+            p { class: "error", role: "alert", "{msg}" }
+        }
+        button {
+            class: "profile-fab", r#type: "button",
+            aria_keyshortcuts: "Control+Shift+N",
+            title: "{tr(lang, Msg::AddProfile)} (Ctrl+Shift+N)",
+            aria_label: tr(lang, Msg::AddProfile),
+            onclick: move |_| ctx.adding.set(true),
+            AddProfileIcon {}
+        }
+    }
+}
+
 /// A person with a "+": the "Add a profile" floating button.
 #[component]
 fn AddProfileIcon() -> Element {
@@ -1019,8 +1120,6 @@ fn Unlock() -> Element {
     };
     let has_err = err.is_some();
     let has_notice = costly.is_some();
-    let profile_list = ctx.profiles.read().all().to_vec();
-    let active_id = (ctx.active)();
     let mut submit = move || {
         let t = now();
         if let Some(m) = ctx.model.write().as_mut() {
@@ -1041,26 +1140,7 @@ fn Unlock() -> Element {
             Logo {}
             h1 { {tr(lang, Msg::AppName)} }
             p { class: "tagline spaced", {tr(lang, Msg::VaultLockedTag)} }
-            if !profile_list.is_empty() {
-                div { class: "profile-pick",
-                    label { r#for: "profile", {tr(lang, Msg::ProfilePick)} }
-                    select { id: "profile",
-                        onchange: move |e| {
-                            let chosen = profile_list.iter().find(|p| p.id.to_string() == e.value()).cloned();
-                            let Some(p) = chosen else { return };
-                            match open_profile(&p) {
-                                Startup::Ready(m) => ctx.model.set(Some(*m)),
-                                Startup::NeedsSetup => {}
-                                Startup::Broken(msg) => ctx.broken.set(Some(msg)),
-                            }
-                            ctx.active.set(Some(p.id));
-                        },
-                        for p in profile_list.iter() {
-                            option { key: "{p.id}", value: "{p.id}", selected: Some(p.id) == active_id, "{p.full_name}" }
-                        }
-                    }
-                }
-            }
+            ProfilePicker {}
             form {
                 onsubmit: move |e| { e.prevent_default(); submit(); },
                 label { class: "sr-only", r#for: "master", {tr(lang, Msg::MasterPassword)} }
@@ -1686,6 +1766,8 @@ fn FormView() -> Element {
 #[component]
 fn SettingsView() -> Element {
     let mut ctx = use_context::<Ctx>();
+    // The delete form below hands a whole `Ctx` to `select_profile`; the signals inside are shared, so a copy is the same state.
+    let ctx_del = ctx.clone();
     let lang = lang_of(&ctx);
     let current = ctx
         .model
@@ -1700,6 +1782,8 @@ fn SettingsView() -> Element {
     let mut sk_pw = use_signal(String::new);
     let mut imp_path = use_signal(String::new);
     let mut imp_msg = use_signal(|| Option::<String>::None);
+    // Columns the user picked for the import file: (our field, the file's header).
+    let mut imp_cols = use_signal(Vec::<(String, String)>::new);
     let mut sk_msg = use_signal(|| Option::<String>::None);
     let has_key = ctx
         .model
@@ -1813,7 +1897,8 @@ fn SettingsView() -> Element {
                 onsubmit: move |e| {
                     e.prevent_default();
                     let path = imp_path.read().clone();
-                    let r = ctx.model.write().as_mut().map(|m| m.import_preview(&path, now()));
+                    imp_cols.set(Vec::new());
+                    let r = ctx.model.write().as_mut().map(|m| m.import_preview(&path, &[], now()));
                     imp_msg.set(match r {
                         Some(Err(e)) => Some(e),
                         _ => None,
@@ -1823,6 +1908,23 @@ fn SettingsView() -> Element {
                 input {
                     id: "imp-path", class: "ltr mono", dir: "ltr", autocomplete: "off", value: "{imp_path}",
                     aria_describedby: "import-hint", oninput: move |e| imp_path.set(e.value()),
+                }
+                // The system's own file chooser; it hands back a path, so the box above fills in and the file is read.
+                label { r#for: "imp-file", {tr(lang, Msg::ImportChooseFile)} }
+                input {
+                    id: "imp-file", r#type: "file", accept: ".csv,.json,text/csv,application/json",
+                    aria_describedby: "import-hint",
+                    onchange: move |e| {
+                        let Some(file) = e.files().into_iter().next() else { return };
+                        let path = file.path().display().to_string();
+                        imp_path.set(path.clone());
+                        imp_cols.set(Vec::new());
+                        let r = ctx.model.write().as_mut().map(|m| m.import_preview(&path, &[], now()));
+                        imp_msg.set(match r {
+                            Some(Err(e)) => Some(e),
+                            _ => None,
+                        });
+                    },
                 }
                 if let Some(e) = imp_msg() { p { class: "error", role: "alert", "{e}" } }
                 button { class: "primary", r#type: "submit", {tr(lang, Msg::ImportPreviewButton)} }
@@ -1835,16 +1937,63 @@ fn SettingsView() -> Element {
                             i.field("username").map(|f| f.value.clone()).unwrap_or_default(),
                             i.urls.first().cloned().unwrap_or_default(),
                         )).collect();
-                        (p.detected, p.items.len(), p.skipped_duplicates, p.skipped_empty, p.warnings.clone(), rows)
+                        (p.detected, p.items.len(), p.skipped_duplicates, p.skipped_empty, p.warnings.clone(), rows,
+                         p.columns.clone(), p.needs_password_column, p.file.display().to_string())
                     })
                 });
                 match plan {
                     None => rsx! {},
-                    Some((detected, count, dups, empty, warnings, rows)) => rsx! {
+                    Some((detected, count, dups, empty, warnings, rows, columns, needs_password, file)) => rsx! {
                         div { role: "region", aria_label: tr(lang, Msg::ImportTitle),
-                            p { role: "status", "{trf(lang, Msg::ImportSummary, &[&detected, &count, &dups, &empty])}" }
+                            if needs_password {
+                                p { role: "alert", {tr(lang, Msg::ImportNeedPassword)} }
+                            } else {
+                                p { role: "status", "{trf(lang, Msg::ImportSummary, &[&detected, &count, &dups, &empty])}" }
+                            }
+                            if let Some(cols) = columns {
+                                section { aria_label: tr(lang, Msg::ImportColumnsTitle),
+                                    h4 { {tr(lang, Msg::ImportColumnsTitle)} }
+                                    p { class: "muted small", id: "import-cols-hint", {tr(lang, Msg::ImportColumnsHint)} }
+                                    for (field, at) in cols.assigned.iter().cloned() {
+                                        {
+                                            let current = imp_cols.read().iter().find(|(f, _)| f == field).map(|(_, h)| h.clone())
+                                                .unwrap_or_else(|| at.map(|i| cols.headers[i].clone()).unwrap_or_default());
+                                            rsx! {
+                                              div { key: "{field}",
+                                                label { r#for: "col-{field}", {tr(lang, column_label(field))} }
+                                                select { id: "col-{field}", aria_describedby: "import-cols-hint",
+                                                    onchange: move |e| {
+                                                        let mut v = imp_cols.read().clone();
+                                                        v.retain(|(f, _)| f != field);
+                                                        v.push((field.to_string(), e.value()));
+                                                        imp_cols.set(v);
+                                                    },
+                                                    option { value: "", selected: current.is_empty(), {tr(lang, Msg::ImportColumnNone)} }
+                                                    for (n, h) in cols.headers.iter().enumerate() {
+                                                        option { key: "{n}", value: "{h}", selected: *h == current, "{h}" }
+                                                    }
+                                                }
+                                              }
+                                            }
+                                        }
+                                    }
+                                    button {
+                                        r#type: "button",
+                                        onclick: move |_| {
+                                            // Fields the user did not touch keep what the reader found.
+                                            let picks = imp_cols.read().clone();
+                                            let r = ctx.model.write().as_mut().map(|m| m.import_preview(&file, &picks, now()));
+                                            imp_msg.set(match r {
+                                                Some(Err(e)) => Some(e),
+                                                _ => None,
+                                            });
+                                        },
+                                        {tr(lang, Msg::ImportReadAgain)}
+                                    }
+                                }
+                            }
                             for w in warnings { p { class: "muted small", "{w}" } }
-                            if count == 0 { p { class: "muted", {tr(lang, Msg::ImportNothing)} } }
+                            if count == 0 && !needs_password { p { class: "muted", {tr(lang, Msg::ImportNothing)} } }
                             ul { class: "list",
                                 for (n, (title, user, url)) in rows.iter().enumerate() {
                                     li { key: "{n}", class: "pad", "{title}  {user}  {url}" }
@@ -1996,18 +2145,21 @@ fn SettingsView() -> Element {
                                 return;
                             }
                             // Open the next profile (locked) first, so the deleted vault is closed before its file goes.
-                            if let Some(next) = list.all().first() {
-                                match open_profile(next) {
-                                    Startup::Ready(m) => ctx.model.set(Some(*m)),
-                                    Startup::NeedsSetup => {}
-                                    Startup::Broken(msg) => ctx.broken.set(Some(msg)),
-                                }
-                                ctx.active.set(Some(next.id));
+                            ctx.profiles.set(list.clone());
+                            if let Some(next) = list.start_profile().cloned() {
+                                select_profile(&mut ctx_del.clone(), &next);
                             }
                             if let Some(file) = profiles::vault_file(&data_dir(), &gone) {
                                 profiles::delete_vault(&file);
                             }
-                            ctx.profiles.set(list);
+                            // Say it aloud. If the next profile's vault could not be opened there is no model to
+                            // carry the announcement, so the sentence goes in front of the problem text instead.
+                            let said = trf(lang, Msg::ProfileDeleted, &[&gone.full_name]);
+                            if let Some(m) = ctx.model.write().as_mut() {
+                                m.announce(said.clone());
+                            } else if let Some(p) = (ctx.problem)() {
+                                ctx.problem.set(Some(format!("{said} {p}")));
+                            }
                         },
                         label { r#for: "del-pw", {tr(lang, Msg::ExportMasterPassword)} }
                         input {

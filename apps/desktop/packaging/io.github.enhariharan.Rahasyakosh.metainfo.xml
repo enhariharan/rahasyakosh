@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.enhariharan.Rahasyakosh</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Rahasyakosh</name>
+  <summary>Local-first, end-to-end-encrypted password manager</summary>
+  <description>
+    <p>Rahasyakosh keeps your logins and two-factor codes in an encrypted vault on your own computer. There are no accounts, no telemetry and no network access.</p>
+    <p>Each person sharing the computer can have a profile with their own vault and master password. Passwords can be imported from browsers and other password managers, and exported again.</p>
+    <p>Early alpha. It has not been independently audited, so do not store real secrets in it yet.</p>
+  </description>
+  <launchable type="desktop-id">rahasyakosh.desktop</launchable>
+  <url type="homepage">https://github.com/enhariharan/rahasyakosh</url>
+  <url type="bugtracker">https://github.com/enhariharan/rahasyakosh/issues</url>
+  <provides>
+    <binary>rahasyakosh</binary>
+  </provides>
+  <categories>
+    <category>Utility</category>
+    <category>Security</category>
+  </categories>
+  <keywords>
+    <keyword>password</keyword>
+    <keyword>vault</keyword>
+    <keyword>2fa</keyword>
+  </keywords>
+  <content_rating type="oars-1.1"/>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+</component>

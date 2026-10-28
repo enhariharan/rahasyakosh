@@ -46,6 +46,9 @@ pub struct ProfileList {
     version: u32,
     #[serde(default)]
     profiles: Vec<Profile>,
+    /// The profile used last, so the app can start on it. Not a secret; may name a profile that is gone.
+    #[serde(default)]
+    last_used: Option<Uuid>,
 }
 
 /// A random version-4 UUID from the caller's generator.
@@ -60,6 +63,7 @@ impl ProfileList {
         Self {
             version: VERSION,
             profiles: Vec::new(),
+            last_used: None,
         }
     }
 
@@ -86,6 +90,48 @@ impl ProfileList {
 
     pub fn get(&self, id: Uuid) -> Option<&Profile> {
         self.profiles.iter().find(|p| p.id == id)
+    }
+
+    /// The profile with this username, ignoring case and surrounding spaces.
+    pub fn find_by_username(&self, username: &str) -> Option<&Profile> {
+        let lower = username.trim().to_lowercase();
+        self.profiles
+            .iter()
+            .find(|p| p.username.to_lowercase() == lower)
+    }
+
+    /// Remembers which profile was used last. Returns false (and changes nothing) if there is no such profile.
+    pub fn set_last_used(&mut self, id: Uuid) -> bool {
+        let known = self.get(id).is_some();
+        if known {
+            self.last_used = Some(id);
+        }
+        known
+    }
+
+    /// The profile to start on: the one used last if it still exists, else the first.
+    pub fn start_profile(&self) -> Option<&Profile> {
+        self.last_used
+            .and_then(|id| self.get(id))
+            .or_else(|| self.profiles.first())
+    }
+
+    /// How to show a profile in a list: its full name, with the username added when another profile has the same
+    /// full name (ignoring case), so two entries are never identical.
+    pub fn display_name(&self, id: Uuid) -> String {
+        let Some(p) = self.get(id) else {
+            return String::new();
+        };
+        let lower = p.full_name.to_lowercase();
+        let clash = self
+            .profiles
+            .iter()
+            .any(|o| o.id != id && o.full_name.to_lowercase() == lower);
+        if clash {
+            format!("{} ({})", p.full_name, p.username)
+        } else {
+            p.full_name.clone()
+        }
     }
 
     /// Checks a name and username (trimmed) against the rules; `except` is the profile being edited, if any.
@@ -158,7 +204,11 @@ impl ProfileList {
         if self.profiles.len() == 1 {
             return Err(ProfileError::LastProfile);
         }
-        Ok(self.profiles.remove(at))
+        let gone = self.profiles.remove(at);
+        if self.last_used == Some(gone.id) {
+            self.last_used = None;
+        }
+        Ok(gone)
     }
 }
 
@@ -239,6 +289,51 @@ mod tests {
             "full_name":"A","username":"a","file":"v.db","colour":"red"}],"theme":1}"#;
         assert_eq!(ProfileList::from_json(newer).unwrap().len(), 1);
         assert!(ProfileList::from_json(b"not json").is_none());
+    }
+
+    #[test]
+    fn the_start_profile_is_the_one_used_last_while_it_exists() {
+        let mut l = list();
+        l.add(Uuid::from_u128(2), "Asha Rao", "asha", "b.db")
+            .unwrap();
+        assert_eq!(l.start_profile().unwrap().id, Uuid::from_u128(1));
+        assert!(l.set_last_used(Uuid::from_u128(2)));
+        assert!(!l.set_last_used(Uuid::from_u128(9)), "unknown profile");
+        assert_eq!(l.start_profile().unwrap().id, Uuid::from_u128(2));
+        // It survives a save and a load.
+        let l2 = ProfileList::from_json(&l.to_json()).unwrap();
+        assert_eq!(l2.start_profile().unwrap().id, Uuid::from_u128(2));
+        // Removing it falls back to the first profile.
+        l.remove(Uuid::from_u128(2)).unwrap();
+        assert_eq!(l.start_profile().unwrap().id, Uuid::from_u128(1));
+        // A list saved before this field existed starts on the first profile.
+        let old = br#"{"version":1,"profiles":[{"id":"00000000-0000-0000-0000-000000000001",
+            "full_name":"A","username":"a","file":"v.db"}]}"#;
+        assert!(ProfileList::from_json(old)
+            .unwrap()
+            .start_profile()
+            .is_some());
+        assert!(ProfileList::new().start_profile().is_none());
+    }
+
+    #[test]
+    fn same_full_names_show_the_username_and_others_do_not() {
+        let mut l = list();
+        l.add(Uuid::from_u128(2), "Asha Rao", "asha", "b.db")
+            .unwrap();
+        l.add(Uuid::from_u128(3), "ASHA RAO", "asha2", "c.db")
+            .unwrap();
+        assert_eq!(l.display_name(Uuid::from_u128(1)), "Default user");
+        assert_eq!(l.display_name(Uuid::from_u128(2)), "Asha Rao (asha)");
+        assert_eq!(l.display_name(Uuid::from_u128(3)), "ASHA RAO (asha2)");
+        assert_eq!(l.display_name(Uuid::from_u128(9)), "");
+    }
+
+    #[test]
+    fn a_username_is_found_ignoring_case() {
+        let l = list();
+        assert!(l.find_by_username(" DefaultUser ").is_some());
+        assert!(l.find_by_username("nobody").is_none());
     }
 
     #[test]

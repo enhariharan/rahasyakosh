@@ -621,6 +621,16 @@ fn toggle_reveal_shows_then_hides_and_item_shortcuts_need_an_open_item() {
 }
 
 #[test]
+fn an_event_outside_the_vault_can_be_announced_politely() {
+    let (mut m, _) = model(Settings::default());
+    let before = m.announcement.spoken();
+    m.announce("Profile Asha was deleted.");
+    assert_eq!(m.announcement.text, "Profile Asha was deleted.");
+    assert!(!m.announcement.urgent);
+    assert_ne!(m.announcement.spoken(), before);
+}
+
+#[test]
 fn state_changes_are_announced_for_a_screen_reader() {
     let (mut m, _) = model(Settings {
         idle_lock_secs: 0,
@@ -1078,7 +1088,7 @@ fn import_shows_a_preview_first_and_stores_only_after_confirming() {
     )
     .unwrap();
     let before = m.session.peek().unwrap().items(Scope::Live).len();
-    m.import_preview(file.to_str().unwrap(), 30).unwrap();
+    m.import_preview(file.to_str().unwrap(), &[], 30).unwrap();
     let plan = m.import.as_ref().unwrap();
     assert_eq!(plan.items.len(), 1);
     assert_eq!(plan.skipped_duplicates, 1);
@@ -1090,7 +1100,7 @@ fn import_shows_a_preview_first_and_stores_only_after_confirming() {
         before + 1
     );
     // The same file again adds nothing.
-    m.import_preview(file.to_str().unwrap(), 32).unwrap();
+    m.import_preview(file.to_str().unwrap(), &[], 32).unwrap();
     assert!(m.import.as_ref().unwrap().items.is_empty());
     m.import_cancel();
     assert!(m.import.is_none());
@@ -1102,24 +1112,106 @@ fn import_refuses_bad_paths_and_a_waiting_preview_goes_when_the_vault_locks() {
         idle_lock_secs: 0,
         ..Settings::default()
     });
-    assert!(m.import_preview("  ", 30).is_err());
-    assert!(m.import_preview("/nonexistent/x.csv", 30).is_err());
+    assert!(m.import_preview("  ", &[], 30).is_err());
+    assert!(m.import_preview("/nonexistent/x.csv", &[], 30).is_err());
     let dir = scratch_dir("import-bad");
     assert!(
-        m.import_preview(dir.to_str().unwrap(), 30).is_err(),
+        m.import_preview(dir.to_str().unwrap(), &[], 30).is_err(),
         "a folder"
     );
     let file = dir.join("no-password.csv");
     std::fs::write(&file, "colour,shape\nred,round\n").unwrap();
-    assert!(m.import_preview(file.to_str().unwrap(), 30).is_err());
+    // Not an error: the screen asks which column holds the passwords. Nothing can be confirmed yet.
+    m.import_preview(file.to_str().unwrap(), &[], 30).unwrap();
+    assert!(m.import.as_ref().unwrap().needs_password_column);
+    assert!(m.import_confirm(31).is_err(), "nothing to add yet");
+    assert!(m.import.is_none());
+    // A mapping that names a column the file does not have is an error.
+    let bad = [("password".to_string(), "nope".to_string())];
+    assert!(m.import_preview(file.to_str().unwrap(), &bad, 30).is_err());
     assert!(m.import.is_none());
     assert!(m.import_confirm(31).is_err(), "nothing to confirm");
     std::fs::write(&file, "name,password\nA,pw\n").unwrap();
-    m.import_preview(file.to_str().unwrap(), 32).unwrap();
+    m.import_preview(file.to_str().unwrap(), &[], 32).unwrap();
     assert!(m.import.is_some());
     m.lock();
     assert!(
         m.import.is_none(),
         "passwords from the file must not outlive the unlocked screen"
     );
+}
+
+#[test]
+fn import_lets_the_user_say_which_column_is_which() {
+    let (mut m, _) = model(Settings {
+        idle_lock_secs: 0,
+        ..Settings::default()
+    });
+    let dir = scratch_dir("import-columns");
+    let file = dir.join("odd.csv");
+    std::fs::write(&file, "Site,Who,Secret\nMail,bob,pw-1\n").unwrap();
+    let path = file.to_str().unwrap();
+    m.import_preview(path, &[], 30).unwrap();
+    let plan = m.import.as_ref().unwrap();
+    assert!(plan.needs_password_column && plan.items.is_empty());
+    assert_eq!(
+        plan.columns.as_ref().unwrap().headers,
+        ["Site", "Who", "Secret"]
+    );
+
+    let pick = |f: &str, h: &str| (f.to_string(), h.to_string());
+    let chosen = [
+        pick("title", "Site"),
+        pick("username", "Who"),
+        pick("password", "Secret"),
+    ];
+    m.import_preview(path, &chosen, 31).unwrap();
+    let plan = m.import.as_ref().unwrap();
+    assert!(!plan.needs_password_column);
+    assert_eq!(plan.items.len(), 1);
+    assert_eq!(plan.items[0].title, "Mail");
+    assert_eq!(plan.items[0].field("password").unwrap().value, "pw-1");
+    assert_eq!(m.import_confirm(32), Ok(1));
+}
+
+#[test]
+fn import_reads_a_bitwarden_json_export_and_a_keepass_csv() {
+    let (mut m, _) = model(Settings {
+        idle_lock_secs: 0,
+        ..Settings::default()
+    });
+    let dir = scratch_dir("import-formats");
+    let json = dir.join("bitwarden.json");
+    std::fs::write(
+        &json,
+        r#"{"encrypted":false,"folders":[],"items":[
+            {"type":1,"name":"Forum","login":{"username":"carol","password":"pw-2","uris":[{"uri":"https://forum.example"}]}},
+            {"type":2,"name":"A note"}]}"#,
+    )
+    .unwrap();
+    m.import_preview(json.to_str().unwrap(), &[], 30).unwrap();
+    let plan = m.import.as_ref().unwrap();
+    assert_eq!((plan.detected, plan.items.len()), ("bitwarden", 1));
+    assert!(
+        plan.columns.is_none(),
+        "a JSON file has no columns to choose"
+    );
+    m.import_cancel();
+
+    let kp = dir.join("keepass.csv");
+    std::fs::write(
+        &kp,
+        "\"Group\",\"Title\",\"Username\",\"Password\",\"URL\",\"Notes\",\"TOTP\"\n\"Web\",\"Bank\",\"me\",\"pw-3\",\"https://bank.example\",\"\",\"\"\n",
+    )
+    .unwrap();
+    m.import_preview(kp.to_str().unwrap(), &[], 31).unwrap();
+    assert_eq!(m.import.as_ref().unwrap().detected, "keepass");
+
+    // Encrypted Bitwarden exports are refused with an explanation.
+    let enc = dir.join("encrypted.json");
+    std::fs::write(&enc, r#"{"encrypted":true,"data":"x"}"#).unwrap();
+    let err = m
+        .import_preview(enc.to_str().unwrap(), &[], 32)
+        .unwrap_err();
+    assert!(err.contains("encrypted"), "{err}");
 }

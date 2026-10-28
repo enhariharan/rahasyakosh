@@ -1,0 +1,3 @@
+folder,favorite,type,name,notes,fields,reprompt,login_uri,login_username,login_password,login_totp
+Work,,login,GitHub,,,0,https://github.com,alice,pw1,JBSWY3DPEHPK3PXP
+,,note,A note,text,,0,,,,

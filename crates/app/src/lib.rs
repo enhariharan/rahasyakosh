@@ -10,6 +10,8 @@
 #[cfg(not(target_family = "wasm"))]
 mod highwater;
 mod index;
+#[cfg(not(target_family = "wasm"))]
+pub mod profile_files;
 mod profiles;
 #[cfg(not(target_family = "wasm"))]
 mod secretkeys;
