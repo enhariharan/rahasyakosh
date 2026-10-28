@@ -110,6 +110,20 @@ Needs a vault made by an older build (use the backup from Setup).
 - [ ] Auto-lock after the idle time returns to the unlock screen with the **same** profile selected.
 - [ ] `ls -l` on the data folder: vault files are readable by you only (`-rw-------`).
 
+## 8b. Rough edges fixed 2026-10-28 (not yet seen in a running window)
+
+| Check | Expected | Result | Notes |
+| ----- | -------- | :----: | ----- |
+| Unlock profile B (not the first), quit the app, start it again | It starts on profile B | | |
+| Delete profile B's vault file by hand (`rm profiles/<id>.db`), start the app | The window shows the **Profile** list, the message that the vault file is missing, and **Add a profile**; no blank error page | | |
+| In that state, pick profile A in the list | A's unlock screen appears and A unlocks | | |
+| Pick the broken profile again | The message comes back; nothing crashes | | |
+| Make two profiles with the same full name and different usernames | The list shows "Name (username1)" and "Name (username2)"; a profile whose name is unique shows only the name | | |
+| Delete a profile in Settings (with Orca on) | Orca says "Profile <name> was deleted."; the next profile's unlock screen shows | | |
+| Delete the profile that is the next one in the list but whose vault file was removed | The deletion still happens; the message is spoken together with the problem text | | |
+| `profiles.json` after picking a profile | Has a `last_used` entry with that profile's id | | |
+| Delete `last_used` from `profiles.json` by hand | The app starts on the first profile | | |
+
 ## 9. Accessibility and languages
 - [ ] Keyboard only: reach the **Profile** list, **Add a profile**, all fields, **Cancel** and the Settings profile buttons with `Tab`; each shows a visible focus ring.
 - [ ] With Orca on: the Profile list is announced with its label "Profile"; error messages ("Enter a username." and so on) are announced when they appear.

@@ -1,0 +1,27 @@
+name: Accessibility problem
+description: Something is hard or impossible to use with a screen reader, keyboard, zoom or high contrast
+labels: [a11y]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What got in the way?
+      description: What you did, what you heard or saw, and what you expected.
+    validations:
+      required: true
+  - type: dropdown
+    id: tech
+    attributes:
+      label: What are you using?
+      multiple: true
+      options: [Orca, Another screen reader, Keyboard only, Zoom or large text, High contrast or dark theme, Right-to-left language, Voice control]
+  - type: input
+    id: system
+    attributes:
+      label: System
+      description: Ubuntu version, desktop, Wayland or X11, and the app version or commit
+  - type: dropdown
+    id: where
+    attributes:
+      label: Screen
+      options: [Unlock, Item list, Item form, Settings, Import, Profiles, Other]

@@ -6,16 +6,16 @@ Guidelines, not a record of work done. Status today: MIT licence, CI (build, tes
 A password manager earns trust slowly. Do these first:
 - [ ] **Be honest in the README.** Keep "not audited, do not store real secrets" until an independent review is done. Label early releases *alpha*.
 - [ ] **Security audit** of `crates/core` (crypto, vault format) by an outside reviewer, or at least a public call for review. Publish the threat model (`docs/04-security-and-crypto.md`).
-- [ ] **Fix the known rough edges** in [`11-next-steps.md`](11-next-steps.md) (profile start-up, missing vault file).
+- [x] **Fix the known rough edges** in [`11-next-steps.md`](11-next-steps.md) (profile start-up, missing vault file). Done 2026-10-28; the new rows in `tests/profiles-test-checklist.md` still need a manual pass.
 - [ ] **Data safety:** a vault-format change after release must migrate old vaults. Freeze the format only after the golden-vault tests pass; keep them in CI.
 - [ ] **Backups and recovery:** document how users back up the vault folder, and say clearly that a lost master password cannot be recovered.
 - [ ] Run all manual checklists in `docs/tests/` on a clean Ubuntu install (LTS 24.04 and the latest release), Wayland and X11, Orca on and off.
 
 ## 1. Repository hygiene (mostly present)
 - [x] `LICENSE` (MIT), `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `SECURITY.md`.
-- [ ] `SECURITY.md`: give a private reporting route (GitHub private vulnerability reporting, plus an email) and a response time.
-- [ ] `CHANGELOG.md` (Keep a Changelog format) and Semantic Versioning. Tag releases `v0.1.0-alpha.1` and so on.
-- [ ] Issue templates (bug, feature, accessibility) and a pull request template.
+- [ ] `SECURITY.md`: has the GitHub private reporting route and a 7-day response time; **add an email address** (yours to choose) and turn on private vulnerability reporting in the repository settings.
+- [x] `CHANGELOG.md` (Keep a Changelog format) is in place with an **Unreleased** section. Still to do: Semantic Versioning in practice, and tagging releases `v0.1.0-alpha.1` and so on.
+- [x] Issue templates (bug, feature, accessibility) and a pull request template, in `.github/`.
 - [ ] Set the same version in every `Cargo.toml` (`apps/desktop` has its own workspace) and in the book.
 - [ ] Keep `Cargo.lock` committed; build with `--locked`.
 - [ ] Decide the name check: confirm "Rahasyakosh" is free as a project and package name (apt, snap, flathub, GitHub topics).
@@ -49,8 +49,8 @@ The desktop app needs WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`), GTK 3 and libsoup 3
 Avoid a plain `curl | sh` installer.
 
 ## 4. Desktop integration files
-- [ ] **AppStream metadata** (`io.github.enhariharan.Rahasyakosh.metainfo.xml`): name, summary, description, screenshots, licence, release list, content rating, categories. Validate with `appstreamcli validate`. Needed by Software Centre, Flathub and the Snap Store.
-- [ ] `rahasyakosh.desktop`: check with `desktop-file-validate`; categories `Utility;Security;`.
+- [ ] **AppStream metadata** (`apps/desktop/packaging/io.github.enhariharan.Rahasyakosh.metainfo.xml`): written and passes `appstreamcli validate --no-net`. Still missing: screenshots, a release list (add one with the first tag) and a `developer` entry. Needed by Software Centre, Flathub and the Snap Store.
+- [x] `rahasyakosh.desktop`: passes `desktop-file-validate` (one hint: it suggests adding `Settings` or `System` as a second category; categories are `Utility;Security;`).
 - [ ] Icons at several sizes (scalable SVG is present) and 2–4 screenshots in `docs/book/src/images/`.
 - [ ] Choose the reverse-DNS app ID once and keep it (`io.github.enhariharan.Rahasyakosh` is the natural one).
 

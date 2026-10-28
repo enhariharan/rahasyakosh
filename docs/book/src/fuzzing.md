@@ -36,7 +36,7 @@ Ten **targets**, one for each place we read bytes we did not write. Each is a pl
 | `record` | An encrypted record, as JSON or as raw fields | A made-up record **never opens** (nobody can forge one) |
 | `payload` | The decrypted bytes inside a record | Padding and item parsing cope with any bytes, even from a buggy or newer program |
 | `item_json` | An item's content | Stable under write and read; the item's `Debug` output never shows a concealed value |
-| `csv_import` | A CSV file, with and without a column mapping | What we import can be exported and imported again |
+| `csv_import` | Any file read as a CSV (with and without a column mapping) and as a Bitwarden JSON export | What we import can be exported and imported again |
 | `totp` | A two-factor secret or `otpauth://` link | Codes always have the right number of digits |
 | `bundle` | A portable vault file (`rk export -f vault`) | Write then read is stable; it loads into a store without panicking |
 | `directory_store` | A folder whose files contain anything | Every operation returns a value or an error |

@@ -1,0 +1,19 @@
+name: Feature request
+description: Suggest something new
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What do you need to do that you cannot do today?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like to happen?
+  - type: input
+    id: story
+    attributes:
+      label: Related user story
+      description: For example US-IMP-02, if it is already in docs/02-epics-and-user-stories.md

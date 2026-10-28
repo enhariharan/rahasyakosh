@@ -140,6 +140,8 @@ so an old password is not lost by accident, and you can go back to it.
 
 **CSPRNG** — A random-number generator safe for secrets (cryptographically secure). Every key and nonce here comes from one.
 
+**Column mapping** — Telling the importer which column of a file holds which kind of information (title, website, username, password, notes, two-factor code, tags). The importer guesses from the header names; you can correct it. `rk import --map password=pwd` does it on the command line, and the desktop import screen has a drop-down for each kind. See [Importing and exporting](import-export.md).
+
 **CSV** — A simple table in plain text (comma-separated values). Browsers export passwords this way. CSV exports are **unencrypted**.
 
 **CSV injection** — A spreadsheet treating a cell that starts with `=`, `+`, `-` or `@` as a formula. Open exports in a text editor.
@@ -206,7 +208,9 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Journal / WAL** — SQLite's safety log. Writes go to the log first, so a crash cannot leave the database half-written.
 
-**JSON** — A text format for structured data. Vault headers, records and exports use it.
+**JSON** — A text format for structured data. Vault headers, records and exports use it. Bitwarden's unencrypted export is JSON, and the importer reads it.
+
+**KDBX / 1pux** — The file formats of KeePass databases (`.kdbx`) and 1Password exports (`.1pux`). Both are packed or encrypted containers, not plain text, so Rahasyakosh cannot import them yet; export from those programs as CSV instead.
 
 **KAT (known-answer test)** — A test that checks output against a value published by someone else. See the testing chapter.
 
@@ -366,7 +370,7 @@ so an old password is not lost by accident, and you can go back to it.
 
 **UUID** — A long random identifier (like `0190…0001`) used to name each item.
 
-**Profile** — One person's set of passwords inside a shared installation. Each profile has its own vault and master password, plus a full name, a unique username and a user ID. See [Profiles](desktop-app.md#profiles-us-prf-01-to-05).
+**Profile** — One person's set of passwords inside a shared installation. Each profile has its own vault and master password, plus a full name, a unique username and a user ID. The app remembers the profile you used last and starts on it. `rk --profile USERNAME` opens a profile's vault from the command line. See [Profiles](desktop-app.md#profiles-us-prf-01-to-05).
 
 **Vault** — The encrypted file that holds all your saved items. See the core ideas above.
 

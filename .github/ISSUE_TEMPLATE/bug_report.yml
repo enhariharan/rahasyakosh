@@ -1,0 +1,39 @@
+name: Bug report
+description: Something does not work as described
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please **do not paste passwords, master passphrases, Secret Keys or vault files** into an issue.
+        For a security problem, use the private route in SECURITY.md instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Start from a new, empty vault if you can.
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options: [Desktop app, "rk (command line)", Both, Not sure]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: "`rk --version`, or the commit you built from"
+  - type: input
+    id: system
+    attributes:
+      label: System
+      description: Ubuntu version, Wayland or X11, and whether a screen reader (Orca) was on

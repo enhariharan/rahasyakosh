@@ -34,7 +34,7 @@ asked. If you prefer to choose your own master password, run `rk init`; it shows
 
 **There is no recovery.** If you lose the master passphrase, nobody can open your vault, including the authors.
 
-The vault is one file, `~/.local/share/rahasyakosh/vault.db`, readable only by you. Use another file with `--vault FILE`, or set `RK_VAULT`.
+The vault is one file, `~/.local/share/rahasyakosh/vault.db`, readable only by you. Use another file with `--vault FILE`, or set `RK_VAULT`. If you also use the desktop app with several profiles, `--profile USERNAME` (or `RK_PROFILE`) opens that profile's vault instead: `rk --profile asha list`. The profile list `profiles.json` is read from the folder of the vault file; profiles are made in the desktop app, and `rk profiles` shows what is there.
 Every command asks for the master passphrase and takes a fraction of a second to check it.
 
 ## Everyday use
@@ -137,7 +137,8 @@ Plaintext exports contain every password. Delete them as soon as you are done, a
 | `rk migrate FILE` | Load an old-format vault or a backup bundle into a new vault |
 | `rk gen [--passphrase]` | Generate a password or passphrase |
 | `rk passwd [--passphrase]` | Change the master password |
-| `rk import FILE [--map F=COL] [--dry-run] [-y]` | Import CSV (Chrome, Firefox or generic) |
+| `rk import FILE [--map F=COL] [--dry-run] [-y]` | Import a CSV (Chrome, Firefox, Bitwarden, KeePassXC, 1Password or generic) or a Bitwarden JSON export |
+| `rk profiles` | List the profiles made in the desktop app (username and full name) |
 | `rk export [-f csv\|json\|vault] [-o FILE] [--force]` | Export |
 
 Add `--help` to any command. Every command also takes `--vault FILE`.

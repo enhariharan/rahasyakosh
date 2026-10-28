@@ -11,9 +11,9 @@ The CSV library is extra code we do not need in `rahasyakosh-core`, which should
 focused on cryptography. The transfer crate only does *conversion*: bytes in, items out, and the
 reverse. It never opens files, prompts, reads the clock or touches keys. The CLI does that part.
 
-## Importing (US-IMP-01)
+## Importing (US-IMP-01, US-IMP-02)
 
-The desktop app does the same from **Settings → Import passwords**: type the file's path, look at the preview, then confirm. It has no `--map`; use `rk import` for odd column names.
+The desktop app does the same from **Settings → Import passwords**: choose the file (with the **Choose a file…** button, or type its path), look at the preview, then confirm. If the columns are not what the app expected, the screen lists the file's columns with a drop-down for each kind of information (title, website, username, password, notes, two-factor code, tags); change them and press **Read the file again with these columns**. A file with no recognisable password column is not rejected: the screen asks you to pick the password column.
 
 ```
 rk import passwords.csv --dry-run         # preview, change nothing
@@ -30,10 +30,17 @@ mean "title". This covers the exports of:
 |---|---|
 | Chrome / Edge | `name, url, username, password, note` |
 | Firefox | `url, username, password, httpRealm, formActionOrigin, guid, …` (no title; we use the website's name) |
+| Bitwarden (CSV) | `folder, favorite, type, name, notes, fields, reprompt, login_uri, login_username, login_password, login_totp` (the folder becomes a tag) |
+| KeePassXC (CSV) | `Group, Title, Username, Password, URL, Notes, TOTP, …` (the group becomes a tag) |
+| 1Password (CSV) | `Title, Website, Username, Password, OTPAuth, Favorite, Archived, Tags, Notes` |
 | Generic and our own export | `title, url, username, password, notes, totp, tags` |
 
 If a file uses names we do not know, `--map FIELD=COLUMN` points a field at a column. If no password
-column can be found at all, the import stops with a message rather than guessing.
+column can be found at all, `rk` stops with a message rather than guessing (the desktop app asks you to choose one).
+
+**Bitwarden JSON.** A Bitwarden export saved as an *unencrypted* `.json` file is read too (`rk import vault.json`, or choose it in the desktop app). Logins are imported with all their websites, notes and two-factor secret, and the folder becomes a tag. Secure notes, cards and identities are not logins: they are left out, and a warning says how many. An *encrypted* Bitwarden export is refused with a message asking for the unencrypted kind. Bitwarden and 1Password CSV files that mix logins with notes and cards are handled the same way.
+
+**Not supported yet.** KeePass `.kdbx` databases and 1Password `.1pux` files are binary containers, so they need their own readers; export from the other program as CSV instead (KeePassXC: *Database → Export → CSV*; 1Password: *File → Export → CSV*). The rest of US-IMP-02 stays open.
 
 **Preview.** Before anything is stored you see each item's title, username and URL. **Passwords are
 never printed.** Warnings are written without secrets too (a test checks this).
