@@ -20,6 +20,7 @@ use rahasyakosh_app::{
 use rahasyakosh_store::private_fs;
 use rahasyakosh_store::{SqliteStore, Uuid};
 use std::cell::Cell;
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
@@ -52,16 +53,43 @@ fn data_dir() -> PathBuf {
         .unwrap_or_default()
 }
 
+/// The folder for the settings file: `RK_CONFIG_HOME` (any platform), else `XDG_CONFIG_HOME`, else `~/.config`.
+fn config_base(rk: Option<OsString>, xdg: Option<OsString>, home: Option<OsString>) -> PathBuf {
+    let set = |v: Option<OsString>| v.filter(|v| !v.is_empty()).map(PathBuf::from);
+    set(rk)
+        .or_else(|| set(xdg))
+        .unwrap_or_else(|| set(home).unwrap_or_default().join(".config"))
+}
+
 fn settings_path() -> PathBuf {
-    let base = std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            std::env::var_os("HOME")
-                .map(PathBuf::from)
-                .unwrap_or_default()
-                .join(".config")
-        });
-    base.join("rahasyakosh/settings.json")
+    config_base(
+        std::env::var_os("RK_CONFIG_HOME"),
+        std::env::var_os("XDG_CONFIG_HOME"),
+        std::env::var_os("HOME"),
+    )
+    .join("rahasyakosh/settings.json")
+}
+
+#[cfg(test)]
+mod config_base_tests {
+    use super::config_base;
+    use std::path::PathBuf;
+
+    fn os(s: &str) -> Option<std::ffi::OsString> {
+        Some(s.into())
+    }
+
+    #[test]
+    fn rk_config_home_wins_then_xdg_then_home() {
+        assert_eq!(config_base(os("/rk"), os("/xdg"), os("/h")), PathBuf::from("/rk"));
+        assert_eq!(config_base(None, os("/xdg"), os("/h")), PathBuf::from("/xdg"));
+        assert_eq!(config_base(None, None, os("/h")), PathBuf::from("/h/.config"));
+    }
+
+    #[test]
+    fn empty_values_are_ignored() {
+        assert_eq!(config_base(os(""), os("/xdg"), os("/h")), PathBuf::from("/xdg"));
+    }
 }
 
 fn load_settings() -> Settings {
