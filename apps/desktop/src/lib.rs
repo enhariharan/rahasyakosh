@@ -81,14 +81,26 @@ mod config_base_tests {
 
     #[test]
     fn rk_config_home_wins_then_xdg_then_home() {
-        assert_eq!(config_base(os("/rk"), os("/xdg"), os("/h")), PathBuf::from("/rk"));
-        assert_eq!(config_base(None, os("/xdg"), os("/h")), PathBuf::from("/xdg"));
-        assert_eq!(config_base(None, None, os("/h")), PathBuf::from("/h/.config"));
+        assert_eq!(
+            config_base(os("/rk"), os("/xdg"), os("/h")),
+            PathBuf::from("/rk")
+        );
+        assert_eq!(
+            config_base(None, os("/xdg"), os("/h")),
+            PathBuf::from("/xdg")
+        );
+        assert_eq!(
+            config_base(None, None, os("/h")),
+            PathBuf::from("/h/.config")
+        );
     }
 
     #[test]
     fn empty_values_are_ignored() {
-        assert_eq!(config_base(os(""), os("/xdg"), os("/h")), PathBuf::from("/xdg"));
+        assert_eq!(
+            config_base(os(""), os("/xdg"), os("/h")),
+            PathBuf::from("/xdg")
+        );
     }
 }
 
