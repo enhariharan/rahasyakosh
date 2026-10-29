@@ -10,6 +10,7 @@ All notable changes to Rahasyakosh are written here, newest first. The format fo
 
 ### Added
 - **Profiles (desktop):** several people can share one installation, each with their own vault and master password. The app starts on the profile used last.
+- **`RK_CONFIG_HOME`** sets the folder of the desktop settings file on any system; it takes priority over `XDG_CONFIG_HOME`.
 - **`rk --profile USERNAME`** (or `RK_PROFILE`) opens a profile's vault from the command line; `rk profiles` lists them.
 - **Import:** Bitwarden JSON exports (unencrypted), and Bitwarden, KeePassXC and 1Password CSV files are recognised. The desktop import screen has a file chooser and a column picker.
 - **Export** to a plain text file, CSV or JSON in the desktop app, with the master password asked again.

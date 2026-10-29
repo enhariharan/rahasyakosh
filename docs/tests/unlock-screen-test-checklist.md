@@ -6,7 +6,7 @@ Run it with the screen reader **off** first, then repeat sections 1, 3 and 6 wit
 ## Setup
 - [ ] Install the current build (`install-local.sh`), quit any older copy, and note the commit.
 - [ ] Use a throwaway data folder so your real vault is not touched:
-      `RK_VAULT=/tmp/rk-test/vault.db XDG_CONFIG_HOME=/tmp/rk-test/cfg rahasyakosh`
+      `RK_VAULT=/tmp/rk-test/vault.db RK_CONFIG_HOME=/tmp/rk-test/cfg rahasyakosh`
 - [ ] Create **two** profiles with different master passwords (for example "Asha Rao" and "Default user"), add one item to each, then lock with `Ctrl+L`. Also keep a run with only **one** profile for section 1.
 - [ ] Note the session type (`echo $XDG_SESSION_TYPE`) and whether Orca is on.
 

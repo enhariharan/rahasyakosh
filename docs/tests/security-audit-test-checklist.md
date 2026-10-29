@@ -14,7 +14,7 @@ Most checks are also worth turning into automated tests when the fix is written.
 - [ ] Make a scratch folder and a throwaway vault. In every command below `rk` means the CLI with this vault:
       `mkdir -p /tmp/rk-audit && cd /tmp/rk-audit && export RK_VAULT=/tmp/rk-audit/v.db RK_PASSWORD='audit-test-passphrase'`
       Then `rk init`, and `rk add` two or three items. Unset `RK_PASSWORD` for tests that must prompt.
-- [ ] For the desktop app use a separate home: `XDG_DATA_HOME=/tmp/rk-audit/data XDG_CONFIG_HOME=/tmp/rk-audit/cfg rahasyakosh`
+- [ ] For the desktop app use a separate home: `XDG_DATA_HOME=/tmp/rk-audit/data RK_CONFIG_HOME=/tmp/rk-audit/cfg rahasyakosh`
 - [ ] Use a result mark in the Result column: `✔` secure, `✘` problem reproduced, `?` not sure. Every `✘` after a fix becomes an issue.
 
 ## 1. Crypto core (Phase 1)
@@ -181,7 +181,7 @@ Use the directory store or SQLite vault as noted. Always copy the vault first (`
 - [ ] `docs/04` says what is and is not done about `mlock` and swap.
 
 ### P6-2 Folder and file permissions
-- [ ] On a fresh install (empty `XDG_DATA_HOME` and `XDG_CONFIG_HOME`), then on an install created by the **old** build:
+- [ ] On a fresh install (empty `XDG_DATA_HOME` and `RK_CONFIG_HOME`), then on an install created by the **old** build:
       `stat -c '%a %n' ~/.local/share/rahasyakosh ~/.local/share/rahasyakosh/profiles ~/.local/share/rahasyakosh/profiles.json ~/.config/rahasyakosh ~/.config/rahasyakosh/settings.json ~/.local/share/rahasyakosh/profiles/*`
       Expected: folders `700`, files `600`, including after the first start of the new build over old modes.
 - [ ] Automated 2026-10-27 (`private_fs` tests, desktop `profiles` test, CLI test); still look once at a real old install.

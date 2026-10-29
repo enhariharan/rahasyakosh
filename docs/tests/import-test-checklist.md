@@ -1,7 +1,7 @@
 # Import screen test checklist (US-IMP-01, US-IMP-02)
 
 A manual pass over **Settings → Import passwords** in the Linux desktop app. About 15 minutes. Use a throwaway vault
-(`RK_VAULT=/tmp/rk-test/vault.db XDG_CONFIG_HOME=/tmp/rk-test/cfg rahasyakosh`) so your real data is not touched. Run it with the
+(`RK_VAULT=/tmp/rk-test/vault.db RK_CONFIG_HOME=/tmp/rk-test/cfg rahasyakosh`) so your real data is not touched. Run it with the
 screen reader off, then repeat sections 2 and 3 with Orca on.
 
 `✔` works · `✘` does not · `?` does something else (say what).

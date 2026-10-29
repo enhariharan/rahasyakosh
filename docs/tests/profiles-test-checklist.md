@@ -7,7 +7,7 @@ Run it with the screen reader **off** first, then repeat sections 2, 3 and 6 wit
 - [ ] Install the current build (`install-local.sh`), quit any older copy, and note the commit.
 - [ ] **Back up first:** `cp ~/.local/share/rahasyakosh/vault.db ~/vault_backup.db` (if a vault exists). Restore it afterwards if you want your old data.
 - [ ] For a clean first run, use a throwaway data folder so your real vault is not touched:
-      `RK_VAULT=/tmp/rk-test/vault.db XDG_CONFIG_HOME=/tmp/rk-test/cfg rahasyakosh`
+      `RK_VAULT=/tmp/rk-test/vault.db RK_CONFIG_HOME=/tmp/rk-test/cfg rahasyakosh`
       (the profile list and the other profiles' vaults go in the same folder as `vault.db`).
 - [ ] Note the session type (`echo $XDG_SESSION_TYPE`) and whether Orca is on.
 

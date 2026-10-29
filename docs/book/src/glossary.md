@@ -166,7 +166,7 @@ so an old password is not lost by accident, and you can go back to it.
 
 **Entropy** — A measure of unpredictability in bits. The more bits, the harder to guess.
 
-**Environment variable** — A named setting a program inherits from its surroundings. `RK_VAULT` chooses the vault file; `RK_PASSWORD` supplies the master password to scripts. **Do not set `RK_PASSWORD` permanently**: it keeps your master password in your environment.
+**Environment variable** — A named setting a program inherits from its surroundings. `RK_VAULT` chooses the vault file; `RK_CONFIG_HOME` chooses the folder for the settings file (it works on every system and takes priority over the Linux-only `XDG_CONFIG_HOME`); `RK_PASSWORD` supplies the master password to scripts. **Do not set `RK_PASSWORD` permanently**: it keeps your master password in your environment.
 
 **Escape sequence (OSC 52)** — A hidden code, starting with the "escape" character, that a terminal obeys instead of printing: for example, clear the screen, move the cursor, or (OSC 52) put some text on the clipboard. Text from an untrusted file can contain such codes, so it must be cleaned before it is printed to a terminal.
 
