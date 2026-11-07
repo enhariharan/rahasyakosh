@@ -15,6 +15,30 @@ rk add GitHub -u alice --url github.com -g
 rk get github --copy     # Copied to clipboard, cleared after 20s
 ```
 
+## Desktop app (Linux)
+
+Install the build libraries once:
+
+```
+sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev \
+                 libayatana-appindicator3-dev libsoup-3.0-dev
+```
+
+Build and run directly (no install):
+
+```
+cargo build --release --manifest-path apps/desktop/Cargo.toml
+./apps/desktop/target/release/rahasyakosh-desktop
+```
+
+Or install for the current user (adds an app-grid entry and a `rahasyakosh` launcher):
+
+```
+./apps/desktop/install-local.sh           # installs to ~/.local/bin/
+rahasyakosh                               # run it
+./apps/desktop/install-local.sh --uninstall   # remove it
+```
+
 ## Read the book
 
 `docs/book/` is a plain-English guide to how Rahasyakosh works (security and cryptography included), written for newcomers and future
