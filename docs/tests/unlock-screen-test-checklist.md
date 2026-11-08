@@ -61,24 +61,30 @@ Run it with the screen reader **off** first, then repeat sections 1, 3 and 6 wit
 | `Enter` or `Space` on the focused floating button | Opens the add-profile page | ✔ | |
 
 ## 5. Errors on this screen
-- [x] Delete one profile's `.db` file by hand, then choose that profile and unlock: "The vault file of this profile is missing". Note whether you can still reach the others (known limit: the error screen blocks everything until restart).
-- [x] Damage `profiles.json` (write `garbage` into it) and start the app: an error is shown and the file is **not** overwritten.
-- [x] An error message on this screen is shown in text, not only by colour.
+| Check | Expected | Result | Notes |
+| ----- | -------- | :----: | ----- |
+| Delete one profile's `.db` file, choose that profile and unlock | "The vault file of this profile is missing"; others still reachable (known limit: error screen blocks until restart) | ✔ | |
+| Damage `profiles.json` (write `garbage`) and start the app | An error is shown; the file is **not** overwritten | ✔ | |
+| An error message on this screen | Shown in text, not only by colour | ✔ | |
 
 ## 6. Accessibility (Orca on)
-- [x] On arrival, Orca announces the password box by its label, not just "window".
-- [x] The **Profile** list is announced with its label and the selected full name. (Announced when explicitly focused, not on arrival — expected: password box has initial focus.)
-- [x] After choosing another profile, Orca announces the choice and the password box can be typed in straight away.
-- [x] "Wrong password." is announced when it appears.
-- [x] The floating button is announced as "Add a profile" with its shortcut.
-- [x] While typing the master password, Orca does not read out the characters.
-- [x] Alt+Tab away and back: the focused box is announced again, and typed keys are not echoed.
-- [x] 200% zoom: nothing overlaps or is hidden; the list, box and buttons can all be reached.
-- [x] Contrast of the floating button, list and messages looks fine in both themes.
+| Check | Expected | Result | Notes |
+| ----- | -------- | :----: | ----- |
+| On arrival | Orca announces the password box by its label, not just "window" | ✔ | |
+| The **Profile** list | Announced with its label and the selected full name | ✔ | Announced when explicitly focused (Tab), not on arrival — expected: password box has initial focus |
+| After choosing another profile | Orca announces the choice; the password box can be typed in straight away | ✔ | |
+| "Wrong password." | Announced when it appears | ✔ | |
+| The floating button | Announced as "Add a profile" with its shortcut | ✔ | |
+| While typing the master password | Orca does not read out the characters | ✔ | |
+| Alt+Tab away and back | The focused box is announced again; typed keys are not echoed | ✔ | |
+| 200% zoom | Nothing overlaps or is hidden; list, box and buttons can all be reached | ✔ | |
+| Contrast | Floating button, list and messages look fine in both themes | ✔ | |
 
 ## 7. Languages
-- [x] Switch the language (for example Hindi, Tamil, Urdu) and lock: the labels, messages and the button tooltip are translated.
-- [x] Urdu reads right to left (button in the left corner) except the password box. Native speakers: note any wrong or odd wording (the translations were written by the assistant and need review).
+| Check | Expected | Result | Notes |
+| ----- | -------- | :----: | ----- |
+| Switch language (e.g. Hindi, Tamil, Urdu) and lock | Labels, messages and button tooltip are translated | ✔ | |
+| Urdu layout | Reads right to left; button in the left corner; password box excepted | ✔ | Translations were written by the assistant and need native-speaker review |
 
 ## Recording results
 Fill in the tables and paste them at the bottom of this file under a dated heading, with the commit, session type and Orca on or off.

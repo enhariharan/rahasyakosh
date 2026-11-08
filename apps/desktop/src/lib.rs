@@ -752,10 +752,15 @@ fn Setup() -> Element {
     let mut saved = use_signal(|| false);
     let mut want_key = use_signal(|| false);
     let mut copied = use_signal(|| false);
-    let mut error = use_signal(|| Option::<String>::None);
+    let mut name_err = use_signal(|| Option::<String>::None);
+    let mut user_err = use_signal(|| Option::<String>::None);
+    let mut form_err = use_signal(|| Option::<String>::None);
     let strength = rahasyakosh_strength::estimate(&pw.read(), &[]);
 
     let create = move |_| {
+        name_err.set(None);
+        user_err.set(None);
+        form_err.set(None);
         let dir = data_dir();
         let mut list = ctx.profiles.read().clone();
         let id = new_profile_id(&mut rand::rng());
@@ -772,7 +777,12 @@ fn Setup() -> Element {
         let profile = match list.add(id, &full_name.read(), &username.read(), &file) {
             Ok(p) => p.clone(),
             Err(e) => {
-                error.set(Some(tr(lang, profile_error_msg(e)).into()));
+                match e {
+                    ProfileError::EmptyName => name_err.set(Some(tr(lang, Msg::ProfileNameEmpty).into())),
+                    ProfileError::EmptyUsername => user_err.set(Some(tr(lang, Msg::ProfileUsernameEmpty).into())),
+                    ProfileError::UsernameTaken => user_err.set(Some(tr(lang, Msg::ProfileUsernameTaken).into())),
+                    _ => form_err.set(Some(tr(lang, profile_error_msg(e)).into())),
+                }
                 return;
             }
         };
@@ -786,7 +796,7 @@ fn Setup() -> Element {
         ) {
             Ok(p) => p,
             Err(e) => {
-                error.set(Some(e));
+                form_err.set(Some(e));
                 return;
             }
         };
@@ -816,14 +826,14 @@ fn Setup() -> Element {
                     match session.add_secret_key(&password, now(), &mut rand::rng()) {
                         Ok(made) => sheet = Some(made),
                         Err(e) => {
-                            error.set(Some(trf(lang, Msg::CouldNotCreateVault, &[&e])));
+                            form_err.set(Some(trf(lang, Msg::CouldNotCreateVault, &[&e])));
                             return;
                         }
                     }
                 }
                 list.set_last_used(id);
                 if let Err(e) = profiles::save(&dir, &list) {
-                    error.set(Some(trf(lang, Msg::CouldNotCreateVault, &[&e])));
+                    form_err.set(Some(trf(lang, Msg::CouldNotCreateVault, &[&e])));
                     return;
                 }
                 let settings_error = save_settings(session.settings()).err();
@@ -838,7 +848,7 @@ fn Setup() -> Element {
                         .set(Some(trf(lang, Msg::SettingsNotSaved, &[&e])));
                 }
             }
-            Err(e) => error.set(Some(trf(lang, Msg::CouldNotCreateVault, &[&e]))),
+            Err(e) => form_err.set(Some(trf(lang, Msg::CouldNotCreateVault, &[&e]))),
         }
     };
 
@@ -862,10 +872,10 @@ fn Setup() -> Element {
     let copy_passphrase = move |_| {
         let text = passphrase.read().clone();
         if model::Clipboard::copy(&mut SystemClipboard, &text).is_err() {
-            error.set(Some(tr(lang, Msg::CouldNotCopy).into()));
+            form_err.set(Some(tr(lang, Msg::CouldNotCopy).into()));
             return;
         }
-        error.set(None);
+        form_err.set(None);
         copied.set(true);
         spawn(async move {
             tokio::time::sleep(std::time::Duration::from_secs(2)).await;
@@ -886,13 +896,19 @@ fn Setup() -> Element {
             if adding { p { class: "muted", {tr(lang, Msg::AddProfileHint)} } }
             section { aria_label: tr(lang, Msg::ProfileSection),
                 label { r#for: "prf-name", {tr(lang, Msg::ProfileFullName)} }
-                input { id: "prf-name", autocomplete: "off", value: "{full_name}", oninput: move |e| full_name.set(e.value()) }
+                input {
+                    id: "prf-name", autocomplete: "off", value: "{full_name}",
+                    aria_describedby: if name_err().is_some() { "prf-name-err" } else { "" },
+                    oninput: move |e| { full_name.set(e.value()); name_err.set(None); },
+                }
+                if let Some(e) = name_err() { p { id: "prf-name-err", class: "error", role: "alert", "{e}" } }
                 label { r#for: "prf-user", {tr(lang, Msg::ProfileUsername)} }
                 input {
                     id: "prf-user", class: "ltr", dir: "ltr", autocomplete: "off", value: "{username}",
-                    aria_describedby: if adding { "" } else { "prf-hint" },
-                    oninput: move |e| username.set(e.value()),
+                    aria_describedby: if user_err().is_some() { "prf-user-err" } else if !adding { "prf-hint" } else { "" },
+                    oninput: move |e| { username.set(e.value()); user_err.set(None); },
                 }
+                if let Some(e) = user_err() { p { id: "prf-user-err", class: "error", role: "alert", "{e}" } }
                 if !adding { p { id: "prf-hint", class: "muted small", {tr(lang, Msg::ProfileKeepHint)} } }
             }
             p { class: "warn", {tr(lang, Msg::ShownOnce)} }
@@ -938,7 +954,8 @@ fn Setup() -> Element {
                 }
                 p { id: "sk-hint", class: "muted small", {tr(lang, Msg::SecretKeyOptionHint)} }
             }
-            if let Some(e) = error() { p { class: "error", role: "alert", "{e}" } }
+            if name_err().is_some() || user_err().is_some() { p { class: "error", role: "alert", {tr(lang, Msg::FixIssuesAbove)} } }
+            if let Some(e) = form_err() { p { class: "error", role: "alert", "{e}" } }
             button { class: "primary", onclick: create, disabled: !own() && !saved(), {tr(lang, Msg::CreateVault)} }
             if adding { button { r#type: "button", onclick: move |_| ctx.adding.set(false), {tr(lang, Msg::CancelAdd)} } }
             p { class: "small", "{trf(lang, Msg::VaultLocation, &[&data_dir().display()])}" }
