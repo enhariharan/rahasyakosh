@@ -58,6 +58,7 @@ else
     git clone "$REPO_URL" "$REPO_DIR"
   fi
   echo "==> Building and installing (this takes a few minutes)..."
+  source "$HOME/.cargo/env"
   cd "$REPO_DIR/apps/desktop"
   ./install-local.sh
 fi
