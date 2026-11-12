@@ -96,3 +96,7 @@ Every `✘` or `?` becomes an issue labelled `desktop` (or `a11y`); note the ste
 
 All checks pass. Notes:
 - Section 6, Profile list announcement: announced when explicitly focused (Tab), not on arrival. Expected — password box holds initial focus. Not a defect.
+
+## 2026-11-12 — commit 2b55bd3, Wayland (GNOME Boxes VM, Ubuntu 24.04)
+
+All checks pass.

@@ -99,3 +99,8 @@ Fill in the tables and paste them at the bottom of this file under a dated headi
 Every `✘` or `?` becomes an issue labelled `desktop`; note the exact steps and any on-screen message.
 
 ---
+
+## 2026-11-12 — commit 2b55bd3, Wayland (GNOME Boxes VM, Ubuntu 24.04)
+
+Sections 1–7 all pass. Notes:
+- Section 5, "Lock and unlock": app unlocks with passphrase alone as expected — secret key is saved to device automatically and loaded without a prompt. Checklist updated to reflect this.
