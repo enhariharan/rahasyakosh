@@ -8,6 +8,7 @@ An external audit is planned before 1.0 (see `docs/04-security-and-crypto.md`).
 Please report privately; do not open a public issue.
 
 - Use GitHub's [private vulnerability reporting](https://github.com/enhariharan/rahasyakosh/security/advisories/new).
+- Or email **enhariharan@gmail.com** (PGP not required; plain email is fine).
 
 Include affected version/commit, reproduction steps and impact. We aim to acknowledge within 7 days
 and to agree a fix and disclosure timeline with you; we credit reporters unless asked not to.
