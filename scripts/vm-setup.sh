@@ -95,6 +95,7 @@ echo " Checklists to run (Wayland first, then X11):"
 if [[ -n "$DEB_PATH" ]] || [[ ! -d "$REPO_DIR" ]]; then
   echo "   Clone or copy the repo to find them under docs/tests/"
 else
+  echo "   $REPO_DIR/docs/tests/first-start-test-checklist.md"
   echo "   $REPO_DIR/docs/tests/unlock-screen-test-checklist.md"
   echo "   $REPO_DIR/docs/tests/profiles-test-checklist.md"
   echo "   $REPO_DIR/docs/tests/import-test-checklist.md"
