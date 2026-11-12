@@ -69,8 +69,9 @@ Reset the throwaway folder.
 | Copy button on the key sheet | Copies the key; icon changes briefly | | |
 | "I have saved it" checkbox or button | Must be confirmed before you can continue | | |
 | Continue | Vault opens | | |
-| Lock and unlock | The app now asks for both the passphrase and the secret key | | |
-| Repeat without ticking the secret key option | No key sheet is shown; vault opens directly | | |
+| Lock and unlock | The app unlocks with the passphrase alone — the key is saved on this device so it is loaded automatically (no prompt). The key sheet said "saved to this device." | | |
+| Lock and unlock on a **different device** (or after deleting the saved key file) | The app asks for both the passphrase and the secret key | | |
+| Repeat without ticking the secret key option | No key sheet is shown; vault opens directly with passphrase only | | |
 
 ## 6. Accessibility (Orca on)
 Restart with a clean folder.
