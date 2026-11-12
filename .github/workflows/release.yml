@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*.[0-9]*.[0-9]*'
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev \
+            libayatana-appindicator3-dev libsoup-3.0-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            apps/desktop -> apps/desktop/target
+
+      - name: Build CLI
+        run: cargo build -p rahasyakosh-cli --release --locked
+
+      - name: Build desktop
+        working-directory: apps/desktop
+        run: cargo build --release --locked
+
+      - name: Strip binaries
+        run: |
+          strip target/release/rk
+          strip apps/desktop/target/release/rahasyakosh-desktop
+
+      - name: Generate SBOM
+        run: |
+          cargo install cargo-cyclonedx --locked
+          cargo cyclonedx --workspace --format json
+          cd apps/desktop && cargo cyclonedx --format json
+
+      - name: SHA-256 checksums
+        run: |
+          sha256sum \
+            target/release/rk \
+            apps/desktop/target/release/rahasyakosh-desktop \
+            > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Attest rk
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: target/release/rk
+
+      - name: Attest rahasyakosh-desktop
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: apps/desktop/target/release/rahasyakosh-desktop
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          generate_release_notes: false
+          body: |
+            **Alpha release — Rahasyakosh has not been independently audited. Do not store real secrets.**
+
+            ## Verify downloads
+
+            Download `SHA256SUMS.txt` alongside the binary and run:
+            ```
+            sha256sum --check SHA256SUMS.txt
+            ```
+
+            Build provenance is recorded via sigstore. Verify with the [GitHub CLI](https://cli.github.com/):
+            ```
+            gh attestation verify rk --repo enhariharan/rahasyakosh
+            gh attestation verify rahasyakosh-desktop --repo enhariharan/rahasyakosh
+            ```
+          files: |
+            target/release/rk
+            apps/desktop/target/release/rahasyakosh-desktop
+            SHA256SUMS.txt
+            *.cdx.json
+            apps/desktop/*.cdx.json
