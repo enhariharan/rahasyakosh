@@ -46,11 +46,17 @@ jobs:
           strip target/release/rk
           strip apps/desktop/target/release/rahasyakosh-desktop
 
+      - name: Install release tools
+        run: cargo install cargo-cyclonedx cargo-deb --locked
+
       - name: Generate SBOM
         run: |
-          cargo install cargo-cyclonedx --locked
           cargo cyclonedx --workspace --format json
           cd apps/desktop && cargo cyclonedx --format json
+
+      - name: Build .deb
+        working-directory: apps/desktop
+        run: cargo deb --no-build
 
       - name: SHA-256 checksums
         run: |
@@ -94,6 +100,7 @@ jobs:
           files: |
             target/release/rk
             apps/desktop/target/release/rahasyakosh-desktop
+            apps/desktop/target/debian/*.deb
             SHA256SUMS.txt
             *.cdx.json
             apps/desktop/*.cdx.json

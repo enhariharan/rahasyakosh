@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Rahasyakosh
+GenericName=Password Manager
+Comment=Local-first, end-to-end-encrypted password manager
+Exec=/usr/bin/rahasyakosh
+Icon=rahasyakosh
+Terminal=false
+Categories=Utility;Security;
+Keywords=password;vault;secret;2fa;totp;
+StartupWMClass=rahasyakosh-desktop

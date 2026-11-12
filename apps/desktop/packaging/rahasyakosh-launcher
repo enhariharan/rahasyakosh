@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Enable the desktop accessibility service before the app starts, so screen
+# readers that are already running can connect immediately. The busctl call is
+# a no-op when the service is already enabled or when busctl is not available.
+if command -v busctl >/dev/null 2>&1 \
+  && [[ "$(busctl --user get-property org.a11y.Bus /org/a11y/bus org.a11y.Status IsEnabled 2>/dev/null)" == "b false" ]]; then
+  busctl --user set-property org.a11y.Bus /org/a11y/bus org.a11y.Status IsEnabled b true >/dev/null 2>&1 || true
+fi
+exec /usr/bin/rahasyakosh-desktop "$@"

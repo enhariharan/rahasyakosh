@@ -36,6 +36,37 @@ path = "src/lib.rs"
 [dev-dependencies]
 rand_chacha = "0.10.0"
 
+[package.metadata.deb]
+name = "rahasyakosh"
+maintainer = "Hariharan Narayanan <enhariharan@gmail.com>"
+copyright = "2024-2026 Hariharan Narayanan"
+license-file = ["../../LICENSE", "0"]
+section = "utils"
+priority = "optional"
+extended-description = """\
+Rahasyakosh is a local-first password manager with end-to-end encryption, \
+two-factor code generation (TOTP), import from Bitwarden / KeePassXC / 1Password, \
+multi-profile support, and full screen-reader accessibility. \
+No network connection, no telemetry, no account required. \
+.
+This is an alpha release. The app has not been independently audited. \
+Do not store real secrets until an audit is complete."""
+depends = "$auto, libwebkit2gtk-4.1-0, libgtk-3-0, libxdo3, libayatana-appindicator3-1, libsoup-3.0-0"
+assets = [
+  # main binary
+  ["target/release/rahasyakosh-desktop", "usr/bin/rahasyakosh-desktop", "755"],
+  # launcher: enables the accessibility service before the app starts (required for Orca)
+  ["packaging/rahasyakosh-launcher", "usr/bin/rahasyakosh", "755"],
+  # desktop entry for the app grid
+  ["packaging/rahasyakosh-system.desktop", "usr/share/applications/rahasyakosh.desktop", "644"],
+  # scalable icon
+  ["packaging/rahasyakosh-chest.svg", "usr/share/icons/hicolor/scalable/apps/rahasyakosh.svg", "644"],
+  # AppStream metadata (Software Centre, Flathub, Snap Store)
+  ["packaging/io.github.enhariharan.Rahasyakosh.metainfo.xml", "usr/share/metainfo/io.github.enhariharan.Rahasyakosh.metainfo.xml", "644"],
+  # readme
+  ["../../README.md", "usr/share/doc/rahasyakosh/README.md", "644"],
+]
+
 # A separate workspace: the desktop app needs system GUI libraries (WebKitGTK on Linux) that the rest of the
 # project, including its CI, does not.
 [workspace]
