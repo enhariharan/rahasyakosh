@@ -39,12 +39,25 @@ apps:
 parts:
   desktop-app:
     plugin: rust
-    source: apps/desktop
-    source-subdir: .
-    # The rust plugin runs `cargo build --release` from source-subdir.
-    # Pass --locked so the build matches the committed Cargo.lock.
-    rust-features: []
+    # The whole repo is needed because apps/desktop depends on ../../crates/*.
+    # source-type git clones only committed files, so the multi-GB target/
+    # directories are not copied into the build container. Commit before packing.
+    source: .
+    source-type: git
+    source-subdir: apps/desktop
+    build-environment:
+      # The gnome extension points LD_LIBRARY_PATH at the GNOME SDK, whose libc
+      # makes the rustup snap (and so cargo/rustc) crash with a symbol lookup
+      # error. Linking finds GTK/WebKit through pkg-config, so this is not needed.
+      - LD_LIBRARY_PATH: ""
     override-build: |
+      # This override replaces the plugin's own build steps, including its
+      # toolchain setup, so install one here (workspace needs Rust >= 1.89).
+      rustup toolchain install stable --profile minimal
+      rustup default stable
+      # override-build runs from the part's build root, not source-subdir, so
+      # enter the desktop crate (its own workspace) explicitly.
+      cd apps/desktop
       # snapcraft's rust plugin does not pass --locked by default
       cargo build --release --locked
       install -Dm755 target/release/rahasyakosh-desktop "$SNAPCRAFT_PART_INSTALL/usr/bin/rahasyakosh-desktop"
@@ -55,6 +68,9 @@ parts:
       - libxdo-dev
       - libayatana-appindicator3-dev
       - libsoup-3.0-dev
+      # openssl-sys comes in via dioxus-desktop -> tungstenite -> native-tls
+      # (dev hot-reload websocket); the app itself makes no network calls.
+      - libssl-dev
       # SQLite is bundled via rusqlite "bundled" feature, so no libsqlite3-dev needed.
       # clang/libclang are needed by bindgen (webkit2gtk and xdo bindings).
       - clang
