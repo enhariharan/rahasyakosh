@@ -19,26 +19,20 @@ description: |
 grade: devel
 confinement: strict
 
-# The gnome extension:
-#   - sets GNOME content snap as a stage-package source for GTK/GLib/GDK
-#   - adds the gtk-3-themes, icon-themes and sound-themes content plugs
-#   - wires up desktop, desktop-legacy, wayland, x11, opengl
-#   - sets XDG_DATA_DIRS, GDK_PIXBUF_MODULE_FILE, etc.
-extensions:
-  - gnome
-
 apps:
   rahasyakosh:
     command: bin/rahasyakosh-launcher
     desktop: usr/share/applications/rahasyakosh.desktop
+    # The gnome extension:
+    #   - sets GNOME content snap as a stage-package source for GTK/GLib/GDK
+    #   - adds the gtk-3-themes, icon-themes and sound-themes content plugs
+    #   - wires up desktop, desktop-legacy, wayland, x11, opengl
+    #   - sets XDG_DATA_DIRS, GDK_PIXBUF_MODULE_FILE, etc.
+    extensions: [gnome]
     plugs:
       - personal-files      # read/write ~/.local/share/rahasyakosh/
       - home                # fallback: access files user explicitly opens
-      - desktop
       - desktop-legacy      # AT-SPI accessibility bus (Orca)
-      - wayland
-      - x11
-      - opengl
       - unity7              # system tray / appindicator on X11
       - ayatana-appindicator # system tray on Wayland
 
