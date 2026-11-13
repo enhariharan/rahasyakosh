@@ -19,7 +19,7 @@ A password manager earns trust slowly. Do these first:
 - [ ] **Security audit** of `crates/core` (crypto, vault format) by an outside reviewer, or at least a public call for review. Publish the threat model (`docs/04-security-and-crypto.md`).
 - [x] **Fix the known rough edges** in [`11-next-steps.md`](11-next-steps.md) (profile start-up, missing vault file). Done 2026-10-28; the new rows in `tests/profiles-test-checklist.md` still need a manual pass.
 - [ ] **Data safety:** a vault-format change after release must migrate old vaults. Freeze the format only after the golden-vault tests pass; keep them in CI.
-- [ ] **Backups and recovery:** document how users back up the vault folder, and say clearly that a lost master password cannot be recovered.
+- [x] **Backups and recovery:** document how users back up the vault folder, and say clearly that a lost master password cannot be recovered. Done 2026-11-13 (`docs/book/src/backups.md`).
 - [x] Run all manual checklists in `docs/tests/` on a clean Ubuntu install (LTS 24.04 and the latest release), Wayland and X11, Orca on and off. Done 2026-11-13 (Wayland and X11, GNOME Boxes VM, Ubuntu 24.04).
 
 ## 1. Repository hygiene (mostly present)
@@ -74,9 +74,9 @@ Avoid a plain `curl | sh` installer.
 - [ ] Release notes: what changed, known issues, and how to verify downloads.
 
 ## 6. Privacy and trust statements
-- [ ] State plainly: no network access, no telemetry, no accounts. If that is true, ship it as a promise and keep a test or CI check that the app opens no network connections.
-- [ ] Say what is stored where: vault files, `profiles.json` (names and usernames are **not encrypted**), settings, WebKit's own files.
-- [ ] Say what the clipboard clearing can and cannot do (clipboard managers and Wayland compositors may keep history).
+- [x] State plainly: no network access, no telemetry, no accounts. Done 2026-11-13 (`docs/book/src/privacy.md`).
+- [x] Say what is stored where: vault files, `profiles.json` (names and usernames are **not encrypted**), settings, WebKit's own files. Done 2026-11-13.
+- [x] Say what the clipboard clearing can and cannot do (clipboard managers and Wayland compositors may keep history). Done 2026-11-13.
 
 ## 7. Community and project health
 - [x] Enable GitHub Discussions, Dependabot security updates, and private vulnerability reporting. Done 2026-11-13.

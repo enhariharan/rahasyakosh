@@ -14,6 +14,8 @@
 - [Sessions: locking, hiding and clearing](sessions.md)
 - [Importing and exporting](import-export.md)
 - [The clipboard and the trash](clipboard.md)
+- [Backing up and recovering your vault](backups.md)
+- [Privacy and data storage](privacy.md)
 - [Writing code that handles secrets](safe-coding.md)
 - [Testing with known answers and properties](testing-with-known-answers.md)
 - [Fuzzing: attacking our own parsers](fuzzing.md)
