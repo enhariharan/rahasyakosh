@@ -7,7 +7,7 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/enhariharan/rahasyakosh"
-rust-version = "1.85"
+rust-version = "1.89"
 
 # Optimise dependencies even in dev/test builds: Argon2 is deliberately heavy and unusably slow unoptimised.
 [profile.dev.package."*"]
