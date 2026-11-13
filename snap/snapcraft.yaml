@@ -30,11 +30,11 @@ apps:
     #   - sets XDG_DATA_DIRS, GDK_PIXBUF_MODULE_FILE, etc.
     extensions: [gnome]
     plugs:
-      - personal-files      # read/write ~/.local/share/rahasyakosh/
-      - home                # fallback: access files user explicitly opens
+      # No personal-files plug: snapd sets $HOME to ~/snap/rahasyakosh/<rev>/,
+      # so the vault lives there, separate from a deb install's ~/.local/share.
+      - home                # non-hidden files in ~ (import/export files)
       - desktop-legacy      # AT-SPI accessibility bus (Orca)
-      - unity7              # system tray / appindicator on X11
-      - ayatana-appindicator # system tray on Wayland
+      - unity7              # system tray: AppIndicator/StatusNotifier D-Bus (X11 and Wayland)
 
 parts:
   desktop-app:
@@ -119,12 +119,3 @@ parts:
       rahasyakosh-256.png: usr/share/icons/hicolor/256x256/apps/rahasyakosh.png
     stage:
       - usr/share/icons/
-
-plugs:
-  personal-files:
-    interface: personal-files
-    write:
-      - $HOME/.local/share/rahasyakosh
-    read:
-      - $HOME/.local/share/rahasyakosh
-      - $HOME/.config/rahasyakosh
