@@ -27,14 +27,14 @@ A password manager earns trust slowly. Do these first:
 - [x] `SECURITY.md`: has the GitHub private reporting route, a 7-day response time, and an email address. Done 2026-11-07. Still to do: turn on private vulnerability reporting in the repository settings.
 - [x] `CHANGELOG.md` (Keep a Changelog format) is in place with an **Unreleased** section. Still to do: Semantic Versioning in practice, and tagging releases `v0.1.0-alpha.1` and so on.
 - [x] Issue templates (bug, feature, accessibility) and a pull request template, in `.github/`.
-- [ ] Set the same version in every `Cargo.toml` (`apps/desktop` has its own workspace) and in the book.
-- [ ] Keep `Cargo.lock` committed; build with `--locked`.
+- [x] Set the same version in every `Cargo.toml` (`apps/desktop` has its own workspace) and in the book. Both workspaces are at `0.1.0`; the book has no version field.
+- [x] Keep `Cargo.lock` committed; build with `--locked`. Both are in place.
 - [ ] Decide the name check: confirm "Rahasyakosh" is free as a project and package name (apt, snap, flathub, GitHub topics).
 
 ## 2. Reproducible, verifiable releases
 - [x] A GitHub Actions workflow that runs on a version tag: builds on `ubuntu-22.04` with `cargo build --release --locked`, produces a `.deb`, and uploads artifacts. Done 2026-11-07.
 - [x] Publish **SHA-256 checksums** and sign them with sigstore keyless signing (`cosign`). Done 2026-11-07.
-- [ ] Generate a **software bill of materials** (`cargo cyclonedx`) and attach it; keep `cargo deny` and `cargo audit` green in the release job.
+- [x] Generate a **software bill of materials** (`cargo cyclonedx`) and attach it; keep `cargo deny` and `cargo audit` green in the release job. Done 2026-11-13 (`.cdx.json` files attached to release).
 - [x] Use GitHub **artifact attestations** (build provenance) so users can check a file came from your workflow. Done 2026-11-07.
 - [ ] Never build releases from a developer laptop.
 
@@ -66,7 +66,7 @@ Avoid a plain `curl | sh` installer.
 - [ ] Choose the reverse-DNS app ID once and keep it (`io.github.enhariharan.Rahasyakosh` is the natural one).
 
 ## 5. Quality bar for each release
-- [ ] CI green on the tagged commit (fmt, clippy `-D warnings`, tests, deny, audit, fuzz job recent).
+- [ ] CI green on the tagged commit (fmt, clippy `-D warnings`, tests, deny, audit, fuzz job recent). Currently failing on `cargo fmt` — fix in progress.
 - [x] Manual checklists in `docs/tests/` run on the release candidate; results pasted in each file. Done 2026-11-13 (Wayland). X11 pass still outstanding.
 - [ ] Upgrade test: install the previous release, create a vault with two profiles, upgrade, confirm everything still unlocks.
 - [ ] Clean-VM install test for each package format, on Ubuntu LTS and the newest release.
@@ -79,7 +79,7 @@ Avoid a plain `curl | sh` installer.
 - [ ] Say what the clipboard clearing can and cannot do (clipboard managers and Wayland compositors may keep history).
 
 ## 7. Community and project health
-- [ ] Enable GitHub Discussions, Dependabot (cargo and Actions) and private vulnerability reporting.
+- [ ] Enable GitHub Discussions (currently off), Dependabot security updates (currently off), and private vulnerability reporting — all in repo Settings.
 - [ ] A short roadmap issue (macOS, Windows, sync, CLI profiles) so people know what is planned.
 - [ ] Label good first issues; invite translators for the six non-English languages (native review is still outstanding).
 - [ ] Announce when ready: r/rust, r/Ubuntu, r/selfhosted, Hacker News "Show HN", Ubuntu Discourse, the Rust users forum. Lead with the honest status (alpha, unaudited) and the accessibility work.

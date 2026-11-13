@@ -778,9 +778,15 @@ fn Setup() -> Element {
             Ok(p) => p.clone(),
             Err(e) => {
                 match e {
-                    ProfileError::EmptyName => name_err.set(Some(tr(lang, Msg::ProfileNameEmpty).into())),
-                    ProfileError::EmptyUsername => user_err.set(Some(tr(lang, Msg::ProfileUsernameEmpty).into())),
-                    ProfileError::UsernameTaken => user_err.set(Some(tr(lang, Msg::ProfileUsernameTaken).into())),
+                    ProfileError::EmptyName => {
+                        name_err.set(Some(tr(lang, Msg::ProfileNameEmpty).into()))
+                    }
+                    ProfileError::EmptyUsername => {
+                        user_err.set(Some(tr(lang, Msg::ProfileUsernameEmpty).into()))
+                    }
+                    ProfileError::UsernameTaken => {
+                        user_err.set(Some(tr(lang, Msg::ProfileUsernameTaken).into()))
+                    }
                     _ => form_err.set(Some(tr(lang, profile_error_msg(e)).into())),
                 }
                 return;
