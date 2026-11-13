@@ -62,8 +62,8 @@ IDs are stable; reference them in commits and tests (e.g. `US-VLT-02`).
 ## E7 — Import / Export (P0/P1)
 | ID | Story | Acceptance criteria |
 |----|-------|---------------------|
-| US-IMP-01 | Import from CSV (generic, Chrome, Firefox). (P0) | Column mapping, preview, dedupe. Available in the CLI (`rk import`) and in the desktop app (**Settings → Import passwords**, with a file chooser and a drop-down per column when the names are not recognised). |
-| US-IMP-02 | Import Bitwarden JSON, KeePass KDBX, 1Password 1pux. (P1) | Mapped to native types; unsupported fields reported. **Partly done: Bitwarden JSON (unencrypted exports; logins, folders as tags; other entry types reported in a warning), and Bitwarden, KeePassXC and 1Password CSV, in the CLI and the desktop app. KeePass `.kdbx` and 1Password `.1pux` are not read yet.** |
+| US-IMP-01 | Import from CSV (generic, Chrome, Firefox). (P0) | Column mapping, preview, dedupe. Available in the CLI (`rk import`) and in the desktop app (**Settings → Import passwords**, with a file chooser and a drop-down per column when the names are not recognised). **Verified 2026-11-13.** |
+| US-IMP-02 | Import Bitwarden JSON, KeePass KDBX, 1Password 1pux. (P1) | Mapped to native types; unsupported fields reported. **Partly done: Bitwarden JSON (unencrypted exports; logins, folders as tags; other entry types reported in a warning), and Bitwarden, KeePassXC and 1Password CSV, in the CLI and the desktop app. KeePass `.kdbx` and 1Password `.1pux` are not read yet.** **Verified 2026-11-13.** |
 | US-IMP-03 | Export CSV/JSON (plaintext, with warning) and encrypted. (P0) | Re-auth required; warning modal. |
 
 ## E8 — Platforms & Shells

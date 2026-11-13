@@ -58,3 +58,9 @@ Put these in a folder such as `/tmp/rk-import/`:
 ## Recording results
 Paste the filled-in tables at the bottom of this file under a dated heading, with the commit, session type and Orca on or off.
 Every `✘` or `?` becomes an issue labelled `desktop` (or `a11y`).
+
+---
+
+## 2026-11-13 — commit 88964be, Wayland (GNOME Boxes VM, Ubuntu 24.04)
+
+All checks pass.
