@@ -4,9 +4,11 @@ All notable changes to Rahasyakosh are written here, newest first. The format fo
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/) once it has a first release.
 
-**There has been no release yet, and the app has not been audited. Do not store real secrets.**
+**Alpha release — the app has not been independently audited. Do not store real secrets.**
 
 ## [Unreleased]
+
+## [0.1.0-alpha.1] — 2026-11-13
 
 ### Added
 - **Profiles (desktop):** several people can share one installation, each with their own vault and master password. The app starts on the profile used last.
