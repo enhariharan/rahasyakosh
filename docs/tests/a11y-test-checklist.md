@@ -157,3 +157,7 @@ Any failure becomes an issue labelled `a11y`. When every area passes on the curr
 | 9 200% zoom         | Pass        | Search box usable, "New item" no longer covers content                |
 
 Reported by the tester as "all pass". The keyboard shortcut checklist (`docs/tests/shortcuts-test-checklist.md`) has not been run yet; `Ctrl+K`, `Ctrl+2` and `Ctrl+3` failed in an earlier report and are still unexplained.
+
+## 2026-11-13 — commit ddc924b, Wayland (GNOME Boxes VM, Ubuntu 24.04)
+
+All checks pass.
