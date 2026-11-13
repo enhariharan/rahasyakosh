@@ -29,7 +29,7 @@ Start with an empty data folder.
 | `profiles.json` exists next to `vault.db` | Has one profile with an `id`, the name and username | ✔ | |
 
 ## 2. The unlock screen (US-PRF-04)
-Have at least two profiles (do section 3 first if you have one).
+Have at least two profiles (do section 3 first if you do not have one).
 
 | Check | Expected | Result | Notes |
 | ----- | -------- | :----: | ----- |
