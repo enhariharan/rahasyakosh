@@ -1145,3 +1145,49 @@ fn import_reads_a_bitwarden_json_export() {
     assert!(!v.ok(&["list"], "").contains("A note"));
     let _ = std::fs::remove_file(&file);
 }
+
+// ---- shell completions (issue #3) -----------------------------------------------------------------------
+
+/// `rk completions <shell>` prints a completion script for the shell named, and nothing else.
+#[test]
+fn completions_print_a_non_empty_script_for_each_shell() {
+    for shell in ["bash", "zsh", "fish"] {
+        let out = Command::new(env!("CARGO_BIN_EXE_rk"))
+            .args(["completions", shell])
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "rk completions {shell} failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let script = String::from_utf8(out.stdout).unwrap();
+        assert!(
+            !script.trim().is_empty(),
+            "the {shell} completion script must not be empty"
+        );
+        assert!(
+            script.contains("rk"),
+            "the {shell} completion script must complete the rk command"
+        );
+        // Nothing but the script: no prompt, no vault, no diagnostics.
+        assert!(
+            out.stderr.is_empty(),
+            "rk completions {shell} wrote to stderr: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+}
+
+/// An unsupported shell is rejected instead of printing something half-right.
+#[test]
+fn completions_rejects_an_unsupported_shell() {
+    let out = Command::new(env!("CARGO_BIN_EXE_rk"))
+        .args(["completions", "tcsh"])
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    assert!(out.stdout.is_empty());
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("tcsh"), "{err}");
+}
