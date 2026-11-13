@@ -39,7 +39,7 @@
       <image type="source" width="1080" height="720">https://raw.githubusercontent.com/enhariharan/rahasyakosh/main/docs/book/src/images/desktop-unlock.png</image>
     </screenshot>
     <screenshot>
-      <caption>Vault list — search and browse all saved entries</caption>
+      <caption>First-run welcome screen — create your first vault with a generated passphrase</caption>
       <image type="source" width="1080" height="720">https://raw.githubusercontent.com/enhariharan/rahasyakosh/main/docs/book/src/images/desktop-welcome.png</image>
     </screenshot>
     <screenshot>

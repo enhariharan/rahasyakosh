@@ -65,7 +65,8 @@ Avoid a plain `curl | sh` installer.
 ## 4. Desktop integration files
 - [x] **AppStream metadata** (`apps/desktop/packaging/io.github.enhariharan.Rahasyakosh.metainfo.xml`): written, passes `appstreamcli validate --no-net`, includes screenshots, a release entry and a `developer` entry. Done 2026-11-07.
 - [x] `rahasyakosh.desktop`: passes `desktop-file-validate` (one hint: it suggests adding `Settings` or `System` as a second category; categories are `Utility;Security;`).
-- [x] Icons at several sizes: PNG 16/32/48/64/128/256px generated from SVG and added to `.deb` assets and `install-local.sh`. Done 2026-11-13. Screenshots still to do.
+- [x] Icons at several sizes: PNG 16/32/48/64/128/256px generated from SVG and added to `.deb` assets and `install-local.sh`. Done 2026-11-13.
+- [x] Screenshots (4): unlock, first-run welcome, item detail with TOTP, edit form — all 1080×720 in `docs/book/src/images/`, referenced in AppStream metainfo. Done 2026-11-13.
 - [ ] Choose the reverse-DNS app ID once and keep it (`io.github.enhariharan.Rahasyakosh` is the natural one).
 
 ## 5. Quality bar for each release
