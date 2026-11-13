@@ -84,8 +84,8 @@ Avoid a plain `curl | sh` installer.
 
 ## 7. Community and project health
 - [x] Enable GitHub Discussions, Dependabot security updates, and private vulnerability reporting. Done 2026-11-13.
-- [ ] A short roadmap issue (macOS, Windows, sync, CLI profiles) so people know what is planned.
-- [ ] Label good first issues; invite translators for the six non-English languages (native review is still outstanding).
+- [x] A short roadmap issue (macOS, Windows, sync, CLI profiles) so people know what is planned. Done 2026-11-13 (issue #1).
+- [x] Label good first issues; invite translators for the six non-English languages. Done 2026-11-13 (issues #2–#4: Hindi translation review, shell completion, .desktop categories).
 - [ ] Announce when ready: r/rust, r/Ubuntu, r/selfhosted, Hacker News "Show HN", Ubuntu Discourse, the Rust users forum. Lead with the honest status (alpha, unaudited) and the accessibility work.
 
 ## 8. Suggested path
