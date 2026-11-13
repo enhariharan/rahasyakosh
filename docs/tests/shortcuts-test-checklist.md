@@ -102,3 +102,7 @@ the current build, update US-DSK-01 and US-A11Y-01 in `docs/02-epics-and-user-st
 
 Earlier failures (`Ctrl+K`, `Ctrl+2`, `Ctrl+3` doing nothing) came from keys pressed with nothing focused not reaching the app's key handler; fixed by catching keys sent to the page itself.
 
+## 2026-11-13 — commit e602d7d, Wayland (GNOME Boxes VM, Ubuntu 24.04)
+
+All checks pass.
+
