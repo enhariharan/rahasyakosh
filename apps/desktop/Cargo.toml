@@ -61,6 +61,13 @@ assets = [
   ["packaging/rahasyakosh-system.desktop", "usr/share/applications/rahasyakosh.desktop", "644"],
   # scalable icon
   ["packaging/rahasyakosh-chest.svg", "usr/share/icons/hicolor/scalable/apps/rahasyakosh.svg", "644"],
+  # PNG icons at standard hicolor sizes
+  ["packaging/icons/rahasyakosh-16.png",  "usr/share/icons/hicolor/16x16/apps/rahasyakosh.png",  "644"],
+  ["packaging/icons/rahasyakosh-32.png",  "usr/share/icons/hicolor/32x32/apps/rahasyakosh.png",  "644"],
+  ["packaging/icons/rahasyakosh-48.png",  "usr/share/icons/hicolor/48x48/apps/rahasyakosh.png",  "644"],
+  ["packaging/icons/rahasyakosh-64.png",  "usr/share/icons/hicolor/64x64/apps/rahasyakosh.png",  "644"],
+  ["packaging/icons/rahasyakosh-128.png", "usr/share/icons/hicolor/128x128/apps/rahasyakosh.png", "644"],
+  ["packaging/icons/rahasyakosh-256.png", "usr/share/icons/hicolor/256x256/apps/rahasyakosh.png", "644"],
   # AppStream metadata (Software Centre, Flathub, Snap Store)
   ["packaging/io.github.enhariharan.Rahasyakosh.metainfo.xml", "usr/share/metainfo/io.github.enhariharan.Rahasyakosh.metainfo.xml", "644"],
   # readme

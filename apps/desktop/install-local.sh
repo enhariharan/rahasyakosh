@@ -9,9 +9,13 @@ bin="$HOME/.local/bin/rahasyakosh-desktop"
 launcher="$HOME/.local/bin/rahasyakosh"
 desktop="$HOME/.local/share/applications/rahasyakosh.desktop"
 icon="$HOME/.local/share/icons/hicolor/scalable/apps/rahasyakosh.svg"
+icon_dir="$HOME/.local/share/icons/hicolor"
 
 if [[ "${1:-}" == "--uninstall" ]]; then
   rm -f "$bin" "$launcher" "$desktop" "$icon"
+  for size in 16 32 48 64 128 256; do
+    rm -f "$icon_dir/${size}x${size}/apps/rahasyakosh.png"
+  done
   echo "Removed the app. Your vault (~/.local/share/rahasyakosh/) and settings (~/.config/rahasyakosh/) were not touched."
   echo "The web view's own files remain and are safe to delete: ~/.local/share/rahasyakosh-desktop ~/.cache/rahasyakosh-desktop"
   exit 0
@@ -21,6 +25,10 @@ cargo build --release --locked
 mkdir -p "$(dirname "$bin")" "$(dirname "$desktop")" "$(dirname "$icon")"
 install -m 755 target/release/rahasyakosh-desktop "$bin"
 install -m 644 packaging/rahasyakosh-chest.svg "$icon"
+for size in 16 32 48 64 128 256; do
+  mkdir -p "$icon_dir/${size}x${size}/apps"
+  install -m 644 "packaging/icons/rahasyakosh-${size}.png" "$icon_dir/${size}x${size}/apps/rahasyakosh.png"
+done
 # The launcher switches the desktop's accessibility service on before the app starts. An app that starts while it is
 # off may never connect to a screen reader turned on later (typed characters are read out, alerts stay silent).
 # The switch lasts for the login session, so it has to be done at every launch, not once at install time.
