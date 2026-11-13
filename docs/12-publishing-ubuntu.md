@@ -2,14 +2,17 @@
 
 Guidelines, not a record of work done.
 
-Status today:
+Status today (2026-11-13):
 * MIT licence,
-* CI (build, tests, clippy, `cargo deny`, audit),
+* CI green (build, tests, clippy, `cargo deny`, audit),
 * A fuzz job,
 * A local installer (`apps/desktop/install-local.sh`),
 * A `.deb` package built with `cargo-deb`,
 * A tag-triggered release workflow with SHA-256 checksums and sigstore attestations,
-* All manual checklists passing on Ubuntu 24.04 Wayland (GNOME Boxes VM, 2026-11-13).
+* All manual checklists passing on Ubuntu 24.04 Wayland and X11 (GNOME Boxes VM, 2026-11-13),
+* v0.1.0-alpha.1 published on GitHub Releases with release notes,
+* Backups/recovery and privacy docs in the book,
+* Name "Rahasyakosh" confirmed free on apt, snap and GitHub.
 
 There is **no security audit yet**.
 
@@ -29,7 +32,7 @@ A password manager earns trust slowly. Do these first:
 - [x] Issue templates (bug, feature, accessibility) and a pull request template, in `.github/`.
 - [x] Set the same version in every `Cargo.toml` (`apps/desktop` has its own workspace) and in the book. Both workspaces are at `0.1.0`; the book has no version field.
 - [x] Keep `Cargo.lock` committed; build with `--locked`. Both are in place.
-- [ ] Decide the name check: confirm "Rahasyakosh" is free as a project and package name (apt, snap, flathub, GitHub topics).
+- [x] Decide the name check: confirm "Rahasyakosh" is free as a project and package name (apt, snap, flathub, GitHub topics). Checked 2026-11-13: not in apt, not in Snap Store, only enhariharan/rahasyakosh on GitHub. Flathub requires manual search; nothing found in public index.
 
 ## 2. Reproducible, verifiable releases
 - [x] A GitHub Actions workflow that runs on a version tag: builds on `ubuntu-22.04` with `cargo build --release --locked`, produces a `.deb`, and uploads artifacts. Done 2026-11-07.
@@ -66,9 +69,9 @@ Avoid a plain `curl | sh` installer.
 - [ ] Choose the reverse-DNS app ID once and keep it (`io.github.enhariharan.Rahasyakosh` is the natural one).
 
 ## 5. Quality bar for each release
-- [ ] CI green on the tagged commit (fmt, clippy `-D warnings`, tests, deny, audit, fuzz job recent). Currently failing on `cargo fmt` — fix in progress.
+- [x] CI green on the tagged commit (fmt, clippy `-D warnings`, tests, deny, audit, fuzz job recent). Green on commits `ad76505` and `20ca27c` (2026-11-13).
 - [x] Manual checklists in `docs/tests/` run on the release candidate; results pasted in each file. Done 2026-11-13 (Wayland and X11).
-- [ ] Upgrade test: install the previous release, create a vault with two profiles, upgrade, confirm everything still unlocks.
+- [x] Upgrade test: install the previous release, create a vault with two profiles, upgrade, confirm everything still unlocks. Not applicable for v0.1.0-alpha.1 (first release). Required from v0.1.0-alpha.2 onward.
 - [ ] Clean-VM install test for each package format, on Ubuntu LTS and the newest release.
 - [x] Accessibility: Orca pass and 200% zoom pass on the release candidate (`docs/tests/a11y-test-checklist.md`). Done 2026-11-13.
 - [ ] Release notes: what changed, known issues, and how to verify downloads.
