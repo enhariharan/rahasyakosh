@@ -46,7 +46,7 @@ The desktop app needs WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`), GTK 3 and libsoup 3
    - Install `rahasyakosh-desktop` to `/usr/bin`, the launcher script, `rahasyakosh.desktop` to `/usr/share/applications`, the icon to `/usr/share/icons/hicolor/scalable/apps`, and an AppStream file (see below).
    - Declare runtime `Depends:` (webkit, gtk3, libxdo, libayatana-appindicator) and set `Section: utils`, a proper description and the licence.
    - The launcher that turns on the accessibility service (see `install-local.sh`) must ship in the package, since screen-reader support depends on it.
-   - Test: `sudo apt install ./rahasyakosh_*.deb` on a clean VM, then remove it with `apt remove` and confirm the vault in `~/.local/share/rahasyakosh/` is untouched.
+   - Test: `sudo apt install ./rahasyakosh_*.deb` on a clean VM, then remove it with `apt remove` and confirm the vault in `~/.local/share/rahasyakosh/` is untouched. **Done 2026-11-13 (v0.1.0-alpha.1, Ubuntu 24.04 Wayland VM).**
 2. **A PPA on Launchpad** so users get updates through `apt`
    - Needs a Launchpad account, a signed GPG key, and a Debian source package (`debian/` folder). Launchpad builds offline, so vendor the Rust crates (`cargo vendor`) or build a binary-only package.
    - Good for Ubuntu users, but more work to keep up.
