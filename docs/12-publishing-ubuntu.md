@@ -20,7 +20,7 @@ A password manager earns trust slowly. Do these first:
 - [x] **Fix the known rough edges** in [`11-next-steps.md`](11-next-steps.md) (profile start-up, missing vault file). Done 2026-10-28; the new rows in `tests/profiles-test-checklist.md` still need a manual pass.
 - [ ] **Data safety:** a vault-format change after release must migrate old vaults. Freeze the format only after the golden-vault tests pass; keep them in CI.
 - [ ] **Backups and recovery:** document how users back up the vault folder, and say clearly that a lost master password cannot be recovered.
-- [x] Run all manual checklists in `docs/tests/` on a clean Ubuntu install (LTS 24.04 and the latest release), Wayland and X11, Orca on and off. Done 2026-11-13 (Wayland, GNOME Boxes VM). X11 pass still outstanding.
+- [x] Run all manual checklists in `docs/tests/` on a clean Ubuntu install (LTS 24.04 and the latest release), Wayland and X11, Orca on and off. Done 2026-11-13 (Wayland and X11, GNOME Boxes VM, Ubuntu 24.04).
 
 ## 1. Repository hygiene (mostly present)
 - [x] `LICENSE` (MIT), `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `SECURITY.md`.
@@ -67,7 +67,7 @@ Avoid a plain `curl | sh` installer.
 
 ## 5. Quality bar for each release
 - [ ] CI green on the tagged commit (fmt, clippy `-D warnings`, tests, deny, audit, fuzz job recent). Currently failing on `cargo fmt` — fix in progress.
-- [x] Manual checklists in `docs/tests/` run on the release candidate; results pasted in each file. Done 2026-11-13 (Wayland). X11 pass still outstanding.
+- [x] Manual checklists in `docs/tests/` run on the release candidate; results pasted in each file. Done 2026-11-13 (Wayland and X11).
 - [ ] Upgrade test: install the previous release, create a vault with two profiles, upgrade, confirm everything still unlocks.
 - [ ] Clean-VM install test for each package format, on Ubuntu LTS and the newest release.
 - [x] Accessibility: Orca pass and 200% zoom pass on the release candidate (`docs/tests/a11y-test-checklist.md`). Done 2026-11-13.

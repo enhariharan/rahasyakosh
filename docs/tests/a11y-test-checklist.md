@@ -161,3 +161,7 @@ Reported by the tester as "all pass". The keyboard shortcut checklist (`docs/tes
 ## 2026-11-13 — commit ddc924b, Wayland (GNOME Boxes VM, Ubuntu 24.04)
 
 All checks pass.
+
+## 2026-11-13 — commit 5c60509, X11/Xorg (GNOME Boxes VM, Ubuntu 24.04)
+
+All checks pass.

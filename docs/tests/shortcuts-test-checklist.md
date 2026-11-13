@@ -106,3 +106,7 @@ Earlier failures (`Ctrl+K`, `Ctrl+2`, `Ctrl+3` doing nothing) came from keys pre
 
 All checks pass.
 
+
+## 2026-11-13 — commit 5c60509, X11/Xorg (GNOME Boxes VM, Ubuntu 24.04)
+
+All checks pass.

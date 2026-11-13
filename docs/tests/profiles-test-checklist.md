@@ -147,3 +147,7 @@ When every row passes, mark US-PRF-01 to 05 as verified in `docs/02-epics-and-us
 ## 2026-11-13 — commit e3565b2, Wayland (GNOME Boxes VM, Ubuntu 24.04)
 
 All checks pass.
+
+## 2026-11-13 — commit 5c60509, X11/Xorg (GNOME Boxes VM, Ubuntu 24.04)
+
+All checks pass.

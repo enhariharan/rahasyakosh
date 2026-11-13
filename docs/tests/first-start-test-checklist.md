@@ -104,3 +104,7 @@ Every `✘` or `?` becomes an issue labelled `desktop`; note the exact steps and
 
 Sections 1–7 all pass. Notes:
 - Section 5, "Lock and unlock": app unlocks with passphrase alone as expected — secret key is saved to device automatically and loaded without a prompt. Checklist updated to reflect this.
+
+## 2026-11-13 — commit 5c60509, X11/Xorg (GNOME Boxes VM, Ubuntu 24.04)
+
+All checks pass.
