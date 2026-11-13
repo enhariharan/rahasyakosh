@@ -1,6 +1,17 @@
 # Publishing Rahasyakosh as an open-source app for Ubuntu
 
-Guidelines, not a record of work done. Status today: MIT licence, CI (build, tests, clippy, `cargo deny`, audit), a fuzz job, and a local installer (`apps/desktop/install-local.sh`). There is **no release process, no installable package, and no security audit yet**.
+Guidelines, not a record of work done.
+
+Status today:
+* MIT licence,
+* CI (build, tests, clippy, `cargo deny`, audit),
+* A fuzz job,
+* A local installer (`apps/desktop/install-local.sh`),
+* A `.deb` package built with `cargo-deb`,
+* A tag-triggered release workflow with SHA-256 checksums and sigstore attestations,
+* All manual checklists passing on Ubuntu 24.04 Wayland (GNOME Boxes VM, 2026-11-13).
+
+There is **no security audit yet**.
 
 ## 0. Before you publish anything
 A password manager earns trust slowly. Do these first:
@@ -9,11 +20,11 @@ A password manager earns trust slowly. Do these first:
 - [x] **Fix the known rough edges** in [`11-next-steps.md`](11-next-steps.md) (profile start-up, missing vault file). Done 2026-10-28; the new rows in `tests/profiles-test-checklist.md` still need a manual pass.
 - [ ] **Data safety:** a vault-format change after release must migrate old vaults. Freeze the format only after the golden-vault tests pass; keep them in CI.
 - [ ] **Backups and recovery:** document how users back up the vault folder, and say clearly that a lost master password cannot be recovered.
-- [ ] Run all manual checklists in `docs/tests/` on a clean Ubuntu install (LTS 24.04 and the latest release), Wayland and X11, Orca on and off.
+- [x] Run all manual checklists in `docs/tests/` on a clean Ubuntu install (LTS 24.04 and the latest release), Wayland and X11, Orca on and off. Done 2026-11-13 (Wayland, GNOME Boxes VM). X11 pass still outstanding.
 
 ## 1. Repository hygiene (mostly present)
 - [x] `LICENSE` (MIT), `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `SECURITY.md`.
-- [ ] `SECURITY.md`: has the GitHub private reporting route and a 7-day response time; **add an email address** (yours to choose) and turn on private vulnerability reporting in the repository settings.
+- [x] `SECURITY.md`: has the GitHub private reporting route, a 7-day response time, and an email address. Done 2026-11-07. Still to do: turn on private vulnerability reporting in the repository settings.
 - [x] `CHANGELOG.md` (Keep a Changelog format) is in place with an **Unreleased** section. Still to do: Semantic Versioning in practice, and tagging releases `v0.1.0-alpha.1` and so on.
 - [x] Issue templates (bug, feature, accessibility) and a pull request template, in `.github/`.
 - [ ] Set the same version in every `Cargo.toml` (`apps/desktop` has its own workspace) and in the book.
@@ -21,10 +32,10 @@ A password manager earns trust slowly. Do these first:
 - [ ] Decide the name check: confirm "Rahasyakosh" is free as a project and package name (apt, snap, flathub, GitHub topics).
 
 ## 2. Reproducible, verifiable releases
-- [ ] A GitHub Actions workflow that runs on a version tag: build on `ubuntu-22.04` (older glibc runs on more systems) with `cargo build --release --locked`, then upload the artifacts.
-- [ ] Publish **SHA-256 checksums** and **sign** them (GPG key published on the project page, or `cosign`/sigstore keyless signing). Give users the exact verify commands.
+- [x] A GitHub Actions workflow that runs on a version tag: builds on `ubuntu-22.04` with `cargo build --release --locked`, produces a `.deb`, and uploads artifacts. Done 2026-11-07.
+- [x] Publish **SHA-256 checksums** and sign them with sigstore keyless signing (`cosign`). Done 2026-11-07.
 - [ ] Generate a **software bill of materials** (`cargo cyclonedx`) and attach it; keep `cargo deny` and `cargo audit` green in the release job.
-- [ ] Use GitHub **artifact attestations** (build provenance) so users can check a file came from your workflow.
+- [x] Use GitHub **artifact attestations** (build provenance) so users can check a file came from your workflow. Done 2026-11-07.
 - [ ] Never build releases from a developer laptop.
 
 ## 3. Packaging for Ubuntu: pick channels in this order
@@ -49,17 +60,17 @@ The desktop app needs WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`), GTK 3 and libsoup 3
 Avoid a plain `curl | sh` installer.
 
 ## 4. Desktop integration files
-- [ ] **AppStream metadata** (`apps/desktop/packaging/io.github.enhariharan.Rahasyakosh.metainfo.xml`): written and passes `appstreamcli validate --no-net`. Still missing: screenshots, a release list (add one with the first tag) and a `developer` entry. Needed by Software Centre, Flathub and the Snap Store.
+- [x] **AppStream metadata** (`apps/desktop/packaging/io.github.enhariharan.Rahasyakosh.metainfo.xml`): written, passes `appstreamcli validate --no-net`, includes screenshots, a release entry and a `developer` entry. Done 2026-11-07.
 - [x] `rahasyakosh.desktop`: passes `desktop-file-validate` (one hint: it suggests adding `Settings` or `System` as a second category; categories are `Utility;Security;`).
 - [ ] Icons at several sizes (scalable SVG is present) and 2–4 screenshots in `docs/book/src/images/`.
 - [ ] Choose the reverse-DNS app ID once and keep it (`io.github.enhariharan.Rahasyakosh` is the natural one).
 
 ## 5. Quality bar for each release
 - [ ] CI green on the tagged commit (fmt, clippy `-D warnings`, tests, deny, audit, fuzz job recent).
-- [ ] Manual checklists in `docs/tests/` run on the release candidate; results pasted in each file.
+- [x] Manual checklists in `docs/tests/` run on the release candidate; results pasted in each file. Done 2026-11-13 (Wayland). X11 pass still outstanding.
 - [ ] Upgrade test: install the previous release, create a vault with two profiles, upgrade, confirm everything still unlocks.
 - [ ] Clean-VM install test for each package format, on Ubuntu LTS and the newest release.
-- [ ] Accessibility: Orca pass and 200% zoom pass on the release candidate (`docs/tests/a11y-test-checklist.md`).
+- [x] Accessibility: Orca pass and 200% zoom pass on the release candidate (`docs/tests/a11y-test-checklist.md`). Done 2026-11-13.
 - [ ] Release notes: what changed, known issues, and how to verify downloads.
 
 ## 6. Privacy and trust statements
