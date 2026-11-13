@@ -24,7 +24,7 @@ A password manager earns trust slowly. Do these first:
 
 ## 1. Repository hygiene (mostly present)
 - [x] `LICENSE` (MIT), `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `SECURITY.md`.
-- [x] `SECURITY.md`: has the GitHub private reporting route, a 7-day response time, and an email address. Done 2026-11-07. Still to do: turn on private vulnerability reporting in the repository settings.
+- [x] `SECURITY.md`: has the GitHub private reporting route, a 7-day response time, and an email address. Private vulnerability reporting enabled 2026-11-13.
 - [x] `CHANGELOG.md` (Keep a Changelog format) is in place with an **Unreleased** section. Still to do: Semantic Versioning in practice, and tagging releases `v0.1.0-alpha.1` and so on.
 - [x] Issue templates (bug, feature, accessibility) and a pull request template, in `.github/`.
 - [x] Set the same version in every `Cargo.toml` (`apps/desktop` has its own workspace) and in the book. Both workspaces are at `0.1.0`; the book has no version field.
@@ -79,7 +79,7 @@ Avoid a plain `curl | sh` installer.
 - [ ] Say what the clipboard clearing can and cannot do (clipboard managers and Wayland compositors may keep history).
 
 ## 7. Community and project health
-- [ ] Enable GitHub Discussions (currently off), Dependabot security updates (currently off), and private vulnerability reporting — all in repo Settings.
+- [x] Enable GitHub Discussions, Dependabot security updates, and private vulnerability reporting. Done 2026-11-13.
 - [ ] A short roadmap issue (macOS, Windows, sync, CLI profiles) so people know what is planned.
 - [ ] Label good first issues; invite translators for the six non-English languages (native review is still outstanding).
 - [ ] Announce when ready: r/rust, r/Ubuntu, r/selfhosted, Hacker News "Show HN", Ubuntu Discourse, the Rust users forum. Lead with the honest status (alpha, unaudited) and the accessibility work.
