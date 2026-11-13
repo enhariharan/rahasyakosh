@@ -141,3 +141,9 @@ Needs a vault made by an older build (use the backup from Setup).
 Fill in the tables and paste them at the bottom of this file under a dated heading, with the commit, session type and Orca on or off.
 Every `✘` or `?` becomes an issue labelled `desktop` (or `a11y`); note the steps, the profile count, and anything shown on screen.
 When every row passes, mark US-PRF-01 to 05 as verified in `docs/02-epics-and-user-stories.md`.
+
+---
+
+## 2026-11-13 — commit e3565b2, Wayland (GNOME Boxes VM, Ubuntu 24.04)
+
+All checks pass.
