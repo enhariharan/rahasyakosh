@@ -56,6 +56,7 @@ The desktop app needs WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`), GTK 3 and libsoup 3
 3. **Snap** (Snap Store, default on Ubuntu)
    - `snapcraft.yaml` with the `gnome` extension; confinement `strict` is preferred. Check what a sandbox does to a password manager: access to the vault folder in the home directory, the clipboard, and the accessibility bus (Orca). Test with a screen reader inside the snap before publishing.
    - Register the name early in the Snap Store; ask for the right interfaces in the forum if needed.
+   - **Progress 2026-11-13:** `snap/snapcraft.yaml` written (core24 base, gnome extension, strict confinement, `personal-files` plug for the vault folder, `desktop-legacy` for AT-SPI/Orca). Name `rahasyakosh` registered in the Snap Store. Build not yet complete: Multipass and LXD both time out waiting for networking on this host (Ubuntu 26.04, all QEMU bridge interfaces NO-CARRIER). Next step: diagnose bridge networking or find an alternative build environment (e.g. a Ubuntu 24.04 VM or CI runner).
 4. **Flatpak / Flathub** (works on Ubuntu too, popular with privacy-minded users)
    - Needs a reproducible manifest, AppStream metadata and a review by the Flathub team. Same sandbox questions as for the snap.
 5. **Official Ubuntu/Debian archive**: long term. Needs a Debian packaging sponsor and all Rust dependencies packaged individually. Do not plan for it in the alpha stage.
