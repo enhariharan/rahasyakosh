@@ -39,8 +39,9 @@ fn vault_path() -> PathBuf {
     if let Some(p) = std::env::var_os("RK_VAULT") {
         return PathBuf::from(p);
     }
-    let home = std::env::var_os("HOME")
-        .map(PathBuf::from)
+    // Inside a snap, the folder shared by all revisions, so `snap revert` cannot roll the vault back.
+    let home = rahasyakosh_app::snap_common_dir()
+        .or_else(|| std::env::var_os("HOME").map(PathBuf::from))
         .unwrap_or_default();
     home.join(".local/share/rahasyakosh/vault.db")
 }
@@ -53,10 +54,17 @@ fn data_dir() -> PathBuf {
         .unwrap_or_default()
 }
 
-/// The folder for the settings file: `RK_CONFIG_HOME` (any platform), else `XDG_CONFIG_HOME`, else `~/.config`.
-fn config_base(rk: Option<OsString>, xdg: Option<OsString>, home: Option<OsString>) -> PathBuf {
+/// The folder for the settings file: `RK_CONFIG_HOME` (any platform), else `<snap common>/.config` inside a
+/// snap, else `XDG_CONFIG_HOME`, else `~/.config`.
+fn config_base(
+    rk: Option<OsString>,
+    snap: Option<PathBuf>,
+    xdg: Option<OsString>,
+    home: Option<OsString>,
+) -> PathBuf {
     let set = |v: Option<OsString>| v.filter(|v| !v.is_empty()).map(PathBuf::from);
     set(rk)
+        .or_else(|| snap.map(|s| s.join(".config")))
         .or_else(|| set(xdg))
         .unwrap_or_else(|| set(home).unwrap_or_default().join(".config"))
 }
@@ -64,6 +72,7 @@ fn config_base(rk: Option<OsString>, xdg: Option<OsString>, home: Option<OsStrin
 fn settings_path() -> PathBuf {
     config_base(
         std::env::var_os("RK_CONFIG_HOME"),
+        rahasyakosh_app::snap_common_dir(),
         std::env::var_os("XDG_CONFIG_HOME"),
         std::env::var_os("HOME"),
     )
@@ -80,17 +89,22 @@ mod config_base_tests {
     }
 
     #[test]
-    fn rk_config_home_wins_then_xdg_then_home() {
+    fn rk_config_home_wins_then_snap_then_xdg_then_home() {
+        let snap = || Some(PathBuf::from("/s/common"));
         assert_eq!(
-            config_base(os("/rk"), os("/xdg"), os("/h")),
+            config_base(os("/rk"), snap(), os("/xdg"), os("/h")),
             PathBuf::from("/rk")
         );
         assert_eq!(
-            config_base(None, os("/xdg"), os("/h")),
+            config_base(None, snap(), os("/xdg"), os("/h")),
+            PathBuf::from("/s/common/.config")
+        );
+        assert_eq!(
+            config_base(None, None, os("/xdg"), os("/h")),
             PathBuf::from("/xdg")
         );
         assert_eq!(
-            config_base(None, None, os("/h")),
+            config_base(None, None, None, os("/h")),
             PathBuf::from("/h/.config")
         );
     }
@@ -98,7 +112,7 @@ mod config_base_tests {
     #[test]
     fn empty_values_are_ignored() {
         assert_eq!(
-            config_base(os(""), os("/xdg"), os("/h")),
+            config_base(os(""), None, os("/xdg"), os("/h")),
             PathBuf::from("/xdg")
         );
     }

@@ -8,6 +8,8 @@
 #![forbid(unsafe_code)]
 
 #[cfg(not(target_family = "wasm"))]
+mod dirs;
+#[cfg(not(target_family = "wasm"))]
 mod highwater;
 mod index;
 #[cfg(not(target_family = "wasm"))]
@@ -18,6 +20,8 @@ mod secretkeys;
 mod session;
 mod vault;
 
+#[cfg(not(target_family = "wasm"))]
+pub use dirs::snap_common_dir;
 #[cfg(not(target_family = "wasm"))]
 pub use highwater::HighWater;
 pub use profiles::{

@@ -5,7 +5,7 @@
 //! printed recovery sheet for a new device.
 use rahasyakosh_core::secret_key::SecretKey;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -18,14 +18,10 @@ impl SecretKeyDir {
         Self { dir: dir.into() }
     }
 
-    /// `$XDG_DATA_HOME/rahasyakosh/secret-keys`, else `~/.local/share/rahasyakosh/secret-keys`.
+    /// `$XDG_DATA_HOME/rahasyakosh/secret-keys`, else `~/.local/share/rahasyakosh/secret-keys` (inside a snap,
+    /// under `$SNAP_USER_COMMON/.local/share/`; see [`crate::dirs`]).
     pub fn default_dir() -> Option<Self> {
-        let base = std::env::var_os("XDG_DATA_HOME")
-            .map(PathBuf::from)
-            .filter(|p| p.is_absolute())
-            .or_else(|| {
-                std::env::var_os("HOME").map(|h| Path::new(&h).join(".local").join("share"))
-            })?;
+        let base = crate::dirs::base_from_env("XDG_DATA_HOME", &[".local", "share"])?;
         Some(Self::at(base.join("rahasyakosh").join("secret-keys")))
     }
 

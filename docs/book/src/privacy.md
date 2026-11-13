@@ -32,6 +32,16 @@ All Rahasyakosh data lives under one folder:
 Desktop display preferences (colour scheme, language, auto-lock time) are stored
 in `~/.config/rahasyakosh/`. They contain no vault data.
 
+**If you installed the snap**, the same files live under the snap's own folder
+instead, `~/snap/rahasyakosh/common/`: the vault folder is
+`~/snap/rahasyakosh/common/.local/share/rahasyakosh/` and the preferences are in
+`~/snap/rahasyakosh/common/.config/rahasyakosh/`. A snap install and a `.deb`
+install therefore have separate vaults; move items between them with export and
+import. The `common` folder is shared by every snap revision, so going back to an
+older version with `snap revert` does not roll your vault back. Removing the snap
+deletes this folder (snapd keeps an automatic snapshot for 31 days), so make a
+backup first.
+
 **`profiles.json` is not encrypted.** The names and usernames you chose for your
 profiles are readable by anyone with access to your home directory. Avoid using
 real-name information there if that matters to you.

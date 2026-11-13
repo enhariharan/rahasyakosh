@@ -27,14 +27,10 @@ impl HighWater {
         Self { path, seen }
     }
 
-    /// Where the file lives by default: `$XDG_STATE_HOME/rahasyakosh/seen.json`, else `~/.local/state/...`.
+    /// Where the file lives by default: `$XDG_STATE_HOME/rahasyakosh/seen.json`, else `~/.local/state/...`
+    /// (inside a snap, under `$SNAP_USER_COMMON/.local/state/`; see [`crate::dirs`]).
     pub fn default_path() -> Option<PathBuf> {
-        let base = std::env::var_os("XDG_STATE_HOME")
-            .map(PathBuf::from)
-            .filter(|p| p.is_absolute())
-            .or_else(|| {
-                std::env::var_os("HOME").map(|h| Path::new(&h).join(".local").join("state"))
-            })?;
+        let base = crate::dirs::base_from_env("XDG_STATE_HOME", &[".local", "state"])?;
         Some(base.join("rahasyakosh").join("seen.json"))
     }
 
