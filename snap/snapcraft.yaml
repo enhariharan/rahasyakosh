@@ -29,12 +29,22 @@ apps:
     #   - wires up desktop, desktop-legacy, wayland, x11, opengl
     #   - sets XDG_DATA_DIRS, GDK_PIXBUF_MODULE_FILE, etc.
     extensions: [gnome]
+    environment:
+      # Inside a snap GLib asks the desktop portal for proxy settings, and the
+      # portal refuses snaps without the `network` plug, so WebKit never opens
+      # the 127.0.0.1 WebSocket (blank white window). The app only talks to
+      # itself on loopback, so connect directly and skip proxy lookups.
+      GIO_USE_PROXY_RESOLVER: dummy
     plugs:
       # No personal-files plug: snapd sets $HOME to ~/snap/rahasyakosh/<rev>/,
       # so the vault lives there, separate from a deb install's ~/.local/share.
       - home                # non-hidden files in ~ (import/export files)
       - desktop-legacy      # AT-SPI accessibility bus (Orca)
       - unity7              # system tray: AppIndicator/StatusNotifier D-Bus (X11 and Wayland)
+      # Dioxus Desktop sends UI updates to the WebKit view over a WebSocket on
+      # 127.0.0.1 (random port, secret key per connection); without this the
+      # app panics with "Failed to bind local TCP listener for edit socket".
+      - network-bind
 
 parts:
   desktop-app:

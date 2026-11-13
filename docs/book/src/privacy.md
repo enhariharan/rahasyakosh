@@ -15,6 +15,14 @@ says exactly what is stored, where, and what the app can and cannot do.
 You can verify this yourself: `ss -tnp` or `nethogs` will show no outgoing
 connections while the app is running.
 
+You will see one **local** connection to `127.0.0.1` (the loopback address,
+which never leaves your computer). The app's window is a small web view, and
+the program sends screen updates to it over this connection. It is protected by
+a secret key that changes on every start. This is also why the snap asks for the
+`network-bind` permission: that lets the app open a socket on your own computer.
+The snap does **not** have the `network` permission, so it cannot reach the
+internet.
+
 ## What is stored and where
 
 All Rahasyakosh data lives under one folder:
