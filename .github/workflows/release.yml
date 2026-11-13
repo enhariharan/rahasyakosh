@@ -51,8 +51,8 @@ jobs:
 
       - name: Generate SBOM
         run: |
-          cargo cyclonedx --workspace --format json
-          cd apps/desktop && cargo cyclonedx --format json
+          cargo cyclonedx --manifest-path Cargo.toml --format json
+          cargo cyclonedx --manifest-path apps/desktop/Cargo.toml --format json
 
       - name: Build .deb
         working-directory: apps/desktop
