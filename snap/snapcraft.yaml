@@ -1,0 +1,120 @@
+name: rahasyakosh
+base: core24
+version: "0.1.0-alpha.1"
+summary: Local-first, end-to-end-encrypted password manager
+description: |
+  Rahasyakosh keeps your logins and two-factor codes in an encrypted vault
+  on your own computer. There are no accounts, no telemetry and no network
+  access.
+
+  Each person sharing the computer can have a profile with their own vault
+  and master password. Passwords can be imported from browsers and other
+  password managers (Bitwarden, KeePassXC, 1Password) and exported again.
+
+  Full screen-reader support via AT-SPI/Orca.
+
+  Early alpha. It has not been independently audited — do not store real
+  secrets until an audit is complete.
+
+grade: devel
+confinement: strict
+
+# The gnome extension:
+#   - sets GNOME content snap as a stage-package source for GTK/GLib/GDK
+#   - adds the gtk-3-themes, icon-themes and sound-themes content plugs
+#   - wires up desktop, desktop-legacy, wayland, x11, opengl
+#   - sets XDG_DATA_DIRS, GDK_PIXBUF_MODULE_FILE, etc.
+extensions:
+  - gnome
+
+apps:
+  rahasyakosh:
+    command: bin/rahasyakosh-launcher
+    desktop: usr/share/applications/rahasyakosh.desktop
+    plugs:
+      - personal-files      # read/write ~/.local/share/rahasyakosh/
+      - home                # fallback: access files user explicitly opens
+      - desktop
+      - desktop-legacy      # AT-SPI accessibility bus (Orca)
+      - wayland
+      - x11
+      - opengl
+      - unity7              # system tray / appindicator on X11
+      - ayatana-appindicator # system tray on Wayland
+
+parts:
+  desktop-app:
+    plugin: rust
+    source: apps/desktop
+    source-subdir: .
+    # The rust plugin runs `cargo build --release` from source-subdir.
+    # Pass --locked so the build matches the committed Cargo.lock.
+    rust-features: []
+    override-build: |
+      # snapcraft's rust plugin does not pass --locked by default
+      cargo build --release --locked
+      install -Dm755 target/release/rahasyakosh-desktop "$SNAPCRAFT_PART_INSTALL/usr/bin/rahasyakosh-desktop"
+
+    build-packages:
+      - libwebkit2gtk-4.1-dev
+      - libgtk-3-dev
+      - libxdo-dev
+      - libayatana-appindicator3-dev
+      - libsoup-3.0-dev
+      # SQLite is bundled via rusqlite "bundled" feature, so no libsqlite3-dev needed.
+      # clang/libclang are needed by bindgen (webkit2gtk and xdo bindings).
+      - clang
+      - libclang-dev
+      - pkg-config
+
+    stage-packages:
+      - libwebkit2gtk-4.1-0
+      - libgtk-3-0
+      - libxdo3
+      - libayatana-appindicator3-1
+      - libsoup-3.0-0
+      # JavaScriptCore is pulled in by webkit2gtk but list it explicitly so
+      # snapcraft doesn't silently drop it.
+      - libjavascriptcoregtk-4.1-0
+
+  launcher:
+    plugin: dump
+    source: apps/desktop/packaging
+    organize:
+      rahasyakosh-launcher: bin/rahasyakosh-launcher
+    stage:
+      - bin/rahasyakosh-launcher
+
+  desktop-files:
+    plugin: dump
+    source: apps/desktop/packaging
+    organize:
+      rahasyakosh-system.desktop: usr/share/applications/rahasyakosh.desktop
+      rahasyakosh-chest.svg: usr/share/icons/hicolor/scalable/apps/rahasyakosh.svg
+      io.github.enhariharan.Rahasyakosh.metainfo.xml: usr/share/metainfo/io.github.enhariharan.Rahasyakosh.metainfo.xml
+    stage:
+      - usr/share/applications/rahasyakosh.desktop
+      - usr/share/icons/hicolor/scalable/apps/rahasyakosh.svg
+      - usr/share/metainfo/io.github.enhariharan.Rahasyakosh.metainfo.xml
+
+  png-icons:
+    plugin: dump
+    source: apps/desktop/packaging/icons
+    organize:
+      rahasyakosh-16.png:  usr/share/icons/hicolor/16x16/apps/rahasyakosh.png
+      rahasyakosh-32.png:  usr/share/icons/hicolor/32x32/apps/rahasyakosh.png
+      rahasyakosh-48.png:  usr/share/icons/hicolor/48x48/apps/rahasyakosh.png
+      rahasyakosh-64.png:  usr/share/icons/hicolor/64x64/apps/rahasyakosh.png
+      rahasyakosh-128.png: usr/share/icons/hicolor/128x128/apps/rahasyakosh.png
+      rahasyakosh-256.png: usr/share/icons/hicolor/256x256/apps/rahasyakosh.png
+    stage:
+      - usr/share/icons/
+
+plugs:
+  personal-files:
+    interface: personal-files
+    write:
+      - $HOME/.local/share/rahasyakosh
+    read:
+      - $HOME/.local/share/rahasyakosh
+      - $HOME/.config/rahasyakosh

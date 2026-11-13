@@ -6,4 +6,7 @@ if command -v busctl >/dev/null 2>&1 \
   && [[ "$(busctl --user get-property org.a11y.Bus /org/a11y/bus org.a11y.Status IsEnabled 2>/dev/null)" == "b false" ]]; then
   busctl --user set-property org.a11y.Bus /org/a11y/bus org.a11y.Status IsEnabled b true >/dev/null 2>&1 || true
 fi
-exec /usr/bin/rahasyakosh-desktop "$@"
+# When running inside a snap the binary lives under $SNAP/usr/bin.
+# Outside a snap (deb, local install) $SNAP is unset, so fall back to the
+# absolute path that the deb and install-local.sh both use.
+exec "${SNAP:+$SNAP}/usr/bin/rahasyakosh-desktop" "$@"
