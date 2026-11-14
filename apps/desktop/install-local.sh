@@ -13,7 +13,7 @@ icon_dir="$HOME/.local/share/icons/hicolor"
 
 if [[ "${1:-}" == "--uninstall" ]]; then
   rm -f "$bin" "$launcher" "$desktop" "$icon"
-  for size in 16 32 48 64 128 256; do
+  for size in 16 32 48 64 128 256 512; do
     rm -f "$icon_dir/${size}x${size}/apps/rahasyakosh.png"
   done
   echo "Removed the app. Your vault (~/.local/share/rahasyakosh/) and settings (~/.config/rahasyakosh/) were not touched."
@@ -25,7 +25,7 @@ cargo build --release --locked
 mkdir -p "$(dirname "$bin")" "$(dirname "$desktop")" "$(dirname "$icon")"
 install -m 755 target/release/rahasyakosh-desktop "$bin"
 install -m 644 packaging/rahasyakosh-chest.svg "$icon"
-for size in 16 32 48 64 128 256; do
+for size in 16 32 48 64 128 256 512; do
   mkdir -p "$icon_dir/${size}x${size}/apps"
   install -m 644 "packaging/icons/rahasyakosh-${size}.png" "$icon_dir/${size}x${size}/apps/rahasyakosh.png"
 done

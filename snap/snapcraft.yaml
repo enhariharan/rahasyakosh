@@ -16,6 +16,7 @@ description: |
   Early alpha. It has not been independently audited — do not store real
   secrets until an audit is complete.
 
+license: MIT
 grade: stable
 confinement: strict
 
@@ -127,5 +128,6 @@ parts:
       rahasyakosh-64.png:  usr/share/icons/hicolor/64x64/apps/rahasyakosh.png
       rahasyakosh-128.png: usr/share/icons/hicolor/128x128/apps/rahasyakosh.png
       rahasyakosh-256.png: usr/share/icons/hicolor/256x256/apps/rahasyakosh.png
+      rahasyakosh-512.png: usr/share/icons/hicolor/512x512/apps/rahasyakosh.png
     stage:
       - usr/share/icons/
