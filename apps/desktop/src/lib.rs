@@ -615,6 +615,30 @@ fn app() -> Element {
         }
     });
 
+    // Also run the refocus script on in-app navigation (unlock → main, view changes within main, etc.).
+    // WindowEvent::Focused fires only on Alt+Tab; every screen transition needs its own run so Orca
+    // does not stay stuck on the filler from the previous page.
+    let nav_gen = use_memo(move || {
+        model.read().as_ref().map(|m| (m.is_unlocked(), m.view.clone()))
+    });
+    let mut nav_first = use_signal(|| true);
+    use_effect(move || {
+        let _ = nav_gen(); // subscribe — re-runs when the visible screen changes
+        if *nav_first.peek() {
+            nav_first.set(false); // skip the initial render; window focus handler covers app open
+            return;
+        }
+        if !platform::screen_reader_active() {
+            return;
+        }
+        if let Some(script) = platform::script_after_window_focus() {
+            spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                let _ = dioxus::document::eval(script).await;
+            });
+        }
+    });
+
     // Lock when the window loses focus (if enabled), and wipe the clipboard secret when it is closed.
     dioxus::desktop::use_wry_event_handler(move |event, _| {
         use dioxus::desktop::tao::event::{Event, WindowEvent};

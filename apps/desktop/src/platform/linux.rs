@@ -10,23 +10,34 @@ use gio::glib::{self, prelude::*};
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-/// Run in the page after the window gets keyboard focus back (Alt+Tab) while a screen reader runs.
+/// Run in the page after the window gets keyboard focus back (Alt+Tab) or after in-app navigation while a screen
+/// reader runs.
 ///
-/// WebKitGTK then reports focus only for the web view as a whole (an unnamed "filler"), not for the control inside
-/// it that has focus. Orca takes the filler as the focused object, and because that is not a password field it reads
-/// out every key typed into the password box. (Recorded with an AT-SPI event listener, 2026-10-24.)
+/// WebKitGTK reports the whole web view as an unnamed AT-SPI "filler" rather than the focused control inside it.
+/// Orca takes the filler as the focused object; because the filler is not a password field, Orca reads out every
+/// key typed into the password box. (Recorded with an AT-SPI event listener, 2026-10-24.)
 ///
-/// Taking focus off the focused control and giving it straight back makes WebKitGTK report focus for that control,
-/// which is what Orca needs. Both happen in the same step: focus never visits another control (a button would put
-/// Orca in browse mode, where letter keys are navigation commands and do not reach the page), and no keystroke can
-/// arrive in between. If the page is not yet told it has focus, it waits a little and tries again.
+/// Two cases:
+/// 1. An element already has focus — blur and immediately refocus it. WebKitGTK then reports that specific element
+///    to AT-SPI (not the filler). Both steps happen synchronously so no keystroke arrives between them, and focus
+///    never visits another control (a button would put Orca in browse mode where letter keys navigate instead of
+///    reaching the page).
+/// 2. Nothing is focused yet (autofocus pending or new page just mounted) — find the first visible, enabled,
+///    non-negative-tabindex element and focus it. This covers initial app launch and in-app page transitions.
+///
+/// Retries up to ten times at 100 ms intervals to handle slow page loads in the snap environment.
 pub const SCRIPT_AFTER_WINDOW_FOCUS: Option<&str> = Some(
     "const refocus=(tries)=>{\
        if(!document.hasFocus()){if(tries>0)setTimeout(()=>refocus(tries-1),100);return}\
        const x=document.activeElement;\
-       if(x&&x!==document.body){x.blur();x.focus()}\
+       if(x&&x!==document.body){x.blur();x.focus();return}\
+       const f=[...document.querySelectorAll('input:not([disabled]),button:not([disabled]),a[href],[tabindex]')]\
+         .filter(e=>e.tabIndex>=0)\
+         .find(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0});\
+       if(f)f.focus();\
+       else if(tries>0)setTimeout(()=>refocus(tries-1),100)\
      };\
-     refocus(5)",
+     refocus(10)",
 );
 
 thread_local! {
