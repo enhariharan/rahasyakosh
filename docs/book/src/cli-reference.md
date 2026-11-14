@@ -72,10 +72,23 @@ rk passwd                # choose a new master password
 rk passwd --passphrase   # replace it with a generated passphrase
 ```
 
-### `rk profiles`
+### `rk profiles` / `rk profile list`
 
 List the profiles (usernames and display names) that have a vault in the same folder as `--vault`.
 Profiles are made in the desktop app.
+
+### `rk profile use USERNAME`
+
+Set the default profile. After this, `rk` commands that do not pass `--profile` open this profile's
+vault automatically. The choice is saved to `profiles.json` next to the vault file.
+
+```
+rk profile use alice    # alice's vault is now the default
+rk list                 # opens alice's vault (no --profile needed)
+rk --profile bob list   # one-off override: opens bob's vault
+```
+
+The `--profile` flag always takes precedence over the saved default.
 
 ---
 
