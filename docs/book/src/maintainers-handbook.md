@@ -54,6 +54,98 @@ new label without clashing.
 Start with [Further reading](further-reading.md). A sensible order: this book → `docs/04` →
 read `crypto.rs` and `vault.rs` end to end → read the tests → read one RFC (6238 is short).
 
+## Testing shell completions (before closing issue #3)
+
+Run through each shell you have installed. Completion works when Tab expands subcommands and flags without opening a vault.
+
+### 1 — Unit test
+
+```
+cargo test -p rahasyakosh-cli completions
+```
+
+Expected: `completions_bash_is_nonempty` passes.
+
+### 2 — Bash
+
+```bash
+# Build (or use the installed rk)
+cargo build -p rahasyakosh-cli
+alias rk="$(pwd)/target/debug/rk"
+
+# Generate and source
+rk completions bash > /tmp/rk-completion.bash
+source /tmp/rk-completion.bash
+
+# Test: press Tab after each line to see the completion expand
+rk <Tab>          # should list all subcommands
+rk get --<Tab>    # should list --field, --copy, --clear-after, …
+rk completions <Tab>   # should list bash, zsh, fish
+```
+
+Checklist:
+- [ ] Subcommands appear on `rk <Tab>`
+- [ ] Flags appear on `rk get --<Tab>`
+- [ ] `rk completions <Tab>` offers `bash`, `zsh`, `fish`
+- [ ] No error output
+
+### 3 — Zsh
+
+```zsh
+mkdir -p ~/.zfunc
+rk completions zsh > ~/.zfunc/_rk
+
+# If fpath/compinit not already set up, add once to ~/.zshrc:
+# fpath=(~/.zfunc $fpath)
+# autoload -U compinit && compinit
+
+# Reload completions in the current session
+autoload -U compinit && compinit -u
+
+# Test
+rk <Tab>
+rk get --<Tab>
+rk completions <Tab>
+```
+
+Checklist:
+- [ ] Subcommands appear
+- [ ] Flags appear
+- [ ] `bash`, `zsh`, `fish` offered for `rk completions <Tab>`
+
+### 4 — Fish (if installed)
+
+```fish
+rk completions fish > ~/.config/fish/completions/rk.fish
+# Start a new fish session, then:
+rk <Tab>
+rk get --<Tab>
+rk completions <Tab>
+```
+
+Checklist:
+- [ ] Subcommands appear
+- [ ] Flags appear
+
+### 5 — Snap version (do this after the snap store revision is published)
+
+```bash
+# Remove the dev alias first if set
+unalias rk 2>/dev/null || true
+
+rk completions bash > /tmp/rk-snap-completion.bash
+source /tmp/rk-snap-completion.bash
+rk <Tab>
+rk get --<Tab>
+```
+
+Checklist:
+- [ ] Completions work from the snap-installed binary (not just the dev build)
+
+Close issue #3 once all boxes above are ticked and the snap revision is live.
+
+---
+
 ## When in doubt
 
 Ask. In security work, "I'm not sure this is safe" is a valuable thing to say in a review.
