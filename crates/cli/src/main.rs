@@ -42,6 +42,11 @@ struct Cli {
 enum Cmd {
     /// List the profiles (usernames and full names) that have a vault here
     Profiles,
+    /// Manage profiles: set the default or list all
+    Profile {
+        #[command(subcommand)]
+        action: ProfileCmd,
+    },
     /// Create a new vault
     Init {
         #[command(flatten)]
@@ -268,6 +273,17 @@ enum SecretKeyCmd {
     Show,
     /// Remove the Secret Key; the master password alone opens the vault again
     Disable,
+}
+
+#[derive(Subcommand)]
+enum ProfileCmd {
+    /// Set the default profile used when --profile is not given
+    Use {
+        /// Username of the profile to make default (see `rk profiles`)
+        username: String,
+    },
+    /// List profiles — same as `rk profiles`
+    List,
 }
 
 /// How the new master password is chosen.
@@ -699,6 +715,60 @@ mod tests {
         assert!(!out.is_empty());
         assert!(out.windows(2).any(|w| w == b"rk"));
     }
+
+    #[test]
+    fn profile_use_sets_default_and_persists() {
+        let dir = std::env::temp_dir()
+            .join(format!("rk-profile-use-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let mut list = rahasyakosh_app::ProfileList::new();
+        let id_a = uuid::Uuid::from_u128(1);
+        let id_b = uuid::Uuid::from_u128(2);
+        list.add(id_a, "Alice Smith", "alice", "alice.db").unwrap();
+        list.add(id_b, "Bob Jones", "bob", "bob.db").unwrap();
+        rahasyakosh_app::profile_files::save_list(&dir, &list).unwrap();
+
+        // alice is first, so start_profile is alice before any `profile use`
+        assert_eq!(list.start_profile().unwrap().username, "alice");
+
+        // simulate `rk profile use bob`
+        let username = "bob";
+        let mut list2 = rahasyakosh_app::profile_files::read_list(&dir)
+            .unwrap()
+            .unwrap();
+        let profile = list2.find_by_username(username).cloned().unwrap();
+        list2.set_last_used(profile.id);
+        rahasyakosh_app::profile_files::save_list(&dir, &list2).unwrap();
+
+        // reload from disk and check bob is now the default
+        let list3 = rahasyakosh_app::profile_files::read_list(&dir)
+            .unwrap()
+            .unwrap();
+        assert_eq!(list3.start_profile().unwrap().username, "bob");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn profile_use_unknown_username_gives_clear_error() {
+        let dir = std::env::temp_dir()
+            .join(format!("rk-profile-unknown-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let mut list = rahasyakosh_app::ProfileList::new();
+        list.add(uuid::Uuid::from_u128(1), "Alice", "alice", "alice.db").unwrap();
+        rahasyakosh_app::profile_files::save_list(&dir, &list).unwrap();
+
+        let list2 = rahasyakosh_app::profile_files::read_list(&dir)
+            .unwrap()
+            .unwrap();
+        assert!(list2.find_by_username("nobody").is_none());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
 
 /// Errors can quote item titles (an ambiguous match lists them), so they are printed through [`safe::line`] too.
@@ -725,14 +795,34 @@ fn run() -> Result<()> {
             p
         }
     };
-    if matches!(cli.cmd, Cmd::Profiles) {
-        let list = read_profiles(&path)?;
-        for p in list.all() {
-            println!(
-                "{}\t{}",
-                safe::line(&p.username),
-                safe::line(&list.display_name(p.id))
-            );
+    if matches!(cli.cmd, Cmd::Profiles | Cmd::Profile { .. }) {
+        let dir = path.parent().unwrap_or_else(|| Path::new("."));
+        match &cli.cmd {
+            Cmd::Profiles | Cmd::Profile { action: ProfileCmd::List } => {
+                let list = read_profiles(&path)?;
+                for p in list.all() {
+                    println!(
+                        "{}\t{}",
+                        safe::line(&p.username),
+                        safe::line(&list.display_name(p.id))
+                    );
+                }
+            }
+            Cmd::Profile { action: ProfileCmd::Use { username } } => {
+                let mut list = read_profiles(&path)?;
+                let Some(profile) = list.find_by_username(username).cloned() else {
+                    let known: Vec<&str> = list.all().iter().map(|p| p.username.as_str()).collect();
+                    bail!(
+                        "no profile with the username {username:?}; the profiles here are: {}",
+                        known.join(", ")
+                    );
+                };
+                list.set_last_used(profile.id);
+                rahasyakosh_app::profile_files::save_list(dir, &list)
+                    .map_err(|e| anyhow::anyhow!("{e}"))?;
+                eprintln!("Default profile set to {:?} ({})", username, list.display_name(profile.id));
+            }
+            _ => unreachable!(),
         }
         return Ok(());
     }
@@ -1253,6 +1343,7 @@ fn run() -> Result<()> {
             }
         }
         Cmd::Profiles
+        | Cmd::Profile { .. }
         | Cmd::Init { .. }
         | Cmd::Gen { .. }
         | Cmd::ClipboardClear { .. }
