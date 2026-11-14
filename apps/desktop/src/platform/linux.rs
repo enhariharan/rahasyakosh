@@ -31,9 +31,11 @@ pub const SCRIPT_AFTER_WINDOW_FOCUS: Option<&str> = Some(
        if(!document.hasFocus()){if(tries>0)setTimeout(()=>refocus(tries-1),100);return}\
        const x=document.activeElement;\
        if(x&&x!==document.body){x.blur();x.focus();return}\
+       const vis=e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0};\
+       const pw=[...document.querySelectorAll('input[type=password]:not([disabled])')].find(vis);\
+       if(pw){pw.focus();return}\
        const f=[...document.querySelectorAll('input:not([disabled]),button:not([disabled]),a[href],[tabindex]')]\
-         .filter(e=>e.tabIndex>=0)\
-         .find(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0});\
+         .filter(e=>e.tabIndex>=0).find(vis);\
        if(f)f.focus();\
        else if(tries>0)setTimeout(()=>refocus(tries-1),100)\
      };\

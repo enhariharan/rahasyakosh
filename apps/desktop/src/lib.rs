@@ -1254,11 +1254,24 @@ fn Unlock() -> Element {
                     aria_describedby: if has_err { "unlock-error" } else if has_notice { "unlock-notice" } else { "" },
                     placeholder: tr(lang, Msg::EnterMasterPassword),
                     oninput: move |e| pw.set(e.value()),
-                    // The focus given by `autofocus` can happen before the screen reader is listening; do it again.
+                    // `autofocus` fires before the screen reader may be listening; redo focus.
+                    // In the snap the WebKit renderer subprocess completes its AT-SPI D-Bus
+                    // handshake up to ~1 s after the window opens, so we retry until the page
+                    // reports document.hasFocus() (window really has keyboard focus) and then
+                    // do a late backup pass 1 s later in case the connection was not yet live.
+                    // The user-hasn't-typed guard (e.value.length === 0) prevents an intrusive
+                    // focus jump while they are already entering their password.
                     onmounted: move |_| {
                         spawn(async move {
                             let _ = dioxus::document::eval(
-                                "setTimeout(()=>{const e=document.getElementById('master');if(e){e.blur();e.focus()}},250)",
+                                "const rf=(n)=>{\
+                                   if(!document.hasFocus()){if(n>0)setTimeout(()=>rf(n-1),200);return}\
+                                   const e=document.getElementById('master');\
+                                   if(!e||e.value.length>0)return;\
+                                   e.blur();e.focus();\
+                                   setTimeout(()=>{const e2=document.getElementById('master');if(e2&&!e2.value.length){e2.blur();e2.focus()}},1000)\
+                                 };\
+                                 rf(10)",
                             )
                             .await;
                         });
