@@ -104,6 +104,13 @@ parts:
       # JavaScriptCore is pulled in by webkit2gtk but list it explicitly so
       # snapcraft doesn't silently drop it.
       - libjavascriptcoregtk-4.1-0
+      # Clipboard tools: the app calls wl-copy/wl-paste on Wayland and xclip
+      # on X11 as external commands to serve and clear the clipboard.
+      - wl-clipboard
+      - xclip
+      # busctl is needed by the launcher to enable AT-SPI/Orca before the app
+      # starts; it is not on the PATH inside the snap by default.
+      - dbus
 
   launcher:
     plugin: dump
