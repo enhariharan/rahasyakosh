@@ -2,7 +2,7 @@
 
 Guidelines, not a record of work done.
 
-Status today (2026-11-13):
+Status today (2026-11-14):
 * MIT licence,
 * CI green (build, tests, clippy, `cargo deny`, audit),
 * A fuzz job,
@@ -10,7 +10,10 @@ Status today (2026-11-13):
 * A `.deb` package built with `cargo-deb`,
 * A tag-triggered release workflow with SHA-256 checksums and sigstore attestations,
 * All manual checklists passing on Ubuntu 24.04 Wayland and X11 (GNOME Boxes VM, 2026-11-13),
-* v0.1.0-alpha.1 published on GitHub Releases with release notes,
+* v0.1.0-alpha.1 published on GitHub Releases and on the Snap Store (`edge` channel),
+* Snap Store listing published: icon, banner, screenshots, full metadata,
+* GHA snap workflow (`.github/workflows/snap.yml`) auto-publishes on every `v*.*.*` tag,
+* Snap Store badge in README, GitHub Sponsors + FUNDING.yml,
 * Backups/recovery and privacy docs in the book,
 * Name "Rahasyakosh" confirmed free on apt, snap and GitHub.
 
@@ -39,7 +42,7 @@ A password manager earns trust slowly. Do these first:
 - [x] Publish **SHA-256 checksums** and sign them with sigstore keyless signing (`cosign`). Done 2026-11-07.
 - [x] Generate a **software bill of materials** (`cargo cyclonedx`) and attach it; keep `cargo deny` and `cargo audit` green in the release job. Done 2026-11-13 (`.cdx.json` files attached to release).
 - [x] Use GitHub **artifact attestations** (build provenance) so users can check a file came from your workflow. Done 2026-11-07.
-- [ ] Never build releases from a developer laptop.
+- [x] Never build releases from a developer laptop. Done 2026-11-14: snap and future `.deb` releases are built by the GHA workflows (`snap.yml`, `release.yml`) on GitHub-hosted runners.
 
 ## 3. Packaging for Ubuntu: pick channels in this order
 The desktop app needs WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`), GTK 3 and libsoup 3; build dependencies are listed in `install-local.sh`. Ubuntu 22.04 and later ship these.
@@ -60,14 +63,7 @@ The desktop app needs WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`), GTK 3 and libsoup 3
    - **Progress 2026-11-13 (later):** `snapcraft pack` now builds `rahasyakosh_0.1.0-alpha.1_amd64.snap` (77 MB) locally with LXD. The networking timeout was `ufw` blocking DHCP/DNS on the LXD bridge; fixed with `sudo ufw allow in on lxdbr0` and `sudo ufw route allow in|out on lxdbr0`. (Use LXD, not `--destructive-mode`: a core24 snap cannot be built directly on a 26.04 host.) The build uses only committed code (`source-type: git`), so commit before packing, and run `snapcraft clean desktop-app` first: snapcraft does not notice new commits and otherwise re-packs the old binary. Next: install with `sudo snap install --dangerous`, then test the vault folder, clipboard, tray and Orca inside the sandbox before uploading to the Snap Store.
    - **Sandbox decisions 2026-11-13:** each install method keeps its own vault. Inside the snap the vault, secret keys, high-water mark and settings live under `$SNAP_USER_COMMON` (`~/snap/rahasyakosh/common/`), not the per-revision `~/snap/rahasyakosh/<rev>/`, so `snap revert` cannot roll the vault back. The `.deb` keeps `~/.local/share/rahasyakosh/`. So no `personal-files` plug is needed, and the Snap Store needs no manual interface review. The tray uses `unity7` (there is no `ayatana-appindicator` interface in snapd). Still to test in the installed snap: the vault lands in `common/`, the clipboard clears, the tray icon appears, and Orca reads the window.
    - **First run in the sandbox 2026-11-13:** two fixes were needed before the window drew. (1) Dioxus Desktop sends UI updates to the WebKit view over a WebSocket on `127.0.0.1` (random port, secret key per connection). Without the `network-bind` plug the app panics with "Failed to bind local TCP listener for edit socket". (2) The window then stayed blank white: inside a snap, GLib asks the desktop portal for proxy settings, the portal turns away snaps that lack the `network` plug, and WebKit never opens the socket. Setting `GIO_USE_PROXY_RESOLVER=dummy` in the app's `environment` skips the proxy lookup. We did not add the `network` plug, so the app still cannot reach the internet. With both fixes the snap installs with `sudo snap install --dangerous`, opens correctly, and creates its files under `~/snap/rahasyakosh/common/`. Also checked in the installed snap: the clipboard clears after the timeout, the tray icon appears, and Orca reads the window. Next: upload to the Snap Store.
-   - **Where to resume (2026-11-14):**
-     - **Done:** commits through `e9c5c81` pushed; `.github/workflows/snap.yml` added (`snapcore/action-build` + `snapcore/action-publish`); `grade: stable` set in `snapcraft.yaml`; book install page updated with snap instructions.
-     - **Still to do — manual steps:**
-       1. Add a `SNAPCRAFT_STORE_CREDENTIALS` secret to the GitHub repo. Generate it on this machine: `snapcraft export-login --snaps rahasyakosh --channels edge,beta,stable -`. Paste the output into **Settings → Secrets → Actions → New repository secret → `SNAPCRAFT_STORE_CREDENTIALS`** in GitHub. (Do not commit the token; it is a long-lived credential.)
-       2. Push the next version tag (`git tag v0.1.0-alpha.1 && git push origin v0.1.0-alpha.1` — skip if already tagged). The `snap.yml` workflow fires on any `v*.*.*` tag, sets the snap version from the tag, builds with LXD inside the GitHub runner, and publishes to `edge` for alpha tags and `stable` for unqualified ones. No store review is needed: `network-bind`, `home`, `desktop-legacy` and `unity7` auto-connect.
-       3. Fill in the Snap Store listing once the first upload succeeds: summary, description, screenshots, licence, the alpha-and-unaudited warning.
-       4. Install from the store on a clean VM (`sudo snap install rahasyakosh --channel=edge`) and do a quick smoke test.
-     - **Local repack** (optional quick check before the CI upload): `snapcraft clean desktop-app && snapcraft pack`, then `sudo snap install --dangerous rahasyakosh_*.snap`.
+   - **Done 2026-11-14:** snap fully published on the Snap Store `edge` channel. `.github/workflows/snap.yml` auto-builds and publishes on every `v*.*.*` tag. Store listing published with icon (512px PNG + SVG), banner (720×240), 4 screenshots, full metadata (`title`, `license`, `website`, `source-code`, `issues`, `contact`, `donation`). Snap Store badge added to README. GitHub Sponsors + FUNDING.yml added. Smoke-test: `sudo snap install rahasyakosh --channel=edge` on a clean machine to complete.
 4. **Flatpak / Flathub** (works on Ubuntu too, popular with privacy-minded users)
    - Needs a reproducible manifest, AppStream metadata and a review by the Flathub team. Same sandbox questions as for the snap.
 5. **Official Ubuntu/Debian archive**: long term. Needs a Debian packaging sponsor and all Rust dependencies packaged individually. Do not plan for it in the alpha stage.
@@ -77,9 +73,9 @@ Avoid a plain `curl | sh` installer.
 ## 4. Desktop integration files
 - [x] **AppStream metadata** (`apps/desktop/packaging/io.github.enhariharan.Rahasyakosh.metainfo.xml`): written, passes `appstreamcli validate --no-net`, includes screenshots, a release entry and a `developer` entry. Done 2026-11-07.
 - [x] `rahasyakosh.desktop`: passes `desktop-file-validate` (one hint: it suggests adding `Settings` or `System` as a second category; categories are `Utility;Security;`).
-- [x] Icons at several sizes: PNG 16/32/48/64/128/256px generated from SVG and added to `.deb` assets and `install-local.sh`. Done 2026-11-13.
+- [x] Icons at several sizes: PNG 16/32/48/64/128/256/512px generated from SVG and added to `.deb` assets and `install-local.sh`. Done 2026-11-13 (512px added 2026-11-14).
 - [x] Screenshots (4): unlock, first-run welcome, item detail with TOTP, edit form — all 1080×720 in `docs/book/src/images/`, referenced in AppStream metainfo. Done 2026-11-13.
-- [ ] Choose the reverse-DNS app ID once and keep it (`io.github.enhariharan.Rahasyakosh` is the natural one).
+- [x] Choose the reverse-DNS app ID once and keep it. Using `io.github.enhariharan.Rahasyakosh` throughout (AppStream metainfo, `.desktop` file, Flatpak if added later). Done 2026-11-07.
 
 ## 5. Quality bar for each release
 - [x] CI green on the tagged commit (fmt, clippy `-D warnings`, tests, deny, audit, fuzz job recent). Green on commits `ad76505` and `20ca27c` (2026-11-13).
