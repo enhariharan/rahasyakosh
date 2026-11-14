@@ -7,6 +7,6 @@ Comment=Local-first, end-to-end-encrypted password manager
 Exec=@EXEC@
 Icon=rahasyakosh
 Terminal=false
-Categories=Utility;Security;
+Categories=Utility;Security;Settings;
 Keywords=password;vault;secret;2fa;totp;
 StartupWMClass=rahasyakosh-desktop

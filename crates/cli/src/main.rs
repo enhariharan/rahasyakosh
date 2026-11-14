@@ -7,7 +7,8 @@ mod file;
 mod safe;
 
 use anyhow::{bail, Context, Result};
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
+use clap_complete::Shell;
 use rahasyakosh_app::{Config, Scope, Vault};
 use rahasyakosh_core::{
     crypto::KdfParams,
@@ -193,6 +194,11 @@ enum Cmd {
         /// Do not ask for confirmation
         #[arg(short, long)]
         yes: bool,
+    },
+    /// Print a shell completion script (bash, zsh or fish) to standard output
+    Completions {
+        /// The shell to generate completions for
+        shell: Shell,
     },
     /// Export the vault. csv, json and txt are PLAINTEXT and ask for the master password again.
     Export {
@@ -682,6 +688,19 @@ fn changed_parts(a: &ItemVersion, b: &ItemVersion) -> String {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn completions_bash_is_nonempty() {
+        let mut out = Vec::new();
+        clap_complete::generate(Shell::Bash, &mut Cli::command(), "rk", &mut out);
+        assert!(!out.is_empty());
+        assert!(out.windows(2).any(|w| w == b"rk"));
+    }
+}
+
 /// Errors can quote item titles (an ambiguous match lists them), so they are printed through [`safe::line`] too.
 fn main() -> std::process::ExitCode {
     match run() {
@@ -763,6 +782,10 @@ fn run() -> Result<()> {
             return Ok(());
         }
         Cmd::ClipboardClear { after } => return clipboard::run_clearer(*after),
+        Cmd::Completions { shell } => {
+            clap_complete::generate(*shell, &mut Cli::command(), "rk", &mut std::io::stdout());
+            return Ok(());
+        }
         Cmd::Init {
             master: opts,
             secret_key,
@@ -1233,6 +1256,7 @@ fn run() -> Result<()> {
         | Cmd::Init { .. }
         | Cmd::Gen { .. }
         | Cmd::ClipboardClear { .. }
+        | Cmd::Completions { .. }
         | Cmd::Migrate { .. } => {
             unreachable!()
         }
