@@ -2,6 +2,7 @@
 
 [Introduction](introduction.md)
 [Quick start: using `rk`](quick-start.md)
+[CLI reference](cli-reference.md)
 [The desktop app](desktop-app.md)
 
 - [What a password manager does](what-is-a-password-manager.md)
