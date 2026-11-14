@@ -17,6 +17,10 @@ description: |
   secrets until an audit is complete.
 
 license: MIT
+website: https://github.com/enhariharan/rahasyakosh
+source-code: https://github.com/enhariharan/rahasyakosh
+issues: https://github.com/enhariharan/rahasyakosh/issues
+contact: https://github.com/enhariharan
 grade: stable
 confinement: strict
 
