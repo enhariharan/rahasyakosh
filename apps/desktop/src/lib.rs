@@ -1810,6 +1810,7 @@ fn FormView() -> Element {
     let Some(f) = form else { return rsx! {} };
     let editing = f.id.is_some();
     let strength = rahasyakosh_strength::estimate(&f.password, &[&f.title, &f.username]);
+    let mut show_pw = use_signal(|| false);
     let form_error = ctx.model.read().as_ref().and_then(|m| m.form_error.clone());
     // `Some("true")` marks the box a form error is about; `describedby` ties the message to it.
     let invalid = |id: &str| form_error.as_ref().is_some_and(|e| e.field_id == id);
@@ -1856,7 +1857,45 @@ fn FormView() -> Element {
                 input { id: "f-user", dir: "auto", autocomplete: "off", value: "{f.username}", oninput: field!(username) }
                 label { r#for: "f-pw", {tr(lang, Msg::FieldPassword)} }
                 div { class: "row",
-                    input { id: "f-pw", class: "grow mono ltr", dir: "ltr", autocomplete: "off", value: "{f.password}", oninput: field!(password) }
+                    input {
+                        id: "f-pw", class: "grow mono ltr", dir: "ltr", autocomplete: "off",
+                        r#type: if show_pw() { "text" } else { "password" },
+                        value: "{f.password}", oninput: field!(password),
+                        // Apply the AT-SPI blur/focus fix so Orca sees ROLE_PASSWORD_TEXT and suppresses echo.
+                        onmounted: move |_| {
+                            spawn(async move {
+                                let _ = dioxus::document::eval(
+                                    "const rf=(n)=>{\
+                                       if(!document.hasFocus()){if(n>0)setTimeout(()=>rf(n-1),200);return}\
+                                       const e=document.getElementById('f-pw');\
+                                       if(!e||e.value.length>0)return;\
+                                       e.blur();e.focus();\
+                                       setTimeout(()=>{const e2=document.getElementById('f-pw');if(e2&&!e2.value.length){e2.blur();e2.focus()}},1000)\
+                                     };\
+                                     rf(10)",
+                                ).await;
+                            });
+                        },
+                    }
+                    button {
+                        r#type: "button",
+                        aria_label: if show_pw() { trf(lang, Msg::HideField, &[&tr(lang, Msg::FieldPassword)]) } else { trf(lang, Msg::ShowField, &[&tr(lang, Msg::FieldPassword)]) },
+                        title: if show_pw() { trf(lang, Msg::HideField, &[&tr(lang, Msg::FieldPassword)]) } else { trf(lang, Msg::ShowField, &[&tr(lang, Msg::FieldPassword)]) },
+                        onclick: move |_| {
+                            show_pw.set(!show_pw());
+                            spawn(async { let _ = dioxus::document::eval("document.getElementById('f-pw')?.focus()").await; });
+                        },
+                        svg {
+                            view_box: "0 0 24 24", width: "18", height: "18",
+                            fill: "none", stroke: "currentColor", stroke_width: "2",
+                            stroke_linecap: "round", stroke_linejoin: "round", "aria-hidden": "true",
+                            if show_pw() {
+                                path { d: EYE_OFF_ICON }
+                            } else {
+                                path { d: "M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" }
+                            }
+                        }
+                    }
                     button {
                         r#type: "button",
                         onclick: move |_| { if let Some(m) = ctx.model.write().as_mut() { m.generate_password(20); } },
