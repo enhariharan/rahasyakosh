@@ -19,29 +19,29 @@
   </g>
 
   <!-- App name -->
-  <text x="210" y="112"
+  <text x="210" y="122"
         font-family="'Segoe UI', 'Noto Sans', 'Liberation Sans', Arial, sans-serif"
         font-size="52" font-weight="700" fill="#ffffff"
         letter-spacing="-0.5">Rahasyakosh</text>
 
-  <!-- Hindi subtitle -->
-  <text x="213" y="145"
-        font-family="'Noto Sans Devanagari', 'Segoe UI', Arial, sans-serif"
-        font-size="17" fill="rgba(255,255,255,0.65)">रहस्यकोश — Vault of Secrets</text>
-
-  <!-- Tagline pills -->
-  <rect x="213" y="163" width="148" height="26" rx="13" fill="rgba(255,255,255,0.15)"/>
-  <text x="287" y="181" text-anchor="middle"
+  <!-- Tagline text -->
+  <text x="213" y="153"
         font-family="'Segoe UI', 'Noto Sans', Arial, sans-serif"
-        font-size="13" fill="#ffffff">Local-first</text>
+        font-size="16" fill="rgba(255,255,255,0.70)">Local-first, end-to-end-encrypted password manager</text>
 
-  <rect x="371" y="163" width="202" height="26" rx="13" fill="rgba(255,255,255,0.15)"/>
-  <text x="472" y="181" text-anchor="middle"
+  <!-- Feature pills -->
+  <rect x="213" y="171" width="103" height="26" rx="13" fill="rgba(255,255,255,0.15)"/>
+  <text x="265" y="189" text-anchor="middle"
         font-family="'Segoe UI', 'Noto Sans', Arial, sans-serif"
-        font-size="13" fill="#ffffff">End-to-end encrypted</text>
+        font-size="12" fill="#ffffff">Local-first</text>
 
-  <rect x="583" y="163" width="118" height="26" rx="13" fill="rgba(255,255,255,0.15)"/>
-  <text x="642" y="181" text-anchor="middle"
+  <rect x="324" y="171" width="166" height="26" rx="13" fill="rgba(255,255,255,0.15)"/>
+  <text x="407" y="189" text-anchor="middle"
         font-family="'Segoe UI', 'Noto Sans', Arial, sans-serif"
-        font-size="13" fill="#ffffff">Screen-reader friendly</text>
+        font-size="12" fill="#ffffff">End-to-end encrypted</text>
+
+  <rect x="498" y="171" width="159" height="26" rx="13" fill="rgba(255,255,255,0.15)"/>
+  <text x="578" y="189" text-anchor="middle"
+        font-family="'Segoe UI', 'Noto Sans', Arial, sans-serif"
+        font-size="12" fill="#ffffff">Screen-reader ready</text>
 </svg>
