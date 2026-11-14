@@ -16,7 +16,7 @@ description: |
   Early alpha. It has not been independently audited — do not store real
   secrets until an audit is complete.
 
-grade: devel
+grade: stable
 confinement: strict
 
 apps:

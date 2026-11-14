@@ -7,6 +7,31 @@ Besides the command-line tool `rk`, Rahasyakosh has a desktop app (`apps/desktop
 
 ## Install
 
+### Snap (Ubuntu — recommended)
+
+```
+sudo snap install rahasyakosh
+```
+
+The snap is published on the Snap Store under the name `rahasyakosh`. Snap updates automatically in the background. The vault lives in `~/snap/rahasyakosh/common/`, separate from a `.deb` install's vault in `~/.local/share/rahasyakosh/`.
+
+> **Alpha — not audited.** Use the `edge` channel until an independent security review is done:
+> ```
+> sudo snap install rahasyakosh --channel=edge
+> ```
+
+### .deb package (Ubuntu / Debian)
+
+Download the latest `rahasyakosh_*.deb` from the [GitHub Releases page](https://github.com/enhariharan/rahasyakosh/releases) and install it:
+
+```
+sudo apt install ./rahasyakosh_*.deb
+```
+
+Remove with `sudo apt remove rahasyakosh` — your vault in `~/.local/share/rahasyakosh/` is left alone.
+
+### Build from source
+
 You need the build libraries once, and a Rust toolchain:
 
 ```
