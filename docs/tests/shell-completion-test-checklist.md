@@ -94,7 +94,7 @@ Paste a summary below with: commit, OS, shell version, any failures.
 
 | Shell | Pass / fail | Notes |
 |-------|-------------|-------|
-| Bash  |             |       |
-| Zsh   |             |       |
-| Fish  |             |       |
-| Snap  |             |       |
+| Bash  | Pass        |       |
+| Zsh   | Pass        |       |
+| Fish  | Pass        |       |
+| Snap  | Pending     | Waiting for snap store revision |
