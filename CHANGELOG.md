@@ -8,6 +8,9 @@ All notable changes to Rahasyakosh are written here, newest first. The format fo
 
 ## [Unreleased]
 
+### Added
+- **`rk completions bash|zsh|fish`** prints a shell completion script to add to the shell's profile.
+
 ## [0.1.0-alpha.1] — 2026-11-13
 
 ### Added

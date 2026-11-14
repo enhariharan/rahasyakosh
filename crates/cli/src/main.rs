@@ -7,7 +7,7 @@ mod file;
 mod safe;
 
 use anyhow::{bail, Context, Result};
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 use rahasyakosh_app::{Config, Scope, Vault};
 use rahasyakosh_core::{
     crypto::KdfParams,
@@ -205,6 +205,11 @@ enum Cmd {
         #[arg(long)]
         force: bool,
     },
+    /// Print a shell completion script (bash, zsh or fish)
+    Completions {
+        /// The shell to print the completion script for
+        shell: CompletionShell,
+    },
 }
 
 #[derive(Clone, Copy, clap::ValueEnum)]
@@ -217,6 +222,27 @@ enum ExportFormat {
     Txt,
     /// Encrypted copy of the vault file (safe to store; needs your master password to open)
     Vault,
+}
+
+/// The shells `rk completions` writes a script for.
+#[derive(Clone, Copy, clap::ValueEnum)]
+enum CompletionShell {
+    /// Bourne Again Shell (bash)
+    Bash,
+    /// Z shell (zsh)
+    Zsh,
+    /// Friendly Interactive Shell (fish)
+    Fish,
+}
+
+impl From<CompletionShell> for clap_complete::Shell {
+    fn from(shell: CompletionShell) -> Self {
+        match shell {
+            CompletionShell::Bash => clap_complete::Shell::Bash,
+            CompletionShell::Zsh => clap_complete::Shell::Zsh,
+            CompletionShell::Fish => clap_complete::Shell::Fish,
+        }
+    }
 }
 
 /// Copy to the clipboard instead of printing.
@@ -695,6 +721,13 @@ fn main() -> std::process::ExitCode {
 
 fn run() -> Result<()> {
     let cli = Cli::parse();
+    // Printing a completion script needs no vault, no HOME and no profile list, so it comes first.
+    if let Cmd::Completions { shell } = &cli.cmd {
+        let mut cmd = Cli::command();
+        let generator: clap_complete::Shell = (*shell).into();
+        clap_complete::generate(generator, &mut cmd, "rk", &mut std::io::stdout());
+        return Ok(());
+    }
     let path = match cli.vault {
         Some(p) => p,
         None => {
@@ -1233,7 +1266,8 @@ fn run() -> Result<()> {
         | Cmd::Init { .. }
         | Cmd::Gen { .. }
         | Cmd::ClipboardClear { .. }
-        | Cmd::Migrate { .. } => {
+        | Cmd::Migrate { .. }
+        | Cmd::Completions { .. } => {
             unreachable!()
         }
     }

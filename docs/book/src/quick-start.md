@@ -140,6 +140,7 @@ Plaintext exports contain every password. Delete them as soon as you are done, a
 | `rk import FILE [--map F=COL] [--dry-run] [-y]` | Import a CSV (Chrome, Firefox, Bitwarden, KeePassXC, 1Password or generic) or a Bitwarden JSON export |
 | `rk profiles` | List the profiles made in the desktop app (username and full name) |
 | `rk export [-f csv\|json\|vault] [-o FILE] [--force]` | Export |
+| `rk completions bash\|zsh\|fish` | Print a shell completion script to add to your shell profile |
 
 Add `--help` to any command. Every command also takes `--vault FILE`.
 
