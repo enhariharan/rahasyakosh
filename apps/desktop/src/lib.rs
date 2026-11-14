@@ -981,7 +981,24 @@ fn Setup() -> Element {
             } else {
                 section { aria_label: tr(lang, Msg::ChooseMasterPassword),
                     label { r#for: "pw", {tr(lang, Msg::MasterPassword)} }
-                    input { id: "pw", class: "ltr", dir: "ltr", r#type: "password", value: "{pw}", oninput: move |e| pw.set(e.value()) }
+                    input {
+                        id: "pw", class: "ltr", dir: "ltr", r#type: "password", value: "{pw}",
+                        oninput: move |e| pw.set(e.value()),
+                        onmounted: move |_| {
+                            spawn(async move {
+                                let _ = dioxus::document::eval(
+                                    "const rf=(n)=>{\
+                                       if(!document.hasFocus()){if(n>0)setTimeout(()=>rf(n-1),200);return}\
+                                       const e=document.getElementById('pw');\
+                                       if(!e||e.value.length>0)return;\
+                                       e.blur();e.focus();\
+                                       setTimeout(()=>{const e2=document.getElementById('pw');if(e2&&!e2.value.length){e2.blur();e2.focus()}},1000)\
+                                     };\
+                                     rf(10)",
+                                ).await;
+                            });
+                        },
+                    }
                     label { r#for: "pw2", {tr(lang, Msg::RepeatIt)} }
                     input { id: "pw2", class: "ltr", dir: "ltr", r#type: "password", value: "{pw2}", oninput: move |e| pw2.set(e.value()) }
                     if !pw.read().is_empty() {
