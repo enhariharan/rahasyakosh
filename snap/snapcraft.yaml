@@ -1,4 +1,5 @@
 name: rahasyakosh
+title: Rahasyakosh
 base: core24
 version: "0.1.0-alpha.1"
 summary: Local-first, end-to-end-encrypted password manager
