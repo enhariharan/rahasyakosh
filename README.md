@@ -8,6 +8,8 @@ Open-source (MIT), local-first, end-to-end-encrypted password manager in Rust.
 
 **Status:** M0–M2 done; M3 in progress (session and a Linux desktop app done). **Not yet audited — do not store real secrets.**
 
+[![Get it from the Snap Store](https://snapcraft.io/static/images/badges/en/snap-store-black.svg)](https://snapcraft.io/rahasyakosh)
+
 ```
 cargo test --workspace
 cargo run -p rahasyakosh-cli -- init      # binary name: rk
@@ -17,23 +19,17 @@ rk get github --copy     # Copied to clipboard, cleared after 20s
 
 ## Desktop app (Linux)
 
-Install the build libraries once:
+**Snap (Ubuntu — recommended):**
+
+```
+sudo snap install rahasyakosh --channel=edge
+```
+
+**Build from source:**
 
 ```
 sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev \
                  libayatana-appindicator3-dev libsoup-3.0-dev
-```
-
-Build and run directly (no install):
-
-```
-cargo build --release --manifest-path apps/desktop/Cargo.toml
-./apps/desktop/target/release/rahasyakosh-desktop
-```
-
-Or install for the current user (adds an app-grid entry and a `rahasyakosh` launcher):
-
-```
 ./apps/desktop/install-local.sh           # installs to ~/.local/bin/
 rahasyakosh                               # run it
 ./apps/desktop/install-local.sh --uninstall   # remove it
