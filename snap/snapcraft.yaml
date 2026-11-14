@@ -43,6 +43,11 @@ apps:
       # the 127.0.0.1 WebSocket (blank white window). The app only talks to
       # itself on loopback, so connect directly and skip proxy lookups.
       GIO_USE_PROXY_RESOLVER: dummy
+      # WebKit spawns a renderer subprocess. Inside a snap that subprocess
+      # inherits the sandbox but its own seccomp filter blocks the AT-SPI
+      # socket, so Orca gets nothing. Disabling WebKit's internal sandbox lets
+      # the renderer reach the AT-SPI D-Bus socket supplied by desktop-legacy.
+      WEBKIT_FORCE_SANDBOX: "0"
     plugs:
       # No personal-files plug: snapd sets $HOME to ~/snap/rahasyakosh/<rev>/,
       # so the vault lives there, separate from a deb install's ~/.local/share.
@@ -111,6 +116,9 @@ parts:
       # busctl is needed by the launcher to enable AT-SPI/Orca before the app
       # starts; it is not on the PATH inside the snap by default.
       - dbus
+      # libdbusmenu-gtk3-4 is a runtime dependency of libayatana-appindicator3-1
+      # (the system tray). Without it the tray icon silently fails to register.
+      - libdbusmenu-gtk3-4
 
   launcher:
     plugin: dump
