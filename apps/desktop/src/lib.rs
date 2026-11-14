@@ -324,7 +324,7 @@ fn handle_key(
         if let Some(m) = model.write().as_mut() {
             match (m.is_unlocked(), m.view.clone()) {
                 (true, View::Form) => m.cancel_form(now()),
-                (true, View::Settings | View::Trash) => m.show(View::Items, now()),
+                (true, View::Settings | View::Trash | View::About) => m.show(View::Items, now()),
                 _ => {}
             }
         }
@@ -1367,6 +1367,7 @@ fn Main() -> Element {
                     (Shortcut::Items, view == View::Items || view == View::Form, tr(lang, Msg::Items).to_string()),
                     (Shortcut::Trash, view == View::Trash, trf(lang, Msg::TrashCount, &[&trash_count])),
                     (Shortcut::Settings, view == View::Settings, tr(lang, Msg::Settings).to_string()),
+                    (Shortcut::About, view == View::About, tr(lang, Msg::About).to_string()),
                 ] {
                     button {
                         key: "{label}",
@@ -1405,6 +1406,7 @@ fn Main() -> Element {
         match view {
             View::Settings => rsx! { SettingsView {} },
             View::Form => rsx! { FormView {} },
+            View::About => rsx! { AboutView {} },
             _ => rsx! { Browser {} },
         }
     }
@@ -1416,6 +1418,7 @@ enum Shortcut {
     Items,
     Trash,
     Settings,
+    About,
     Lock,
     NewItem,
     // The next ones act on the item open in the detail pane.
@@ -1439,6 +1442,7 @@ impl Shortcut {
             ("1", _) => Some(Self::Items),
             ("2", _) => Some(Self::Trash),
             ("3", _) => Some(Self::Settings),
+            ("4", _) => Some(Self::About),
             ("l" | "L", _) => Some(Self::Lock),
             ("n" | "N", _) => Some(Self::NewItem),
             ("p" | "P", false) => Some(Self::Pin),
@@ -1468,7 +1472,7 @@ impl Shortcut {
     fn needs_item(self) -> bool {
         !matches!(
             self,
-            Self::Items | Self::Trash | Self::Settings | Self::Lock | Self::NewItem
+            Self::Items | Self::Trash | Self::Settings | Self::About | Self::Lock | Self::NewItem
         )
     }
 
@@ -1477,6 +1481,7 @@ impl Shortcut {
             Self::Items => "Ctrl+1",
             Self::Trash => "Ctrl+2",
             Self::Settings => "Ctrl+3",
+            Self::About => "Ctrl+4",
             Self::Lock => "Ctrl+L",
             Self::NewItem => "Ctrl+N",
             Self::Pin => "Ctrl+P",
@@ -1495,6 +1500,7 @@ impl Shortcut {
             Self::Items => "Control+1",
             Self::Trash => "Control+2",
             Self::Settings => "Control+3",
+            Self::About => "Control+4",
             Self::Lock => "Control+L",
             Self::NewItem => "Control+N",
             Self::Pin => "Control+P",
@@ -1513,6 +1519,7 @@ impl Shortcut {
             Self::Items => "M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01",
             Self::Trash => "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
             Self::Settings => "M4 7h10M18 7h2M4 17h2M10 17h10M16 4v6M8 14v6",
+            Self::About => "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 8h.01M11 12h1v4h1",
             Self::Lock => "M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z",
             Self::NewItem => "M12 5v14M5 12h14",
             Self::Pin => "M12 17v5M9 3h6l-1 7 3 3v2H7v-2l3-3z",
@@ -1532,6 +1539,7 @@ impl Shortcut {
             Self::Items => m.show(View::Items, now),
             Self::Trash => m.show(View::Trash, now),
             Self::Settings => m.show(View::Settings, now),
+            Self::About => m.show(View::About, now),
             Self::Lock => m.lock(),
             Self::NewItem => m.start_new(now),
             Self::Pin => m.toggle_favourite(now),
@@ -2339,6 +2347,33 @@ fn SettingsView() -> Element {
                         if let Some(text) = del_msg() { p { class: "error", role: "alert", "{text}" } }
                         button { class: "danger", r#type: "submit", {tr(lang, Msg::DeleteProfileButton)} }
                     }
+                }
+            }
+        }
+    }
+}
+
+// ---- about -----------------------------------------------------------------------------------------------------
+
+#[component]
+fn AboutView() -> Element {
+    let ctx = use_context::<Ctx>();
+    let lang = lang_of(&ctx);
+    let version = env!("CARGO_PKG_VERSION");
+    rsx! {
+        main { class: "form",
+            h2 { {tr(lang, Msg::AboutTitle)} }
+            p { {trf(lang, Msg::AboutVersion, &[&version])} }
+            p { {tr(lang, Msg::AboutDesc)} }
+            p { {tr(lang, Msg::AboutNoNetwork)} }
+            p { class: "muted small", {tr(lang, Msg::AboutAlpha)} }
+            p { {tr(lang, Msg::AboutLicense)} }
+            p {
+                a {
+                    href: "https://github.com/enhariharan/rahasyakosh",
+                    target: "_blank",
+                    rel: "noopener noreferrer",
+                    {tr(lang, Msg::AboutSource)}
                 }
             }
         }

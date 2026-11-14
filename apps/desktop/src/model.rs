@@ -192,6 +192,7 @@ pub enum View {
     Items,
     Trash,
     Settings,
+    About,
     /// The add/edit form is open (its content is in `Model::form`).
     Form,
 }
