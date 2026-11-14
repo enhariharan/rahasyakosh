@@ -17,7 +17,7 @@ description: |
   secrets until an audit is complete.
 
 license: MIT
-icon: apps/desktop/packaging/icons/rahasyakosh-512.png
+icon: apps/desktop/packaging/rahasyakosh.svg
 website: https://github.com/enhariharan/rahasyakosh
 source-code: https://github.com/enhariharan/rahasyakosh
 issues: https://github.com/enhariharan/rahasyakosh/issues
