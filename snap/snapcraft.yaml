@@ -60,6 +60,11 @@ apps:
       # app panics with "Failed to bind local TCP listener for edit socket".
       - network-bind
 
+  rk:
+    command: usr/bin/rk
+    plugs:
+      - home
+
 parts:
   desktop-app:
     plugin: rust
@@ -120,6 +125,23 @@ parts:
       # libdbusmenu-gtk3-4 is a runtime dependency of libayatana-appindicator3-1
       # (the system tray). Without it the tray icon silently fails to register.
       - libdbusmenu-gtk3-4
+
+  cli:
+    plugin: rust
+    source: .
+    source-type: git
+    build-environment:
+      - LD_LIBRARY_PATH: ""
+    override-build: |
+      rustup toolchain install stable --profile minimal
+      rustup default stable
+      cargo build --release --locked -p rahasyakosh-cli
+      install -Dm755 target/release/rk "$SNAPCRAFT_PART_INSTALL/usr/bin/rk"
+    build-packages:
+      - pkg-config
+      - libssl-dev
+      - clang
+      - libclang-dev
 
   launcher:
     plugin: dump
