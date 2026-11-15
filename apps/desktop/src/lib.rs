@@ -1960,6 +1960,7 @@ fn SettingsView() -> Element {
     let mut sk_pw = use_signal(String::new);
     let mut imp_path = use_signal(String::new);
     let mut imp_msg = use_signal(|| Option::<String>::None);
+    let mut kdbx_pw = use_signal(String::new);
     // Columns the user picked for the import file: (our field, the file's header).
     let mut imp_cols = use_signal(Vec::<(String, String)>::new);
     let mut sk_msg = use_signal(|| Option::<String>::None);
@@ -2090,7 +2091,7 @@ fn SettingsView() -> Element {
                 // The system's own file chooser; it hands back a path, so the box above fills in and the file is read.
                 label { r#for: "imp-file", {tr(lang, Msg::ImportChooseFile)} }
                 input {
-                    id: "imp-file", r#type: "file", accept: ".csv,.json,text/csv,application/json",
+                    id: "imp-file", r#type: "file", accept: ".csv,.json,.kdbx,.1pux,text/csv,application/json",
                     aria_describedby: "import-hint",
                     onchange: move |e| {
                         let Some(file) = e.files().into_iter().next() else { return };
@@ -2116,14 +2117,37 @@ fn SettingsView() -> Element {
                             i.urls.first().cloned().unwrap_or_default(),
                         )).collect();
                         (p.detected, p.items.len(), p.skipped_duplicates, p.skipped_empty, p.warnings.clone(), rows,
-                         p.columns.clone(), p.needs_password_column, p.file.display().to_string())
+                         p.columns.clone(), p.needs_password_column, p.needs_kdbx_password, p.file.display().to_string())
                     })
                 });
                 match plan {
                     None => rsx! {},
-                    Some((detected, count, dups, empty, warnings, rows, columns, needs_password, file)) => rsx! {
+                    Some((detected, count, dups, empty, warnings, rows, columns, needs_password, needs_kdbx_pw, file)) => rsx! {
                         div { role: "region", aria_label: tr(lang, Msg::ImportTitle),
-                            if needs_password {
+                            if needs_kdbx_pw {
+                                form {
+                                    onsubmit: move |e| {
+                                        e.prevent_default();
+                                        let path = imp_path.read().clone();
+                                        let pw = kdbx_pw.read().clone();
+                                        let r = ctx.model.write().as_mut()
+                                            .map(|m| m.import_preview_kdbx(&path, &pw, now()));
+                                        imp_msg.set(match r {
+                                            Some(Err(e)) => Some(e),
+                                            _ => None,
+                                        });
+                                    },
+                                    p { class: "muted small", id: "kdbx-pw-hint", {tr(lang, Msg::KdbxPasswordHint)} }
+                                    label { r#for: "kdbx-pw", {tr(lang, Msg::KdbxPasswordLabel)} }
+                                    input {
+                                        id: "kdbx-pw", r#type: "password", autocomplete: "current-password",
+                                        aria_describedby: "kdbx-pw-hint",
+                                        value: "{kdbx_pw}",
+                                        oninput: move |e| kdbx_pw.set(e.value()),
+                                    }
+                                    button { class: "primary", r#type: "submit", {tr(lang, Msg::ImportPreviewButton)} }
+                                }
+                            } else if needs_password {
                                 p { role: "alert", {tr(lang, Msg::ImportNeedPassword)} }
                             } else {
                                 p { role: "status", "{trf(lang, Msg::ImportSummary, &[&detected, &count, &dups, &empty])}" }

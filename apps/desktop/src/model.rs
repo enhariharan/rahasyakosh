@@ -211,6 +211,8 @@ pub struct ImportPlan {
     pub columns: Option<rahasyakosh_transfer::CsvColumns>,
     /// True when the file has no password column yet: nothing was read, and the user must choose one.
     pub needs_password_column: bool,
+    /// True when the file is a KDBX database: the user must supply the master password before anything is read.
+    pub needs_kdbx_password: bool,
 }
 
 /// One line in the item list.
@@ -663,6 +665,20 @@ impl<S: Store, C: Clipboard> Model<S, C> {
             .map_err(|Locked| t(lang, Msg::VaultIsLocked).to_string())?;
         let existing: Vec<Item> = vault.items(Scope::Any).into_iter().cloned().collect();
         let cannot_read = |e: rahasyakosh_transfer::Error| trf(lang, Msg::ImportCannotRead, &[&e]);
+        if rahasyakosh_transfer::is_kdbx(&data) {
+            self.import = Some(ImportPlan {
+                file,
+                detected: "keepass",
+                items: Vec::new(),
+                skipped_duplicates: 0,
+                skipped_empty: 0,
+                warnings: Vec::new(),
+                columns: None,
+                needs_password_column: false,
+                needs_kdbx_password: true,
+            });
+            return Ok(());
+        }
         let csv_columns = if rahasyakosh_transfer::is_json(&data) {
             None
         } else {
@@ -684,6 +700,7 @@ impl<S: Store, C: Clipboard> Model<S, C> {
                 warnings: Vec::new(),
                 columns: csv_columns,
                 needs_password_column: true,
+                needs_kdbx_password: false,
             });
             return Ok(());
         }
@@ -699,6 +716,72 @@ impl<S: Store, C: Clipboard> Model<S, C> {
             warnings: report.warnings,
             columns: csv_columns,
             needs_password_column: false,
+            needs_kdbx_password: false,
+        });
+        Ok(())
+    }
+
+    /// Read a KDBX database with the supplied master password and populate the import preview.
+    pub fn import_preview_kdbx(
+        &mut self,
+        path: &str,
+        password: &str,
+        now: i64,
+    ) -> Result<(), String> {
+        self.activity(now);
+        self.import = None;
+        let result = self.try_import_preview_kdbx(path, password, now);
+        if let Err(e) = &result {
+            self.error(e.clone(), now);
+        }
+        result
+    }
+
+    fn try_import_preview_kdbx(
+        &mut self,
+        path: &str,
+        password: &str,
+        now: i64,
+    ) -> Result<(), String> {
+        use std::io::Read;
+        let lang = self.lang();
+        let path = path.trim();
+        if path.is_empty() {
+            return Err(t(lang, Msg::ImportEmptyPath).into());
+        }
+        let file = expand_home(path);
+        let limit = rahasyakosh_transfer::MAX_IMPORT_BYTES as u64;
+        let mut data = zeroize::Zeroizing::new(Vec::new());
+        std::fs::File::open(&file)
+            .and_then(|f| {
+                if !f.metadata()?.is_file() {
+                    return Err(std::io::ErrorKind::InvalidInput.into());
+                }
+                f.take(limit + 1).read_to_end(&mut data)
+            })
+            .map_err(|e| trf(lang, Msg::ImportCannotRead, &[&e]))?;
+        if data.len() as u64 > limit {
+            return Err(t(lang, Msg::ImportTooLarge).into());
+        }
+        let vault = self
+            .session
+            .vault(now)
+            .map_err(|Locked| t(lang, Msg::VaultIsLocked).to_string())?;
+        let existing: Vec<Item> = vault.items(Scope::Any).into_iter().cloned().collect();
+        let cannot_read = |e: rahasyakosh_transfer::Error| trf(lang, Msg::ImportCannotRead, &[&e]);
+        let report =
+            rahasyakosh_transfer::import_kdbx(&data, password, &existing, now, Uuid::now_v7)
+                .map_err(cannot_read)?;
+        self.import = Some(ImportPlan {
+            file,
+            detected: report.detected,
+            items: report.items,
+            skipped_duplicates: report.skipped_duplicates,
+            skipped_empty: report.skipped_empty,
+            warnings: report.warnings,
+            columns: None,
+            needs_password_column: false,
+            needs_kdbx_password: false,
         });
         Ok(())
     }
