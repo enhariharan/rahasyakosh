@@ -22,6 +22,8 @@ pub enum Error {
     Export(String),
     #[error("not a valid vault bundle: {0}")]
     Bundle(String),
+    #[error("not a valid 1Password export: {0}")]
+    OnePux(String),
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -464,8 +466,228 @@ pub fn is_json(data: &[u8]) -> bool {
     body.iter().find(|b| !b.is_ascii_whitespace()) == Some(&b'{')
 }
 
-/// Reads an import file of either kind: a Bitwarden JSON export if it starts with `{`, else a CSV.
-/// `overrides` only matters for CSV.
+/// Returns true when `data` starts with the ZIP local-file magic (`PK\x03\x04`), which is the
+/// container format used by `.1pux` files.
+pub fn is_1pux(data: &[u8]) -> bool {
+    data.len() >= 4 && data[0..4] == [0x50, 0x4B, 0x03, 0x04]
+}
+
+/// Import a 1Password `.1pux` unencrypted export.
+///
+/// Only Login (`001`) and Password (`005`) items are imported; other categories and archived items
+/// are counted in warnings. TOTP fields stored in sections are imported. Vault names are added as
+/// tags unless the vault is called "Personal", "Private", or "Unshared".
+pub fn import_1pux(
+    data: &[u8],
+    existing: &[Item],
+    now: i64,
+    mut new_id: impl FnMut() -> Uuid,
+) -> Result<ImportReport> {
+    if data.len() > MAX_IMPORT_BYTES {
+        return Err(Error::OnePux("file is too large".into()));
+    }
+    use std::io::Read;
+    use zip::ZipArchive;
+
+    let mut archive = ZipArchive::new(std::io::Cursor::new(data))
+        .map_err(|e| Error::OnePux(format!("not a valid .1pux archive: {e}")))?;
+
+    let export_data = {
+        let mut f = archive
+            .by_name("export.data")
+            .map_err(|_| Error::OnePux("missing export.data inside the archive".into()))?;
+        let mut buf = Vec::new();
+        f.read_to_end(&mut buf)
+            .map_err(|e| Error::OnePux(e.to_string()))?;
+        buf
+    };
+
+    let root: serde_json::Value = serde_json::from_slice(&export_data)
+        .map_err(|e| Error::OnePux(format!("export.data is not valid JSON: {e}")))?;
+
+    let accounts = root
+        .get("accounts")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| Error::OnePux("export.data has no \"accounts\" array".into()))?;
+
+    let mut out = Collector::new("1password", existing);
+    for account in accounts {
+        let vaults = account.get("vaults").and_then(|v| v.as_array());
+        for vault in vaults.into_iter().flatten() {
+            let vault_name = vault
+                .get("attrs")
+                .and_then(|a| a.get("name"))
+                .and_then(|n| n.as_str())
+                .unwrap_or("");
+            let items = vault.get("items").and_then(|v| v.as_array());
+            for item in items.into_iter().flatten() {
+                parse_1pux_item(item, vault_name, &mut out, now, &mut new_id);
+            }
+        }
+    }
+    Ok(out.finish())
+}
+
+fn parse_1pux_item(
+    item: &serde_json::Value,
+    vault_name: &str,
+    out: &mut Collector,
+    now: i64,
+    new_id: &mut impl FnMut() -> Uuid,
+) {
+    let state = item
+        .get("state")
+        .and_then(|s| s.as_str())
+        .unwrap_or("active");
+    if state == "archived" {
+        out.not_logins += 1;
+        return;
+    }
+    let cat = item
+        .get("categoryUuid")
+        .and_then(|c| c.as_str())
+        .unwrap_or("");
+    if !matches!(cat, "001" | "005") {
+        out.not_logins += 1;
+        return;
+    }
+
+    let ov = item.get("overview");
+    let det = item.get("details");
+
+    let title = ov
+        .and_then(|o| o.get("title"))
+        .and_then(|t| t.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+
+    let primary_url = ov
+        .and_then(|o| o.get("url"))
+        .and_then(|u| u.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    let extra_urls: Vec<String> = ov
+        .and_then(|o| o.get("urls"))
+        .and_then(|u| u.as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|u| u.get("u").and_then(|v| v.as_str()))
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    let mut urls: Vec<String> = Vec::new();
+    if !primary_url.is_empty() {
+        urls.push(primary_url);
+    }
+    for u in extra_urls {
+        if !urls.contains(&u) {
+            urls.push(u);
+        }
+    }
+
+    if title.is_empty() && urls.is_empty() {
+        out.report.skipped_empty += 1;
+        return;
+    }
+    let title = if title.is_empty() {
+        host_of(&urls[0])
+    } else {
+        title
+    };
+
+    let login_fields = det
+        .and_then(|d| d.get("loginFields"))
+        .and_then(|l| l.as_array());
+    let mut username = String::new();
+    let mut password = String::new();
+    for f in login_fields.into_iter().flatten() {
+        let des = f
+            .get("designation")
+            .and_then(|d| d.as_str())
+            .unwrap_or("");
+        let val = f.get("value").and_then(|v| v.as_str()).unwrap_or("");
+        match des {
+            "username" => username = val.to_string(),
+            "password" => password = val.to_string(),
+            _ => {}
+        }
+    }
+
+    let mut new_item = Item::login(&title, &username, &password, now, new_id());
+    new_item.urls = urls;
+    new_item.notes = det
+        .and_then(|d| d.get("notesPlain"))
+        .and_then(|n| n.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    let mut tags: Vec<String> = ov
+        .and_then(|o| o.get("tags"))
+        .and_then(|t| t.as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|t| t.as_str())
+        .map(str::to_string)
+        .collect();
+    if !vault_name.is_empty()
+        && !matches!(
+            vault_name.to_lowercase().as_str(),
+            "personal" | "private" | "unshared"
+        )
+    {
+        tags.push(vault_name.to_string());
+    }
+    new_item.tags = tags;
+
+    let sections = det
+        .and_then(|d| d.get("sections"))
+        .and_then(|s| s.as_array());
+    for section in sections.into_iter().flatten() {
+        let fields = section.get("fields").and_then(|f| f.as_array());
+        for field in fields.into_iter().flatten() {
+            let field_title = field
+                .get("title")
+                .and_then(|t| t.as_str())
+                .unwrap_or("")
+                .trim();
+            let Some(value) = field.get("value") else {
+                continue;
+            };
+            if let Some(totp_uri) = value.get("totp").and_then(|t| t.as_str()) {
+                out.add_totp(&mut new_item, totp_uri.trim());
+            } else if let Some(s) = value.get("concealed").and_then(|s| s.as_str()) {
+                if !field_title.is_empty() {
+                    new_item.fields.push(Field::secret(field_title, s));
+                }
+            } else if let Some(s) = value.get("string").and_then(|s| s.as_str()) {
+                if !field_title.is_empty() {
+                    new_item.fields.push(Field::text(field_title, s));
+                }
+            } else if let Some(s) = value.get("url").and_then(|s| s.as_str()) {
+                if !field_title.is_empty() {
+                    new_item.fields.push(Field::text(field_title, s));
+                }
+            } else if let Some(s) = value.get("phone").and_then(|s| s.as_str()) {
+                if !field_title.is_empty() {
+                    new_item.fields.push(Field::text(field_title, s));
+                }
+            } else if let Some(email_obj) = value.get("email") {
+                if let Some(addr) = email_obj.get("email_address").and_then(|a| a.as_str()) {
+                    if !field_title.is_empty() {
+                        new_item.fields.push(Field::text(field_title, addr));
+                    }
+                }
+            }
+        }
+    }
+
+    out.push(new_item);
+}
+
+/// Reads an import file: a Bitwarden JSON export if it starts with `{`, a `.1pux` archive if it
+/// starts with the ZIP magic, else a CSV. `overrides` only matters for CSV.
 pub fn import_file(
     data: &[u8],
     overrides: &[(String, String)],
@@ -480,6 +702,8 @@ pub fn import_file(
             now,
             new_id,
         )
+    } else if is_1pux(data) {
+        import_1pux(data, existing, now, new_id)
     } else {
         import_csv(data, overrides, existing, now, new_id)
     }
