@@ -22,6 +22,8 @@ pub enum Error {
     Export(String),
     #[error("not a valid vault bundle: {0}")]
     Bundle(String),
+    #[error("not a valid KeePass database: {0}")]
+    Kdbx(String),
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -616,6 +618,107 @@ pub fn export_txt(items: &[Item]) -> Zeroizing<String> {
         }
     }
     Zeroizing::new(out)
+}
+
+/// Returns `true` when `data` starts with the KeePass/KDBX file signature.
+pub fn is_kdbx(data: &[u8]) -> bool {
+    data.len() >= 4 && data[0..4] == [0x03, 0xD9, 0xA2, 0x9A]
+}
+
+/// Import a KeePass `.kdbx` database (KDBX 3 or 4). Groups become tags (flattened with `/`).
+/// Entries in the "Recycle Bin" group are skipped. TOTP is imported from the `otp` field URI.
+/// Custom fields are carried verbatim; fields whose names hint at a secret are marked concealed.
+///
+/// `password` is the master password for the database. Key-file-only databases are not supported.
+#[cfg(not(target_family = "wasm"))]
+pub fn import_kdbx(
+    data: &[u8],
+    password: &str,
+    existing: &[Item],
+    now: i64,
+    mut new_id: impl FnMut() -> Uuid,
+) -> Result<ImportReport> {
+    if data.len() > MAX_IMPORT_BYTES {
+        return Err(Error::Kdbx("file is too large".into()));
+    }
+    use keepass::{Database, DatabaseKey};
+    let key = DatabaseKey::new().with_password(password);
+    let db = Database::parse(data, key).map_err(|e| Error::Kdbx(e.to_string()))?;
+    let mut out = Collector::new("keepass", existing);
+    walk_kdbx_group(db.root(), None, &mut out, now, &mut new_id);
+    Ok(out.finish())
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn walk_kdbx_group(
+    group: keepass::db::GroupRef<'_>,
+    group_tag: Option<&str>,
+    out: &mut Collector,
+    now: i64,
+    new_id: &mut impl FnMut() -> Uuid,
+) {
+    use keepass::db::fields;
+    if group.name.to_lowercase() == "recycle bin" {
+        return;
+    }
+    let entry_ids: Vec<_> = group.entry_ids().collect();
+    for entry_id in entry_ids {
+        if let Some(entry) = group.entry(entry_id) {
+            let title = entry.get_title().unwrap_or("").trim().to_string();
+            let url = entry.get_url().unwrap_or("").trim().to_string();
+            if title.is_empty() && url.is_empty() {
+                out.report.skipped_empty += 1;
+                continue;
+            }
+            let title = if title.is_empty() { host_of(&url) } else { title };
+            let username = entry.get_username().unwrap_or("").to_string();
+            let pw = entry.get_password().unwrap_or("").to_string();
+            let mut item = Item::login(&title, &username, &pw, now, new_id());
+            if !url.is_empty() {
+                item.urls.push(url);
+            }
+            item.notes = entry.get(fields::NOTES).unwrap_or("").to_string();
+            if let Some(tag) = group_tag {
+                item.tags.push(tag.to_string());
+            }
+            item.tags.extend(entry.tags.iter().cloned());
+            if let Some(otp) = entry.get_raw_otp_value() {
+                out.add_totp(&mut item, otp.trim());
+            }
+            const KNOWN: &[&str] = &[
+                fields::TITLE,
+                fields::USERNAME,
+                fields::PASSWORD,
+                fields::URL,
+                fields::NOTES,
+                fields::OTP,
+            ];
+            for (k, v) in &entry.fields {
+                if !KNOWN.contains(&k.as_str()) {
+                    let lower = k.to_lowercase();
+                    let concealed = ["password", "secret", "key", "token", "pin"]
+                        .iter()
+                        .any(|s| lower.contains(s));
+                    item.fields.push(if concealed {
+                        Field::secret(k, v.as_str())
+                    } else {
+                        Field::text(k, v.as_str())
+                    });
+                }
+            }
+            out.push(item);
+        }
+    }
+    let child_ids: Vec<_> = group.group_ids().collect();
+    for child_id in child_ids {
+        if let Some(child) = group.group(child_id) {
+            let child_tag = match group_tag {
+                None => child.name.clone(),
+                Some(parent) => format!("{}/{}", parent, child.name),
+            };
+            walk_kdbx_group(child, Some(&child_tag), out, now, new_id);
+        }
+    }
 }
 
 #[cfg(test)]
