@@ -18,3 +18,8 @@ zeroize = "1.9.1"
 # proptest (via rusty-fork) does not build for WASI; property tests run natively only.
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 proptest = "1.12.0"
+keepass = { version = "0.17", features = ["save_kdbx4"] }
+
+# keepass needs std::io and OS-level crypto; not available on wasm32-unknown-unknown.
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+keepass = "0.17"
