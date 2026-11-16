@@ -679,9 +679,23 @@ impl<S: Store, C: Clipboard> Model<S, C> {
             });
             return Ok(());
         }
-        let csv_columns = if rahasyakosh_transfer::is_json(&data) {
-            None
-        } else {
+        if rahasyakosh_transfer::is_1pux(&data) || rahasyakosh_transfer::is_json(&data) {
+            let report = rahasyakosh_transfer::import_file(&data, columns, &existing, now, Uuid::now_v7)
+                .map_err(cannot_read)?;
+            self.import = Some(ImportPlan {
+                file,
+                detected: report.detected,
+                items: report.items,
+                skipped_duplicates: report.skipped_duplicates,
+                skipped_empty: report.skipped_empty,
+                warnings: report.warnings,
+                columns: None,
+                needs_password_column: false,
+                needs_kdbx_password: false,
+            });
+            return Ok(());
+        }
+        let csv_columns = {
             Some(rahasyakosh_transfer::csv_columns(&data, columns).map_err(cannot_read)?)
         };
         // A CSV with no password column cannot be read yet; show its columns so the user can pick one.
