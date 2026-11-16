@@ -186,7 +186,7 @@ enum Cmd {
     },
     /// Change the master password
     Passwd(MasterOpts),
-    /// Import logins from a CSV file (Chrome, Firefox, Bitwarden, KeePassXC, 1Password or generic) or a Bitwarden JSON export
+    /// Import logins from a CSV file (Chrome, Firefox, Bitwarden, KeePassXC, 1Password or generic), a Bitwarden JSON export, a KeePass .kdbx database, or a 1Password .1pux export
     Import {
         file: PathBuf,
         /// Map one of our fields to a column header, e.g. --map password=pwd (fields: title, url,
@@ -1263,7 +1263,26 @@ fn run() -> Result<()> {
                 std::fs::read(&file).with_context(|| format!("reading {}", file.display()))?,
             );
             let existing: Vec<Item> = vault.items(Scope::Any).into_iter().cloned().collect();
-            let report = transfer::import_file(&data, &overrides, &existing, now(), Uuid::now_v7)?;
+            let is_1pux_ext = file
+                .extension()
+                .map_or(false, |e| e.eq_ignore_ascii_case("1pux"));
+            let report = if transfer::is_kdbx(&data) {
+                let kdbx_pw = if let Ok(p) = std::env::var("RK_KDBX_PASSWORD") {
+                    zeroize::Zeroizing::new(p)
+                } else {
+                    zeroize::Zeroizing::new(rpassword::prompt_password(
+                        "KeePass database password: ",
+                    )?)
+                };
+                transfer::import_kdbx(&data, &kdbx_pw, &existing, now(), Uuid::now_v7)?
+            } else if is_1pux_ext && !transfer::is_1pux(&data) {
+                bail!(
+                    "not a valid 1Password export: {} does not appear to be a ZIP archive",
+                    file.display()
+                )
+            } else {
+                transfer::import_file(&data, &overrides, &existing, now(), Uuid::now_v7)?
+            };
             eprintln!(
                 "Detected format: {}. {} to import, {} duplicate(s) skipped, {} empty row(s) skipped.",
                 report.detected,
@@ -1292,10 +1311,17 @@ fn run() -> Result<()> {
             let count = report.items.len();
             vault.add_many(report.items, &mut rng)?;
             eprintln!("Imported {count} item(s)");
-            eprintln!(
-                "The CSV still holds your passwords in plain text. Delete it securely: {}",
-                file.display()
-            );
+            if report.detected == "keepass" {
+                eprintln!(
+                    "The .kdbx file is encrypted; you may keep or delete it: {}",
+                    file.display()
+                );
+            } else {
+                eprintln!(
+                    "The file still holds your passwords in plain text. Delete it securely: {}",
+                    file.display()
+                );
+            }
         }
         Cmd::Export {
             format,

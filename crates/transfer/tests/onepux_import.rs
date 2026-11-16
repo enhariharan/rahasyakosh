@@ -431,7 +431,8 @@ fn onepux_is_1pux_detection() {
     assert!(!is_1pux(b"title,url,username,password\n"));
     assert!(!is_1pux(b"{\"accounts\":[]}"));
     assert!(!is_1pux(b""));
-    assert!(!is_1pux(b"\x50\x4B")); // too short
+    assert!(is_1pux(b"\x50\x4B")); // 2-byte PK prefix is enough to signal a ZIP
+    assert!(!is_1pux(b"\x50")); // single byte is not enough
 }
 
 #[test]

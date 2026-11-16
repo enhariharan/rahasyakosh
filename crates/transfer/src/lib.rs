@@ -468,10 +468,10 @@ pub fn is_json(data: &[u8]) -> bool {
     body.iter().find(|b| !b.is_ascii_whitespace()) == Some(&b'{')
 }
 
-/// Returns true when `data` starts with the ZIP local-file magic (`PK\x03\x04`), which is the
-/// container format used by `.1pux` files.
+/// Returns true when `data` starts with the ZIP signature (`PK`, first two bytes), which covers
+/// normal zips (`PK\x03\x04`), empty zips (`PK\x05\x06`), and spanned zips (`PK\x07\x08`).
 pub fn is_1pux(data: &[u8]) -> bool {
-    data.len() >= 4 && data[0..4] == [0x50, 0x4B, 0x03, 0x04]
+    data.len() >= 2 && data[0..2] == [0x50, 0x4B]
 }
 
 /// Import a 1Password `.1pux` unencrypted export.
