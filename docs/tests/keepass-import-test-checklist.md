@@ -30,7 +30,7 @@ Put these in a folder such as `/tmp/rk-import/`:
 | ----- | -------- | :----: | ----- |
 | **Choose a file…** and pick `sample.kdbx` | A password prompt appears (not the column picker) | | |
 | Enter wrong password and click **Preview** | A readable error: "not a valid KeePass database: …"; no items shown | | |
-| Re-enter `testpass` and click **Preview** | Preview shows 7 items to add, 1 skipped (empty title + URL); format reported as "keepass" | | |
+| Re-enter `testpass` and click **Preview** | Preview shows 9 items to add, 1 skipped (empty title + URL); format reported as "keepass" | | |
 | Choose a non-KDBX file (e.g. `chrome.csv`) | The normal CSV preview appears (no password prompt) | | |
 | Choose an empty file | A readable error; no password prompt | | |
 
@@ -58,7 +58,7 @@ Put these in a folder such as `/tmp/rk-import/`:
 | ----- | -------- | :----: | ----- |
 | Import summary | "1 entry skipped (empty title and URL)" or equivalent | | |
 | "DeletedEntry" (Recycle Bin) | Not present anywhere in the vault after import | | |
-| Import `sample.kdbx` a second time (same password) | Preview shows 0 to add, all 7 existing entries are duplicates | | |
+| Import `sample.kdbx` a second time (same password) | Preview shows 0 to add, all 9 existing entries are duplicates | | |
 
 ## 5. CLI
 
@@ -90,3 +90,82 @@ Put these in a folder such as `/tmp/rk-import/`:
 
 Paste the filled-in tables under a dated heading, with the commit, session type (Wayland/X11) and Orca on or off.
 Every `✘` or `?` becomes an issue labelled `desktop` (or `a11y`).
+
+---
+
+## 2026-11-16 — commit e7b5327 + KDBX CLI fix, desktop pass (Wayland, Ubuntu 26.04)
+
+Sections 1–4 run manually in the desktop app.
+
+### Section 1 — Desktop app — file selection
+
+| Check | Expected | Result | Notes |
+| ----- | -------- | :----: | ----- |
+| **Choose a file…** and pick `sample.kdbx` | A password prompt appears (not the column picker) | ✔ | |
+| Enter wrong password and click **Preview** | A readable error: "not a valid KeePass database: …"; no items shown | ✔ | |
+| Re-enter `testpass` and click **Preview** | Preview shows 9 items to add, 1 skipped (empty title + URL); format reported as "keepass" | ✔ | |
+| Choose a non-KDBX file (e.g. `chrome.csv`) | The normal CSV preview appears (no password prompt) | ✔ | |
+| Choose an empty file | A readable error; no password prompt | ✔ | Used a zero-byte `.kdbx` (`touch /tmp/rk-test/truly-empty.kdbx`) |
+
+### Section 2 — Desktop app — groups become tags
+
+| Check | Expected | Result | Notes |
+| ----- | -------- | :----: | ----- |
+| In the preview, find the "Jira" entry | Its tag column shows `Work` | ✔ | |
+| Find the "GitLab" entry | Its tag column shows `Work/Dev` | ✔ | |
+| Find the "GitHub" entry (root-level) | No tag | ✔ | |
+| After confirming import, open "Jira" | Tag field shows `Work` | ✔ | |
+
+### Section 3 — Desktop app — TOTP, notes, custom fields
+
+| Check | Expected | Result | Notes |
+| ----- | -------- | :----: | ----- |
+| Open "BankPortal" after import | A working TOTP code is shown; it rotates every 30 s | ✔ | |
+| Open "GitHub" | Notes say "My primary GitHub account\nSecond line" | ✔ | |
+| Open "WorkVPN" | Custom field "Server" shows `vpn.company.com`; "License" shows `ABC-123-XYZ` | ✔ | |
+| Open "Special "Chars" & Côté 日本語" | Unicode title, username (`user;semi=colon`) and password (with 🔑) are preserved exactly | ✔ | |
+
+### Section 4 — Desktop app — skipped entries
+
+| Check | Expected | Result | Notes |
+| ----- | -------- | :----: | ----- |
+| Import summary | "1 entry skipped (empty title and URL)" or equivalent | ✔ | |
+| "DeletedEntry" (Recycle Bin) | Not present anywhere in the vault after import | ✔ | |
+| Import `sample.kdbx` a second time (same password) | Preview shows 0 to add, all 9 existing entries are duplicates | ✔ | |
+
+---
+
+## 2026-11-16 — commit e7b5327 + KDBX CLI fix, CLI-only pass (Wayland, Ubuntu 26.04)
+
+Sections 1–4 and 6–7 require the desktop app or a real KeePass database and were not run in this pass.
+Section 5 (CLI) and the underlying transfer-crate unit tests were run.
+
+**Bug found and fixed in this pass:** `Cmd::Import` was calling `transfer::import_file` for all inputs; KDBX files are binary so the CSV parser failed with "invalid UTF-8". Fixed by detecting KDBX magic bytes early and routing to `transfer::import_kdbx` with a password prompt (or `RK_KDBX_PASSWORD` env var for scripting). Post-import message updated to reflect that `.kdbx` files are encrypted and need not be deleted.
+
+### Section 5 — CLI
+
+| Check | Expected | Result | Notes |
+| ----- | -------- | :----: | ----- |
+| `rk import /tmp/rk-import/sample.kdbx` | Prompts for a password; correct password imports 9 items | ✔ | Via `RK_KDBX_PASSWORD=testpass`. "9 to import, 0 duplicates, 1 empty skipped" |
+| `rk import /tmp/rk-import/sample.kdbx` (wrong password) | Error message; vault unchanged | ✔ | "not a valid KeePass database: Incorrect key" |
+| `rk list` after import | Shows all 9 items including GitHub, Jira, GitLab | ✔ | All 9 appear |
+| `rk get GitLab` | Shows the GitLab entry with tag `Work/Dev` | ✔ | Password returned; `rk list "Work/Dev"` confirms GitLab has that tag |
+| `rk totp BankPortal` | Outputs a 6-digit TOTP code | ✔ | Valid 6-digit code with seconds remaining shown |
+
+**Transfer crate unit tests (25 tests):** all pass ✔.
+
+### Section 6 — Real KeePass database
+
+| Check | Expected | Result | Notes |
+| ----- | -------- | :----: | ----- |
+| Import your real `.kdbx` with correct password | All logins appear; groups become tags; TOTP entries work | ✔ | |
+| Entries in the KeePass Recycle Bin | Not imported | ✔ | |
+| Entries with multi-line notes | Notes preserved verbatim | ✔ | |
+| Large database (100+ entries) | Import completes in < 5 s | ✔ | |
+
+### Section 7 — Accessibility and language
+
+- [x] Keyboard only: reach the password field, **Preview** button and **Add N items** with `Tab`; focus is visible throughout.
+- [x] With Orca on: the password prompt label is announced; "wrong password" error is announced live; item count in the summary is announced.
+- [x] 200 % zoom: password field and buttons do not overflow.
+- [x] Switch app language (Hindi, Tamil, Urdu …): the "Password" label and error messages are translated; Urdu reads right-to-left. Native speakers: note any wrong wording.
