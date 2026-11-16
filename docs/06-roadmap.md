@@ -48,7 +48,7 @@ security-relevant changes reviewed by a second maintainer.
 - [x] US-EXP-02 (E12): Settings export offers text, CSV and JSON, with the same safety rules as the text export
 - [x] E13 user profiles (US-PRF-01 to 05) in the Linux desktop app: one vault and master password per profile, picker on the unlock screen, add/edit/delete. Still to do: `rk --profile <username>` in the CLI, and native review of the new translations
 - [x] Profile rough edges (2026-10-28): starts on the last profile used, a missing vault file no longer blocks the other profiles, same full names are told apart by username, deleting a profile is spoken. `rk --profile USERNAME` and `rk profiles` in the CLI
-- [x] US-IMP-02 (partly, 2026-10-28): Bitwarden JSON import; Bitwarden, KeePassXC and 1Password CSV recognised; desktop import has a file chooser and a column picker. KeePass `.kdbx` and 1Password `.1pux` are still open. The `csv_import` fuzz target covers the JSON reader too
+- [x] US-IMP-02 (2026-11-16): KeePass `.kdbx` and 1Password `.1pux` imports complete — desktop wired 2026-11-15; `rk import` now detects KDBX magic bytes and calls `import_kdbx` with a password prompt (or `RK_KDBX_PASSWORD`). CLI checklists passed. Two minor error-message issues remain (non-zip `.1pux` and empty-zip `.1pux` fall through to CSV parser instead of a clear archive error).
 - [ ] Next: macOS/Windows clipboard and packaging, tray + global shortcut (Wayland portal), then M4 sync
 
 ## Original order
