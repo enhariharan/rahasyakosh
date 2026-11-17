@@ -1,0 +1,6 @@
+folder,favorite,type,name,notes,fields,reprompt,login_uri,login_username,login_password,login_totp
+Work,0,login,GitHub,,,,https://github.com,alice@example.com,gh-pass-123,JBSWY3DPEHPK3PXP
+Personal,1,login,Gmail,,,,https://mail.google.com,alice@example.com,gm-pass-456,
+,0,login,Example Bank,,,,https://bank.example.com,alice,bank-pass-789,
+Work,0,note,SSH key notes,"Keep this safe",,,,,,
+,0,login,No URL entry,,,,,,no-url-pass,

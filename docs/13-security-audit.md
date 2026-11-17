@@ -26,7 +26,7 @@ It does not prove the app is secure. However, it lowers the chance that obvious 
 
 ### When is the audit conducted
 - Started after the main features (vault, profiles, import/export, desktop app, accessibility) existed
-- Finished before the first public release described in `docs/12-publishing-ubuntu.md`.
+- Finished before the first public release described in `docs/deploy/snap_store_checklist.md`.
 - The audit scope is a snapshot of the code at that date (the report names the commit).
 - It must be **repeated in part** when something it covers changes: the vault format, the key hierarchy, the store, the clipboard code, import/export, the installer or the CI.
 - Each fix is re-checked with the matching section of the test checklist.

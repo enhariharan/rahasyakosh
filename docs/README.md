@@ -13,7 +13,7 @@ Targets: Linux, macOS, Windows, Android, iOS (later), Browser (WASM + extension)
 | 06 | [Roadmap & Implementation Plan](06-roadmap.md) | Milestones, testing, CI, release |
 | 07 | [M2 Store Design](07-store-design.md) | Store trait, SQLite/directory backends, trash, history, search (draft) |
 | 11 | [Next steps](11-next-steps.md) | Notes for resuming work: queue, decisions needed, known limits |
-| 12 | [Publishing for Ubuntu](12-publishing-ubuntu.md) | Guidelines for releasing and packaging as an open-source Ubuntu app |
+| 12 | [Publishing for Ubuntu](deploy/snap_store_checklist.md) | Guidelines for releasing and packaging as an open-source Ubuntu app |
 | — | [The Rahasyakosh Book](book/src/introduction.md) | Plain-English guide to security and cryptography for newcomers and maintainers (mdBook: `mdbook serve docs/book --open`) |
 
 Status: **draft v0.1** — decisions marked *ADR* in 03 are open to revision until M2.
