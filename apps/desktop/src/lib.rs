@@ -2254,7 +2254,10 @@ fn SettingsView() -> Element {
                 }
             }
             h3 { {tr(lang, Msg::ExportTitle)} }
-            p { class: "muted small", id: "export-warning", {tr(lang, Msg::ExportWarning)} }
+            p { class: "muted small", {tr(lang, Msg::ExportWarning)} }
+            p { class: "small", id: "export-warning", style: "color: var(--danger); font-weight: bold;",
+                {tr(lang, Msg::ExportCaution)}
+            }
             form {
                 onsubmit: move |e| {
                     e.prevent_default();
