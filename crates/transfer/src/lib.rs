@@ -305,10 +305,14 @@ pub fn import_csv(
     let map = resolve_columns(&headers, overrides)?;
     let at = |c: Col| map[Col::ALL.iter().position(|x| *x == c).unwrap()];
     if at(Col::Password).is_none() {
-        return Err(Error::Mapping(format!(
-            "no password column found in headers [{}]; use --map password=<column>",
-            headers.join(", ")
-        )));
+        return Err(if headers.is_empty() {
+            Error::Mapping("the file appears to be empty".into())
+        } else {
+            Error::Mapping(format!(
+                "no password column found in headers ({}); use --map password=<column>",
+                headers.join(", ")
+            ))
+        });
     }
     let has = |name: &str| headers.iter().any(|h| h == name);
     let detected = if has("httprealm") || has("formactionorigin") {
