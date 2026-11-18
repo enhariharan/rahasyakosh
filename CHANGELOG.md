@@ -8,6 +8,49 @@ All notable changes to Rahasyakosh are written here, newest first. The format fo
 
 ## [Unreleased]
 
+## [0.1.0-alpha.4] — 2026-11-17
+
+### Added
+- **KeePass `.kdbx` import (US-IMP-02):** import a KeePass 4 database directly from the desktop import screen or with `rk import file.kdbx`. The database password is prompted; `RK_KDBX_PASSWORD` can supply it non-interactively.
+- **1Password `.1pux` import (US-IMP-02):** import a 1Password unencrypted export from the desktop or with `rk import file.1pux`. Login and Password items, TOTP fields, vault names as tags, and URL/notes are all carried over.
+- **`rk profile use <username>`:** set the default profile from the command line without opening the desktop app.
+
+### Fixed
+- A `.1pux` file that is not a valid ZIP archive now gives a clear error ("not a valid .1pux archive") instead of silently falling through to the CSV parser.
+- An empty ZIP file given a `.1pux` extension now gives a clear "missing export.data" error instead of a confusing CSV-column error.
+- `rk import` correctly detects KDBX magic bytes and `.1pux` ZIP headers regardless of the file name.
+- An import file that is completely empty now shows a user-readable hint rather than a bare I/O error.
+- Export warning text and note field labels sharpened.
+
+### How to verify
+Downloads are signed with sigstore keyless signing. Check a file with:
+```
+cosign verify-blob --bundle <file>.bundle --certificate-identity-regexp 'github.com/enhariharan/rahasyakosh' --certificate-oidc-issuer https://token.actions.githubusercontent.com <file>
+```
+
+### Known issues
+- macOS and Windows are not yet supported.
+- The app has not been independently audited. **Do not store real secrets until an audit is complete.**
+- Deleting a profile has no trash; it removes the vault file permanently.
+
+## [0.1.0-alpha.3] — 2026-11-16
+
+### Added
+- **Shell completions:** `rk completions bash|zsh|fish` generates shell completion scripts. Install instructions are in the CLI reference (`rk help completions`).
+- **About page (Ctrl+4):** shows the version, a short description, and a link to the source repository.
+- **`rahasyakosh.rk` snap command:** the `rk` CLI is now accessible inside the snap as `rahasyakosh.rk`.
+- Banner image added to Snap Store listing.
+
+### Fixed
+- Shell completions work on bash, zsh and fish (manual checklist passed).
+
+## [0.1.0-alpha.2] — 2026-11-15
+
+### Fixed
+- Orca (screen reader) no longer misreads the password field on initial load and after in-app navigation in the snap.
+- The setup master-password fields now retry the AT-SPI blur/focus handshake until the accessibility service is ready, so Orca reliably echoes key presses on the first try.
+- The password field in the item form now has a show/hide toggle, accessible by keyboard and screen reader.
+
 ## [0.1.0-alpha.1] — 2026-11-13
 
 ### Added

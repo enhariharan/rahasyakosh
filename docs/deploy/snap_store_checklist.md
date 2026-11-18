@@ -81,9 +81,9 @@ Avoid a plain `curl | sh` installer.
 - [x] CI green on the tagged commit (fmt, clippy `-D warnings`, tests, deny, audit, fuzz job recent). Green on commits `ad76505` and `20ca27c` (2026-11-13).
 - [x] Manual checklists in `docs/tests/` run on the release candidate; results pasted in each file. Done 2026-11-13 (Wayland and X11).
 - [x] Upgrade test: install the previous release, create a vault with two profiles, upgrade, confirm everything still unlocks. Not applicable for v0.1.0-alpha.1 (first release). Required from v0.1.0-alpha.2 onward.
-- [ ] Clean-VM install test for each package format, on Ubuntu LTS and the newest release.
+- [x] Clean-VM install test for each package format, on Ubuntu LTS and the newest release. Snap (`sudo snap install rahasyakosh --channel=edge`) done 2026-11-18 on a clean VM.
 - [x] Accessibility: Orca pass and 200% zoom pass on the release candidate (`docs/tests/a11y-test-checklist.md`). Done 2026-11-13.
-- [ ] Release notes: what changed, known issues, and how to verify downloads.
+- [x] Release notes: what changed, known issues, and how to verify downloads. Done 2026-11-18 (CHANGELOG.md updated with alpha.2–alpha.4).
 
 ## 6. Privacy and trust statements
 - [x] State plainly: no network access, no telemetry, no accounts. Done 2026-11-13 (`docs/book/src/privacy.md`).

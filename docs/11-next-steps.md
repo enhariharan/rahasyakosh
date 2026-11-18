@@ -14,8 +14,7 @@ Written 2026-10-25, updated 2026-10-28. Profiles (E13) and export to text, CSV a
 3. ~~**`rk --profile <username>`**~~ Done: `rk --profile USERNAME` (or `RK_PROFILE`) and `rk profiles`. The profile list is read from the folder of the vault file. The CLI cannot create profiles; the desktop app does.
 4. ~~Desktop import screen.~~ Built, and polished 2026-10-28: a file chooser, a column picker (also when no password column is found), Bitwarden JSON, and recognition of Bitwarden, KeePassXC and 1Password CSV files. ~~Still open from US-IMP-02: KeePass `.kdbx` and 1Password `.1pux`.~~ Done (desktop wired 2026-11-15, CLI `rk import` wired 2026-11-16, error-message bugs fixed 2026-11-16).
 5. ~~**Native-speaker review of translations**~~ Done 2026-11-10: Hindi, Sanskrit, Tamil, Telugu, Malayalam, Urdu reviewed by a human reviewer.
-6. **Publishing to Ubuntu**: see [`deploy/snap_store_checklist.md`](deploy/snap_store_checklist.md). Repository files (changelog, issue and pull request templates) are in place; the release workflow, signing and packages are not.
-   - **Register Rahasyakosh snap name on Snapcraft** (snapcraft.io/account/snaps → Register a snap name → `rahasyakosh`). Site returned HTTP 504 on 2026-11-12; retry later.
+6. ~~**Publishing to Ubuntu**~~ Done through v0.1.0-alpha.4: snap on `edge` channel, GHA auto-publish workflow, Snap Store listing with icon/screenshots/metadata, sigstore signing.
 
 ## Open items from earlier (see `06-roadmap.md`)
 - macOS and Windows clipboard and packaging.
