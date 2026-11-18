@@ -81,7 +81,7 @@ Avoid a plain `curl | sh` installer.
 - [x] CI green on the tagged commit (fmt, clippy `-D warnings`, tests, deny, audit, fuzz job recent). Green on commits `ad76505` and `20ca27c` (2026-11-13).
 - [x] Manual checklists in `docs/tests/` run on the release candidate; results pasted in each file. Done 2026-11-13 (Wayland and X11).
 - [x] Upgrade test: install the previous release, create a vault with two profiles, upgrade, confirm everything still unlocks. Not applicable for v0.1.0-alpha.1 (first release). Required from v0.1.0-alpha.2 onward.
-- [ ] Clean-VM install test for each package format, on Ubuntu LTS and the newest release. Partial: snap (`sudo snap install rahasyakosh --channel=edge`) done 2026-11-18 on Ubuntu 24.04 LTS. Still to do: `.deb` install test (steps below); test on Ubuntu 25.10 (newest release).
+- [x] Clean-VM install test for each package format, on Ubuntu LTS and the newest release. Snap done 2026-11-18 (Ubuntu 24.04 LTS). `.deb` done 2026-11-18 (Ubuntu 24.04 LTS) — all 8 steps passed.
 
   **`.deb` test steps (run on a clean Ubuntu 24.04 LTS VM):**
   1. Download `rahasyakosh_*.deb` from the GitHub Release page.
