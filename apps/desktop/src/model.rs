@@ -679,6 +679,28 @@ impl<S: Store, C: Clipboard> Model<S, C> {
             });
             return Ok(());
         }
+        let is_1pux_ext = file
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("1pux"));
+        if is_1pux_ext {
+            // Always route .1pux extension files directly to import_1pux so that
+            // non-ZIP and empty-ZIP cases get a clear archive error instead of
+            // silently falling through to the CSV parser.
+            let report = rahasyakosh_transfer::import_1pux(&data, &existing, now, Uuid::now_v7)
+                .map_err(cannot_read)?;
+            self.import = Some(ImportPlan {
+                file,
+                detected: report.detected,
+                items: report.items,
+                skipped_duplicates: report.skipped_duplicates,
+                skipped_empty: report.skipped_empty,
+                warnings: report.warnings,
+                columns: None,
+                needs_password_column: false,
+                needs_kdbx_password: false,
+            });
+            return Ok(());
+        }
         if rahasyakosh_transfer::is_1pux(&data) || rahasyakosh_transfer::is_json(&data) {
             let report = rahasyakosh_transfer::import_file(&data, columns, &existing, now, Uuid::now_v7)
                 .map_err(cannot_read)?;

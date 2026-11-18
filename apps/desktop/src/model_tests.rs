@@ -1215,3 +1215,50 @@ fn import_reads_a_bitwarden_json_export_and_a_keepass_csv() {
         .unwrap_err();
     assert!(err.contains("encrypted"), "{err}");
 }
+
+#[test]
+fn import_1pux_non_zip_gives_archive_error_not_csv_fallthrough() {
+    let (mut m, _) = model(Settings {
+        idle_lock_secs: 0,
+        ..Settings::default()
+    });
+    let dir = scratch_dir("import-1pux-nonzip");
+    // A file with .1pux extension but non-ZIP content (plain text).
+    let bad = dir.join("export.1pux");
+    std::fs::write(&bad, "this is not a zip archive").unwrap();
+    let err = m.import_preview(bad.to_str().unwrap(), &[], 30).unwrap_err();
+    assert!(
+        err.to_lowercase().contains("archive") || err.to_lowercase().contains("1pux"),
+        "expected an archive error, got: {err}"
+    );
+}
+
+#[test]
+fn import_1pux_empty_zip_gives_archive_error_not_csv_fallthrough() {
+    let (mut m, _) = model(Settings {
+        idle_lock_secs: 0,
+        ..Settings::default()
+    });
+    let dir = scratch_dir("import-1pux-emptyzip");
+    // A file with .1pux extension that is a valid but empty ZIP (EOCD record only, no entries).
+    let empty_zip = dir.join("export.1pux");
+    #[rustfmt::skip]
+    let eocd: [u8; 22] = [
+        0x50, 0x4B, 0x05, 0x06, // end-of-central-directory signature
+        0x00, 0x00,             // disk number
+        0x00, 0x00,             // disk with start of central directory
+        0x00, 0x00,             // number of entries on this disk
+        0x00, 0x00,             // total entries
+        0x00, 0x00, 0x00, 0x00, // size of central directory
+        0x00, 0x00, 0x00, 0x00, // offset of central directory
+        0x00, 0x00,             // comment length
+    ];
+    std::fs::write(&empty_zip, eocd).unwrap();
+    let err = m
+        .import_preview(empty_zip.to_str().unwrap(), &[], 30)
+        .unwrap_err();
+    assert!(
+        err.to_lowercase().contains("export.data") || err.to_lowercase().contains("archive"),
+        "expected a missing-export.data error, got: {err}"
+    );
+}
