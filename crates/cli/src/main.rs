@@ -704,73 +704,6 @@ fn changed_parts(a: &ItemVersion, b: &ItemVersion) -> String {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn completions_bash_is_nonempty() {
-        let mut out = Vec::new();
-        clap_complete::generate(Shell::Bash, &mut Cli::command(), "rk", &mut out);
-        assert!(!out.is_empty());
-        assert!(out.windows(2).any(|w| w == b"rk"));
-    }
-
-    #[test]
-    fn profile_use_sets_default_and_persists() {
-        let dir = std::env::temp_dir().join(format!("rk-profile-use-test-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-
-        let mut list = rahasyakosh_app::ProfileList::new();
-        let id_a = uuid::Uuid::from_u128(1);
-        let id_b = uuid::Uuid::from_u128(2);
-        list.add(id_a, "Alice Smith", "alice", "alice.db").unwrap();
-        list.add(id_b, "Bob Jones", "bob", "bob.db").unwrap();
-        rahasyakosh_app::profile_files::save_list(&dir, &list).unwrap();
-
-        // alice is first, so start_profile is alice before any `profile use`
-        assert_eq!(list.start_profile().unwrap().username, "alice");
-
-        // simulate `rk profile use bob`
-        let username = "bob";
-        let mut list2 = rahasyakosh_app::profile_files::read_list(&dir)
-            .unwrap()
-            .unwrap();
-        let profile = list2.find_by_username(username).cloned().unwrap();
-        list2.set_last_used(profile.id);
-        rahasyakosh_app::profile_files::save_list(&dir, &list2).unwrap();
-
-        // reload from disk and check bob is now the default
-        let list3 = rahasyakosh_app::profile_files::read_list(&dir)
-            .unwrap()
-            .unwrap();
-        assert_eq!(list3.start_profile().unwrap().username, "bob");
-
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn profile_use_unknown_username_gives_clear_error() {
-        let dir =
-            std::env::temp_dir().join(format!("rk-profile-unknown-test-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-
-        let mut list = rahasyakosh_app::ProfileList::new();
-        list.add(uuid::Uuid::from_u128(1), "Alice", "alice", "alice.db")
-            .unwrap();
-        rahasyakosh_app::profile_files::save_list(&dir, &list).unwrap();
-
-        let list2 = rahasyakosh_app::profile_files::read_list(&dir)
-            .unwrap()
-            .unwrap();
-        assert!(list2.find_by_username("nobody").is_none());
-
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-}
-
 /// Errors can quote item titles (an ambiguous match lists them), so they are printed through [`safe::line`] too.
 fn main() -> std::process::ExitCode {
     match run() {
@@ -1274,7 +1207,7 @@ fn run() -> Result<()> {
             let existing: Vec<Item> = vault.items(Scope::Any).into_iter().cloned().collect();
             let is_1pux_ext = file
                 .extension()
-                .map_or(false, |e| e.eq_ignore_ascii_case("1pux"));
+                .is_some_and(|e| e.eq_ignore_ascii_case("1pux"));
             let report = if transfer::is_kdbx(&data) {
                 let kdbx_pw = if let Ok(p) = std::env::var("RK_KDBX_PASSWORD") {
                     zeroize::Zeroizing::new(p)
@@ -1388,4 +1321,71 @@ fn run() -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn completions_bash_is_nonempty() {
+        let mut out = Vec::new();
+        clap_complete::generate(Shell::Bash, &mut Cli::command(), "rk", &mut out);
+        assert!(!out.is_empty());
+        assert!(out.windows(2).any(|w| w == b"rk"));
+    }
+
+    #[test]
+    fn profile_use_sets_default_and_persists() {
+        let dir = std::env::temp_dir().join(format!("rk-profile-use-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let mut list = rahasyakosh_app::ProfileList::new();
+        let id_a = uuid::Uuid::from_u128(1);
+        let id_b = uuid::Uuid::from_u128(2);
+        list.add(id_a, "Alice Smith", "alice", "alice.db").unwrap();
+        list.add(id_b, "Bob Jones", "bob", "bob.db").unwrap();
+        rahasyakosh_app::profile_files::save_list(&dir, &list).unwrap();
+
+        // alice is first, so start_profile is alice before any `profile use`
+        assert_eq!(list.start_profile().unwrap().username, "alice");
+
+        // simulate `rk profile use bob`
+        let username = "bob";
+        let mut list2 = rahasyakosh_app::profile_files::read_list(&dir)
+            .unwrap()
+            .unwrap();
+        let profile = list2.find_by_username(username).cloned().unwrap();
+        list2.set_last_used(profile.id);
+        rahasyakosh_app::profile_files::save_list(&dir, &list2).unwrap();
+
+        // reload from disk and check bob is now the default
+        let list3 = rahasyakosh_app::profile_files::read_list(&dir)
+            .unwrap()
+            .unwrap();
+        assert_eq!(list3.start_profile().unwrap().username, "bob");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn profile_use_unknown_username_gives_clear_error() {
+        let dir =
+            std::env::temp_dir().join(format!("rk-profile-unknown-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let mut list = rahasyakosh_app::ProfileList::new();
+        list.add(uuid::Uuid::from_u128(1), "Alice", "alice", "alice.db")
+            .unwrap();
+        rahasyakosh_app::profile_files::save_list(&dir, &list).unwrap();
+
+        let list2 = rahasyakosh_app::profile_files::read_list(&dir)
+            .unwrap()
+            .unwrap();
+        assert!(list2.find_by_username("nobody").is_none());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
