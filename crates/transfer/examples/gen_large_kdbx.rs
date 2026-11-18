@@ -35,11 +35,11 @@ fn main() {
             for i in 0..22 {
                 let n = gi * 22 + i + 1;
                 let mut e = g.add_entry();
-                e.set_unprotected(fields::TITLE, &format!("Service {n:03}"));
-                e.set_unprotected(fields::USERNAME, &format!("user{n:03}@example.com"));
-                e.set_protected(fields::PASSWORD, &format!("Passw0rd!{n:03}"));
-                e.set_unprotected(fields::URL, &format!("https://service{n:03}.example.com"));
-                e.set_unprotected(fields::NOTES, &format!("Auto-generated entry {n}"));
+                e.set_unprotected(fields::TITLE, format!("Service {n:03}"));
+                e.set_unprotected(fields::USERNAME, format!("user{n:03}@example.com"));
+                e.set_protected(fields::PASSWORD, format!("Passw0rd!{n:03}"));
+                e.set_unprotected(fields::URL, format!("https://service{n:03}.example.com"));
+                e.set_unprotected(fields::NOTES, format!("Auto-generated entry {n}"));
             }
         }
 
@@ -50,7 +50,7 @@ fn main() {
             rb.edit(|g| g.name = "Recycle Bin".to_string());
             for i in 1..=5 {
                 let mut e = rb.add_entry();
-                e.set_unprotected(fields::TITLE, &format!("Deleted {i}"));
+                e.set_unprotected(fields::TITLE, format!("Deleted {i}"));
                 e.set_unprotected(fields::USERNAME, "ghost");
                 e.set_protected(fields::PASSWORD, "old");
                 e.set_unprotected(fields::URL, "https://deleted.example.com");
