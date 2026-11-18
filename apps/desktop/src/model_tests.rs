@@ -1226,7 +1226,9 @@ fn import_1pux_non_zip_gives_archive_error_not_csv_fallthrough() {
     // A file with .1pux extension but non-ZIP content (plain text).
     let bad = dir.join("export.1pux");
     std::fs::write(&bad, "this is not a zip archive").unwrap();
-    let err = m.import_preview(bad.to_str().unwrap(), &[], 30).unwrap_err();
+    let err = m
+        .import_preview(bad.to_str().unwrap(), &[], 30)
+        .unwrap_err();
     assert!(
         err.to_lowercase().contains("archive") || err.to_lowercase().contains("1pux"),
         "expected an archive error, got: {err}"

@@ -619,7 +619,10 @@ fn app() -> Element {
     // WindowEvent::Focused fires only on Alt+Tab; every screen transition needs its own run so Orca
     // does not stay stuck on the filler from the previous page.
     let nav_gen = use_memo(move || {
-        model.read().as_ref().map(|m| (m.is_unlocked(), m.view.clone()))
+        model
+            .read()
+            .as_ref()
+            .map(|m| (m.is_unlocked(), m.view.clone()))
     });
     let mut nav_first = use_signal(|| true);
     use_effect(move || {

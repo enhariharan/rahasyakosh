@@ -702,8 +702,9 @@ impl<S: Store, C: Clipboard> Model<S, C> {
             return Ok(());
         }
         if rahasyakosh_transfer::is_1pux(&data) || rahasyakosh_transfer::is_json(&data) {
-            let report = rahasyakosh_transfer::import_file(&data, columns, &existing, now, Uuid::now_v7)
-                .map_err(cannot_read)?;
+            let report =
+                rahasyakosh_transfer::import_file(&data, columns, &existing, now, Uuid::now_v7)
+                    .map_err(cannot_read)?;
             self.import = Some(ImportPlan {
                 file,
                 detected: report.detected,
@@ -717,9 +718,8 @@ impl<S: Store, C: Clipboard> Model<S, C> {
             });
             return Ok(());
         }
-        let csv_columns = {
-            Some(rahasyakosh_transfer::csv_columns(&data, columns).map_err(cannot_read)?)
-        };
+        let csv_columns =
+            { Some(rahasyakosh_transfer::csv_columns(&data, columns).map_err(cannot_read)?) };
         // A CSV with no password column cannot be read yet; show its columns so the user can pick one.
         let password_found = csv_columns.as_ref().is_none_or(|c| {
             c.assigned
