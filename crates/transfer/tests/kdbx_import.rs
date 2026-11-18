@@ -30,10 +30,7 @@ fn ids() -> impl FnMut() -> Uuid {
 /// Recycle Bin group:
 ///   - DeletedEntry : entry that must NOT be imported
 fn build_kdbx_fixture() -> Vec<u8> {
-    use keepass::{
-        Database, DatabaseKey,
-        db::fields,
-    };
+    use keepass::{db::fields, Database, DatabaseKey};
 
     let mut db = Database::new();
 
@@ -181,17 +178,29 @@ fn kdbx_basic_import() {
     assert_eq!(r.detected, "keepass");
     // 6 root entries (GitHub, BankPortal, example.org, WorkVPN, SpecialChars)
     // + 1 Work/Jira + 1 Work/Dev/GitLab = 7 (the empty-both entry is skipped)
-    assert_eq!(r.items.len(), 7, "unexpected item count: {:?}", r.items.iter().map(|i| &i.title).collect::<Vec<_>>());
+    assert_eq!(
+        r.items.len(),
+        7,
+        "unexpected item count: {:?}",
+        r.items.iter().map(|i| &i.title).collect::<Vec<_>>()
+    );
     assert_eq!(r.skipped_empty, 1, "expected 1 empty entry skipped");
 
     // Spot-check the GitHub entry
-    let gh = r.items.iter().find(|i| i.title == "GitHub").expect("GitHub not found");
+    let gh = r
+        .items
+        .iter()
+        .find(|i| i.title == "GitHub")
+        .expect("GitHub not found");
     assert_eq!(gh.field("username").unwrap().value, "alice@example.com");
     assert!(gh.field("password").unwrap().concealed);
     assert_eq!(gh.field("password").unwrap().value, "s3cretPW!");
     assert_eq!(gh.urls, ["https://github.com"]);
     assert_eq!(gh.notes, "My primary GitHub account");
-    assert!(gh.tags.is_empty(), "root-level entry should have no group tag");
+    assert!(
+        gh.tags.is_empty(),
+        "root-level entry should have no group tag"
+    );
 }
 
 #[test]
@@ -199,11 +208,27 @@ fn kdbx_groups_become_tags() {
     let data = build_kdbx_fixture();
     let r = import_kdbx(&data, "testpass", &[], 100, ids()).unwrap();
 
-    let jira = r.items.iter().find(|i| i.title == "Jira").expect("Jira not found");
-    assert_eq!(jira.tags, ["Work"], "Work-group entry should have tag 'Work'");
+    let jira = r
+        .items
+        .iter()
+        .find(|i| i.title == "Jira")
+        .expect("Jira not found");
+    assert_eq!(
+        jira.tags,
+        ["Work"],
+        "Work-group entry should have tag 'Work'"
+    );
 
-    let gitlab = r.items.iter().find(|i| i.title == "GitLab").expect("GitLab not found");
-    assert_eq!(gitlab.tags, ["Work/Dev"], "nested entry should have tag 'Work/Dev'");
+    let gitlab = r
+        .items
+        .iter()
+        .find(|i| i.title == "GitLab")
+        .expect("GitLab not found");
+    assert_eq!(
+        gitlab.tags,
+        ["Work/Dev"],
+        "nested entry should have tag 'Work/Dev'"
+    );
 }
 
 #[test]
@@ -220,7 +245,11 @@ fn kdbx_recycle_bin_skipped() {
 fn kdbx_totp_imported() {
     let data = build_kdbx_fixture();
     let r = import_kdbx(&data, "testpass", &[], 100, ids()).unwrap();
-    let bank = r.items.iter().find(|i| i.title == "BankPortal").expect("BankPortal not found");
+    let bank = r
+        .items
+        .iter()
+        .find(|i| i.title == "BankPortal")
+        .expect("BankPortal not found");
     let totp = bank.field("totp").expect("totp field should be present");
     assert!(totp.concealed);
     assert!(
@@ -234,11 +263,19 @@ fn kdbx_totp_imported() {
 fn kdbx_custom_fields() {
     let data = build_kdbx_fixture();
     let r = import_kdbx(&data, "testpass", &[], 100, ids()).unwrap();
-    let vpn = r.items.iter().find(|i| i.title == "WorkVPN").expect("WorkVPN not found");
-    let server = vpn.field("Server").expect("Server custom field should be present");
+    let vpn = r
+        .items
+        .iter()
+        .find(|i| i.title == "WorkVPN")
+        .expect("WorkVPN not found");
+    let server = vpn
+        .field("Server")
+        .expect("Server custom field should be present");
     assert_eq!(server.value, "vpn.company.com");
     assert!(!server.concealed, "Server field should not be concealed");
-    let license = vpn.field("License").expect("License field should be present");
+    let license = vpn
+        .field("License")
+        .expect("License field should be present");
     assert_eq!(license.value, "ABC-123-XYZ");
 }
 
@@ -269,7 +306,10 @@ fn kdbx_special_characters() {
         .iter()
         .find(|i| i.title.contains("Chars"))
         .expect("SpecialChars entry not found");
-    assert!(sc.title.contains("Côté"), "Unicode in title should be preserved");
+    assert!(
+        sc.title.contains("Côté"),
+        "Unicode in title should be preserved"
+    );
     assert_eq!(sc.field("username").unwrap().value, "user;semi=colon");
     assert!(sc.field("password").unwrap().value.contains('\u{1F511}'));
 }
@@ -290,7 +330,7 @@ fn kdbx_duplicate_detection() {
 #[test]
 fn kdbx_notes_multiline() {
     // Quickly verify that Notes content is preserved exactly (a common whitespace trap).
-    use keepass::{Database, DatabaseKey, db::fields};
+    use keepass::{db::fields, Database, DatabaseKey};
     let mut db = Database::new();
     {
         let mut root = db.root_mut();

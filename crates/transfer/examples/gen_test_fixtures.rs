@@ -4,19 +4,14 @@
 //!
 //! If no output directory is given, files are written to `crates/transfer/tests/fixtures/`.
 
-use std::{
-    io::Write as _,
-    path::PathBuf,
-};
+use std::{io::Write as _, path::PathBuf};
 use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
 
 fn main() {
     let out_dir = std::env::args()
         .nth(1)
         .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
-        });
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures"));
     std::fs::create_dir_all(&out_dir).expect("create output directory");
 
     let path = out_dir.join("sample.1pux");

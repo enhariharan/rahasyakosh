@@ -718,8 +718,7 @@ mod tests {
 
     #[test]
     fn profile_use_sets_default_and_persists() {
-        let dir = std::env::temp_dir()
-            .join(format!("rk-profile-use-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("rk-profile-use-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
 
@@ -753,13 +752,14 @@ mod tests {
 
     #[test]
     fn profile_use_unknown_username_gives_clear_error() {
-        let dir = std::env::temp_dir()
-            .join(format!("rk-profile-unknown-test-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("rk-profile-unknown-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
 
         let mut list = rahasyakosh_app::ProfileList::new();
-        list.add(uuid::Uuid::from_u128(1), "Alice", "alice", "alice.db").unwrap();
+        list.add(uuid::Uuid::from_u128(1), "Alice", "alice", "alice.db")
+            .unwrap();
         rahasyakosh_app::profile_files::save_list(&dir, &list).unwrap();
 
         let list2 = rahasyakosh_app::profile_files::read_list(&dir)
@@ -798,7 +798,10 @@ fn run() -> Result<()> {
     if matches!(cli.cmd, Cmd::Profiles | Cmd::Profile { .. }) {
         let dir = path.parent().unwrap_or_else(|| Path::new("."));
         match &cli.cmd {
-            Cmd::Profiles | Cmd::Profile { action: ProfileCmd::List } => {
+            Cmd::Profiles
+            | Cmd::Profile {
+                action: ProfileCmd::List,
+            } => {
                 let list = read_profiles(&path)?;
                 for p in list.all() {
                     println!(
@@ -808,7 +811,9 @@ fn run() -> Result<()> {
                     );
                 }
             }
-            Cmd::Profile { action: ProfileCmd::Use { username } } => {
+            Cmd::Profile {
+                action: ProfileCmd::Use { username },
+            } => {
                 let mut list = read_profiles(&path)?;
                 let Some(profile) = list.find_by_username(username).cloned() else {
                     let known: Vec<&str> = list.all().iter().map(|p| p.username.as_str()).collect();
@@ -820,7 +825,11 @@ fn run() -> Result<()> {
                 list.set_last_used(profile.id);
                 rahasyakosh_app::profile_files::save_list(dir, &list)
                     .map_err(|e| anyhow::anyhow!("{e}"))?;
-                eprintln!("Default profile set to {:?} ({})", username, list.display_name(profile.id));
+                eprintln!(
+                    "Default profile set to {:?} ({})",
+                    username,
+                    list.display_name(profile.id)
+                );
             }
             _ => unreachable!(),
         }

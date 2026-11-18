@@ -1,6 +1,4 @@
-use rahasyakosh_transfer::{
-    import_1pux, import_file, is_1pux, ImportReport,
-};
+use rahasyakosh_transfer::{import_1pux, import_file, is_1pux, ImportReport};
 use uuid::Uuid;
 
 fn ids() -> impl FnMut() -> Uuid {
@@ -332,7 +330,11 @@ fn onepux_empty_entry_skipped() {
 #[test]
 fn onepux_standalone_password_imported() {
     let r = run(&build_fixture());
-    let sp = r.items.iter().find(|i| i.title == "Standalone Pass").unwrap();
+    let sp = r
+        .items
+        .iter()
+        .find(|i| i.title == "Standalone Pass")
+        .unwrap();
     assert_eq!(sp.field("username").unwrap().value, "frank");
     assert_eq!(sp.field("password").unwrap().value, "standalone");
 }
@@ -389,29 +391,20 @@ fn onepux_missing_export_data() {
 fn onepux_bad_json() {
     let zip = zip_with_content("export.data", b"not json at all");
     let err = import_1pux(&zip, &[], 1, ids()).unwrap_err();
-    assert!(
-        err.to_string().contains("not valid JSON"),
-        "got: {err}"
-    );
+    assert!(err.to_string().contains("not valid JSON"), "got: {err}");
 }
 
 #[test]
 fn onepux_no_accounts_key() {
     let zip = zip_with_content("export.data", b"{\"foo\":1}");
     let err = import_1pux(&zip, &[], 1, ids()).unwrap_err();
-    assert!(
-        err.to_string().contains("accounts"),
-        "got: {err}"
-    );
+    assert!(err.to_string().contains("accounts"), "got: {err}");
 }
 
 #[test]
 fn onepux_not_a_zip() {
     let err = import_1pux(b"this is not a zip file", &[], 1, ids()).unwrap_err();
-    assert!(
-        err.to_string().contains(".1pux archive"),
-        "got: {err}"
-    );
+    assert!(err.to_string().contains(".1pux archive"), "got: {err}");
 }
 
 #[test]

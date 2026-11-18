@@ -9,7 +9,7 @@
 fn main() {
     #[cfg(not(target_family = "wasm"))]
     {
-        use keepass::{Database, DatabaseKey, db::fields};
+        use keepass::{db::fields, Database, DatabaseKey};
 
         let out_path = std::env::args()
             .nth(1)

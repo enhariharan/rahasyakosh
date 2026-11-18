@@ -609,10 +609,7 @@ fn parse_1pux_item(
     let mut username = String::new();
     let mut password = String::new();
     for f in login_fields.into_iter().flatten() {
-        let des = f
-            .get("designation")
-            .and_then(|d| d.as_str())
-            .unwrap_or("");
+        let des = f.get("designation").and_then(|d| d.as_str()).unwrap_or("");
         let val = f.get("value").and_then(|v| v.as_str()).unwrap_or("");
         match des {
             "username" => username = val.to_string(),
@@ -898,7 +895,11 @@ fn walk_kdbx_group(
                 out.report.skipped_empty += 1;
                 continue;
             }
-            let title = if title.is_empty() { host_of(&url) } else { title };
+            let title = if title.is_empty() {
+                host_of(&url)
+            } else {
+                title
+            };
             let username = entry.get_username().unwrap_or("").to_string();
             let pw = entry.get_password().unwrap_or("").to_string();
             let mut item = Item::login(&title, &username, &pw, now, new_id());

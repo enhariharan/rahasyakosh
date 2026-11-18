@@ -7,7 +7,7 @@
 fn main() {
     #[cfg(not(target_family = "wasm"))]
     {
-        use keepass::{Database, DatabaseKey, db::fields};
+        use keepass::{db::fields, Database, DatabaseKey};
 
         let out_path = std::env::args()
             .nth(1)
@@ -16,8 +16,16 @@ fn main() {
         let mut db = Database::new();
 
         let groups = [
-            "Work", "Personal", "Finance", "Social", "Shopping",
-            "Travel", "Dev", "Health", "Education", "Misc",
+            "Work",
+            "Personal",
+            "Finance",
+            "Social",
+            "Shopping",
+            "Travel",
+            "Dev",
+            "Health",
+            "Education",
+            "Misc",
         ];
 
         for (gi, group_name) in groups.iter().enumerate() {
@@ -27,11 +35,11 @@ fn main() {
             for i in 0..22 {
                 let n = gi * 22 + i + 1;
                 let mut e = g.add_entry();
-                e.set_unprotected(fields::TITLE,    &format!("Service {n:03}"));
-                e.set_unprotected(fields::USERNAME,  &format!("user{n:03}@example.com"));
-                e.set_protected(fields::PASSWORD,   &format!("Passw0rd!{n:03}"));
-                e.set_unprotected(fields::URL,       &format!("https://service{n:03}.example.com"));
-                e.set_unprotected(fields::NOTES,     &format!("Auto-generated entry {n}"));
+                e.set_unprotected(fields::TITLE, &format!("Service {n:03}"));
+                e.set_unprotected(fields::USERNAME, &format!("user{n:03}@example.com"));
+                e.set_protected(fields::PASSWORD, &format!("Passw0rd!{n:03}"));
+                e.set_unprotected(fields::URL, &format!("https://service{n:03}.example.com"));
+                e.set_unprotected(fields::NOTES, &format!("Auto-generated entry {n}"));
             }
         }
 
@@ -42,10 +50,10 @@ fn main() {
             rb.edit(|g| g.name = "Recycle Bin".to_string());
             for i in 1..=5 {
                 let mut e = rb.add_entry();
-                e.set_unprotected(fields::TITLE,   &format!("Deleted {i}"));
+                e.set_unprotected(fields::TITLE, &format!("Deleted {i}"));
                 e.set_unprotected(fields::USERNAME, "ghost");
-                e.set_protected(fields::PASSWORD,  "old");
-                e.set_unprotected(fields::URL,      "https://deleted.example.com");
+                e.set_protected(fields::PASSWORD, "old");
+                e.set_unprotected(fields::URL, "https://deleted.example.com");
             }
         }
 
@@ -59,7 +67,10 @@ fn main() {
         }
         std::fs::write(&out_path, &bytes).expect("failed to write file");
         println!("Written {} bytes to {out_path}", bytes.len());
-        println!("Entries: {} logins + 5 Recycle Bin (should be skipped)", groups.len() * 22);
+        println!(
+            "Entries: {} logins + 5 Recycle Bin (should be skipped)",
+            groups.len() * 22
+        );
         println!("Password: testpass");
     }
 
