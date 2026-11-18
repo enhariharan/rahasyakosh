@@ -6,6 +6,9 @@ targets = [
 
 [advisories]
 yanked = "deny"
+ignore = [
+    { id = "RUSTSEC-2026-0543", reason = "`chrono` is unmaintained; no safe upgrade exists. Pulled in transitively by keepass v0.17. Not used by vault crypto code." },
+]
 
 [licenses]
 allow = [

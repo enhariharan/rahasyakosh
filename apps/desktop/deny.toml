@@ -11,9 +11,7 @@ yanked = "deny"
 ignore = [
     { id = "RUSTSEC-2024-0436", reason = "`paste` is unmaintained, no vulnerability; used by GUI toolkit macros" },
     { id = "RUSTSEC-2024-0370", reason = "`proc-macro-error` is unmaintained, no vulnerability; build-time only" },
-    { id = "RUSTSEC-2025-0057", reason = "`fxhash` is unmaintained, no vulnerability; used inside the GUI toolkit" },
-    { id = "RUSTSEC-2024-0429", reason = "glib `VariantStrIter` unsoundness; we never iterate GVariant strings, toolkit internal" },
-    { id = "RUSTSEC-2026-0097", reason = "`rand` unsound only with a custom logger that calls rand::rng(); this app installs no logger. Affects a copy inside the toolkit" },
+    { id = "RUSTSEC-2026-0543", reason = "`chrono` is unmaintained; no safe upgrade exists. Pulled in by keepass v0.17 via rahasyakosh-transfer. Not used by vault crypto code." },
 ]
 
 [licenses]
