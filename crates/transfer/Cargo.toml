@@ -13,11 +13,11 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 thiserror = "2.0.21"
 uuid = "1.28.0"
-zip = { version = "2", default-features = false, features = ["deflate"] }
+zip = { version = "9", default-features = false, features = ["deflate"] }
 zeroize = "1.9.1"
 
 [dev-dependencies]
-zip = { version = "2", default-features = false, features = ["deflate"] }
+zip = { version = "9", default-features = false, features = ["deflate"] }
 
 # proptest (via rusty-fork) does not build for WASI; property tests run natively only.
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
