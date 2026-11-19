@@ -22,7 +22,9 @@ conflicts=('rahasyakosh' 'rahasyakosh-git')
 _ghver="${pkgver/\.alpha/-alpha.}"  # 0.1.0.alpha5 → 0.1.0-alpha.5
 
 source_x86_64=(
-  "rahasyakosh-${pkgver}.deb::https://github.com/enhariharan/rahasyakosh/releases/download/v${_ghver}/rahasyakosh_${_ghver//-alpha./-alpha.}-1_amd64.deb"
+  # Release .deb files are named after the tag from v0.1.0-alpha.10 on; earlier
+  # releases have no file by this name, so bump pkgver to alpha.10 or later.
+  "rahasyakosh-${pkgver}.deb::https://github.com/enhariharan/rahasyakosh/releases/download/v${_ghver}/rahasyakosh_${_ghver}_amd64.deb"
   "rk-${pkgver}::https://github.com/enhariharan/rahasyakosh/releases/download/v${_ghver}/rk"
 )
 sha256sums_x86_64=(
