@@ -32,16 +32,24 @@ python3 flatpak-cargo-generator.py \
 Commit `generated-sources.json` alongside the manifest.
 
 ### 3. Test the build locally
+Run these from the repository root.
 ```bash
-flatpak-builder --force-clean --sandbox \
-  /tmp/rk-flatpak-build \
+flatpak-builder --force-clean --sandbox --delete-build-dirs \
+  ~/.cache/rk-flatpak-build \
   flatpak/io.github.enhariharan.Rahasyakosh.yml
 
 flatpak-builder --run \
-  /tmp/rk-flatpak-build \
+  ~/.cache/rk-flatpak-build \
   flatpak/io.github.enhariharan.Rahasyakosh.yml \
   rahasyakosh
 ```
+The build folder (`~/.cache/rk-flatpak-build`) must be on the same filesystem as
+the folder you run the command from, because flatpak-builder keeps its cache in
+`.flatpak-builder/` there and links files across. Don't use `/tmp`: on many
+systems it is a RAM disk (tmpfs), and the build stops with `The state dir
+(…/.flatpak-builder) is not on the same filesystem as the target dir (/tmp)`.
+`--delete-build-dirs` removes each module's build folder afterwards; the
+desktop app's build folder is over 2 GB.
 
 ### 4. Submit to Flathub
 1. Fork `https://github.com/flathub/flathub`
@@ -102,6 +110,7 @@ Dioxus WebSocket works, prefer it over full network access.
 | Blank white screen | WebKit proxy resolver | Add `--env=GIO_USE_PROXY_RESOLVER=dummy` |
 | App panics on startup | Dioxus WebSocket blocked | Ensure `--share=network` or `--share=localhost` |
 | `WebKitWebProcess: cannot open display:` then `readPIDFromPeer: Unexpected short read` | Dioxus sets `GDK_BACKEND=x11` for WebKit's renderer process, but on a Wayland desktop Flatpak hides X11 (`fallback-x11`), so the renderer finds no display and quits | Already handled in code: `platform::renderer_via_x11()` turns the switch off when `DISPLAY` is unset. Don't set `GDK_BACKEND` in the manifest or launcher; Dioxus overrides it anyway, and forcing one backend breaks hosts that only have the other |
+| `The state dir (…/.flatpak-builder) is not on the same filesystem as the target dir (/tmp)` | `/tmp` is a RAM disk (tmpfs) and the build cache is on disk | Use a build folder on the same disk, e.g. `~/.cache/rk-flatpak-build` (step 3) |
 | `cargo: command not found` | rust-stable extension not on PATH | Add `--build-option append-path` for the extension |
 | Build fails: missing crate | `generated-sources.json` out of date | Re-run `flatpak-cargo-generator.py` |
 | Flathub CI fails: metainfo error | AppStream validation failure | Run `appstream-util validate` on the `.metainfo.xml` |
