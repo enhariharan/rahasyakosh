@@ -8,6 +8,11 @@ All notable changes to Rahasyakosh are written here, newest first. The format fo
 
 ## [Unreleased]
 
+## [0.1.0-alpha.9] — 2026-11-19
+
+### Fixed
+- **PPA uploads:** Launchpad's upload server answered `550 Requested action not taken: internal server error` partway through the alpha.7 and alpha.8 uploads, which stopped the rest. noble has alpha.7 and alpha.8; resolute and stonking got neither. The workflow now retries each series up to 3 times and carries on with the others if one still fails, then lists what was not uploaded. No app changes since alpha.6.
+
 ## [0.1.0-alpha.8] — 2026-11-19
 
 ### Changed
