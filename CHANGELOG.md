@@ -8,6 +8,11 @@ All notable changes to Rahasyakosh are written here, newest first. The format fo
 
 ## [Unreleased]
 
+### Fixed
+- **Release .deb version and name:** the GitHub release `.deb` was always `rahasyakosh_0.1.0-1_amd64.deb`, with version `0.1.0-1` taken from `Cargo.toml`. apt ranks that above every PPA alpha and even the PPA's final 0.1.0, so anyone who installed it would never get PPA upgrades. The package version now comes from the tag (`0.1.0~alpha10-1`, the PPA's scheme) and the file is named after the tag (`rahasyakosh_0.1.0-alpha.10_amd64.deb`). If you installed the alpha.9 `.deb` from GitHub, remove it once (`sudo apt remove rahasyakosh`) before installing a newer one or using the PPA.
+- **Release checksums:** `SHA256SUMS.txt` listed build paths (`target/release/rk`), so `sha256sum --check` failed on the downloaded files, and it left out the `.deb`. It now lists bare file names, including the `.deb`; check with `sha256sum --check --ignore-missing SHA256SUMS.txt`.
+- **AUR package:** the PKGBUILD downloaded a `.deb` name no release had. It now uses the tag-based name, which releases have from v0.1.0-alpha.10 on.
+
 ## [0.1.0-alpha.9] — 2026-11-19
 
 ### Fixed
