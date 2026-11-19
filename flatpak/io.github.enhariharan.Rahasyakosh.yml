@@ -55,7 +55,7 @@ modules:
       - type: git
         url: https://github.com/enhariharan/rahasyakosh
         tag: v0.1.0-alpha.5
-        commit: 3a5896e3f3c956c1b226e7ce0ab3a01bd3b1ad87
+        commit: 3a5896e877406076827066e1ce4c7c1c23fe9d91
       # generated-sources.json is produced by flatpak-cargo-generator.py from Cargo.lock.
       # Regenerate with:
       #   python3 flatpak-cargo-generator.py apps/desktop/Cargo.lock -o generated-sources.json
