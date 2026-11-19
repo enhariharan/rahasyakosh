@@ -8,6 +8,11 @@ All notable changes to Rahasyakosh are written here, newest first. The format fo
 
 ## [Unreleased]
 
+## [0.1.0-alpha.7] — 2026-11-19
+
+### Fixed
+- **PPA uploads:** the alpha.6 PPA run stopped before uploading anything (`unmet build dependencies: build-essential`), because the runner image does not include `build-essential`. The workflow now installs it. No app changes since alpha.6.
+
 ## [0.1.0-alpha.6] — 2026-11-19
 
 ### Added
