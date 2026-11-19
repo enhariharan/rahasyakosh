@@ -8,6 +8,11 @@ All notable changes to Rahasyakosh are written here, newest first. The format fo
 
 ## [Unreleased]
 
+## [0.1.0-alpha.8] — 2026-11-19
+
+### Changed
+- **PPA series:** the PPA now gets builds for the Ubuntu releases Launchpad still supports: noble (24.04 LTS), resolute (26.04 LTS) and stonking (26.10). oracular (24.10), plucky (25.04) and questing (25.10) have reached end of life and Launchpad refuses uploads to them; the alpha.7 upload stopped at plucky, so resolute never got alpha.7. No app changes since alpha.6.
+
 ## [0.1.0-alpha.7] — 2026-11-19
 
 ### Fixed
@@ -27,7 +32,7 @@ All notable changes to Rahasyakosh are written here, newest first. The format fo
 ## [0.1.0-alpha.5] — 2026-11-19
 
 ### Added
-- **PPA for all supported Ubuntu series:** install with `sudo add-apt-repository ppa:enhariharan/rahasyakosh && sudo apt install rahasyakosh`. Covers noble (24.04 LTS), oracular (24.10), plucky (25.04), questing (25.10), and resolute (26.10).
+- **PPA for all supported Ubuntu series:** install with `sudo add-apt-repository ppa:enhariharan/rahasyakosh && sudo apt install rahasyakosh`. Covers noble (24.04 LTS), oracular (24.10), plucky (25.04), questing (25.10), and resolute (26.04 LTS).
 - **Automated PPA uploads:** a new `ppa.yml` workflow builds and uploads signed source packages to the PPA for all five Ubuntu series on every release tag.
 
 ### Fixed

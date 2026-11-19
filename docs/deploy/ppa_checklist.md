@@ -112,8 +112,9 @@ rahasyakosh (0.1.0~alpha4-1) noble; urgency=low
 
  -- Hariharan Narayanan <enhariharan@gmail.com>  Wed, 18 Nov 2026 00:00:00 +0530
 ```
-Update the series (`noble` = 24.04, `oracular` = 24.10, `plucky` = 25.04,
-`questing` = 25.10) and date for each upload. Use `dch` to edit it:
+Update the series (`noble` = 24.04 LTS, `resolute` = 26.04 LTS,
+`stonking` = 26.10; only series Launchpad still supports, see
+`ppa_release_checklist.md`) and date for each upload. Use `dch` to edit it:
 ```
 dch -i   # increment and open in $EDITOR
 ```
