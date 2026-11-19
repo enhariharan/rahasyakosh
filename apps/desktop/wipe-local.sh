@@ -13,6 +13,7 @@ echo "This will permanently delete:"
 echo "  App binaries and desktop entry"
 echo "  Vault and profiles:  ~/.local/share/rahasyakosh/"
 echo "  Settings:            ~/.config/rahasyakosh/"
+echo "  State:               ~/.local/state/rahasyakosh/"
 echo "  WebKit cache:        ~/.local/share/rahasyakosh-desktop/  ~/.cache/rahasyakosh-desktop/"
 echo ""
 read -r -p "Type YES to continue: " confirm
@@ -26,8 +27,9 @@ done
 rm -f "$HOME/.local/share/icons/hicolor/icon-theme.cache"
 command -v update-desktop-database >/dev/null && update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
 
-# Vault, profiles and settings
+# Vault, profiles, settings and state
 rm -rf "$HOME/.local/share/rahasyakosh/"
+rm -rf "$HOME/.local/state/rahasyakosh/"
 rm -rf "$HOME/.config/rahasyakosh/"
 
 # WebKit's own files (session storage, IndexedDB, disk cache)
