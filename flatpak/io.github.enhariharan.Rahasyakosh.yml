@@ -82,19 +82,18 @@ modules:
       - sed -i 's|>rahasyakosh.desktop<|>io.github.enhariharan.Rahasyakosh.desktop<|'
           /app/share/metainfo/io.github.enhariharan.Rahasyakosh.metainfo.xml
     sources:
-      - type: dir
-        path: ..
-        skip:
-          - "*.snap"
-          - "*.deb"
-          - "*.buildinfo"
-          - "*.changes"
-          - "*.tar.gz*"
-          - apps/debian
-          - target
-          - apps/desktop/target
-      # generated-sources.json is produced by flatpak-cargo-generator.py from Cargo.lock.
-      # Regenerate with:
-      #   python3 flatpak-cargo-generator.py apps/desktop/Cargo.lock -o generated-sources.json
+      # Flathub builds a tagged commit, never a local folder. On each release,
+      # set tag and commit to the new release (docs/deploy/flathub_checklist.md,
+      # "Per-release update"); flatpak-builder checks that the tag still points
+      # at this commit. To try changes that aren't tagged yet, see "Test
+      # uncommitted changes" in the same checklist.
+      - type: git
+        url: https://github.com/enhariharan/rahasyakosh.git
+        tag: v0.1.0-alpha.9
+        commit: 7bd7b91e6d161db3cb865e9e5284ace5f0e8a9b1
+      # generated-sources.json lists every crate in apps/desktop/Cargo.lock so
+      # the build can run offline, as Flathub requires. It must match the
+      # Cargo.lock of the commit above. Regenerate from the repository root with:
+      #   python3 flatpak-cargo-generator.py apps/desktop/Cargo.lock -o flatpak/generated-sources.json
       # See: https://github.com/flatpak/flatpak-builder-tools/tree/master/cargo
       - generated-sources.json
