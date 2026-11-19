@@ -11,5 +11,10 @@ pub fn screen_reader_enabled_now() -> bool {
     false
 }
 
+/// Dioxus only moves the renderer to X11 on Linux, so its setting has no effect here; keep the default.
+pub fn renderer_via_x11() -> bool {
+    true
+}
+
 /// Nothing known to be needed when the window gets focus back.
 pub const SCRIPT_AFTER_WINDOW_FOCUS: Option<&str> = None;

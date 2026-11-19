@@ -33,6 +33,16 @@ pub fn debug() -> bool {
     std::env::var_os("RAHASYAKOSH_DEBUG").is_some_and(|v| !v.is_empty() && v != "0")
 }
 
+/// Whether to let Dioxus run the page's renderer (WebKit's separate "web process") through X11, which it does by
+/// default on Linux to dodge WebKit drawing bugs on Wayland desktops. Where no X server can be reached, that switch
+/// makes the renderer quit the moment it starts ("cannot open display"), so this says no and the renderer stays on
+/// Wayland. The usual case is the Flatpak on a Wayland desktop: Flatpak hides X11 whenever Wayland is there.
+///
+/// Call once, before any other thread starts and before the window opens: it may set an environment variable.
+pub fn renderer_via_x11() -> bool {
+    os::renderer_via_x11()
+}
+
 /// Start watching for system events the app has to react to. Call once, on the main thread, before the window opens.
 pub fn init() {
     SCREEN_READER_ON.store(os::screen_reader_enabled_now(), Ordering::SeqCst);

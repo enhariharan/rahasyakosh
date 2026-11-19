@@ -280,6 +280,8 @@ pub fn launch() {
 
 /// Open the window, starting from `initial` if given (for the development gallery), else from the vault file.
 pub fn launch_with(initial: Option<AppModel>) {
+    // First, while this is the only thread: it may set an environment variable.
+    let renderer_via_x11 = platform::renderer_via_x11();
     INITIAL.with(|c| *c.borrow_mut() = initial);
     platform::init();
     let window = WindowBuilder::new()
@@ -288,7 +290,12 @@ pub fn launch_with(initial: Option<AppModel>) {
         .with_inner_size(LogicalSize::new(1080.0, 720.0))
         .with_min_inner_size(LogicalSize::new(760.0, 520.0));
     dioxus::LaunchBuilder::desktop()
-        .with_cfg(Config::new().with_window(window).with_menu(None))
+        .with_cfg(
+            Config::new()
+                .with_window(window)
+                .with_menu(None)
+                .with_disable_dma_buf_on_wayland(renderer_via_x11),
+        )
         .launch(app);
 }
 
