@@ -89,8 +89,8 @@ modules:
       # uncommitted changes" in the same checklist.
       - type: git
         url: https://github.com/enhariharan/rahasyakosh.git
-        tag: v0.1.0-alpha.9
-        commit: 7bd7b91e6d161db3cb865e9e5284ace5f0e8a9b1
+        tag: v0.1.0-alpha.10
+        commit: 85c877734117c79786c6aab60e40dfa1b725723a
       # generated-sources.json lists every crate in apps/desktop/Cargo.lock so
       # the build can run offline, as Flathub requires. It must match the
       # Cargo.lock of the commit above. Regenerate from the repository root with:
