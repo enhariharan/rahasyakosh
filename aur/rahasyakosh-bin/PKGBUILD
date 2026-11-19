@@ -1,0 +1,58 @@
+# Maintainer: Hariharan Narayanan <enhariharan@gmail.com>
+pkgname=rahasyakosh-bin
+pkgver=0.1.0.alpha5
+pkgrel=1
+pkgdesc="Local-first, end-to-end-encrypted password manager (desktop + CLI)"
+arch=('x86_64')
+url="https://github.com/enhariharan/rahasyakosh"
+license=('MIT')
+depends=(
+  'webkit2gtk-4.1'
+  'gtk3'
+  'xdotool'
+  'libsoup3'
+)
+optdepends=(
+  'libayatana-appindicator: system tray icon support'
+)
+provides=('rahasyakosh')
+conflicts=('rahasyakosh' 'rahasyakosh-git')
+
+# _ghver is the GitHub release tag (without 'v'); derived from pkgver
+_ghver="${pkgver/\.alpha/-alpha.}"  # 0.1.0.alpha5 → 0.1.0-alpha.5
+
+source_x86_64=(
+  "rahasyakosh-${pkgver}.deb::https://github.com/enhariharan/rahasyakosh/releases/download/v${_ghver}/rahasyakosh_${_ghver//-alpha./-alpha.}-1_amd64.deb"
+  "rk-${pkgver}::https://github.com/enhariharan/rahasyakosh/releases/download/v${_ghver}/rk"
+)
+sha256sums_x86_64=(
+  'd8592d8261c9871122c47d92580c7c5f9aa7a3b7e94ff397ea10eb273918810b'  # .deb
+  'b20a42a4d9901a3d1b965374338584beefa19baa199d528fa9ca7aabfa71f67f'  # rk
+)
+noextract=("rahasyakosh-${pkgver}.deb")
+
+prepare() {
+  bsdtar -xf "rahasyakosh-${pkgver}.deb"
+  bsdtar -xf data.tar.xz
+}
+
+package() {
+  # Desktop app (from .deb)
+  install -Dm755 usr/bin/rahasyakosh-desktop \
+    "${pkgdir}/usr/bin/rahasyakosh-desktop"
+  install -Dm755 usr/bin/rahasyakosh \
+    "${pkgdir}/usr/bin/rahasyakosh"
+  install -Dm644 "usr/share/applications/rahasyakosh.desktop" \
+    "${pkgdir}/usr/share/applications/rahasyakosh.desktop"
+  install -Dm644 "usr/share/icons/hicolor/scalable/apps/rahasyakosh.svg" \
+    "${pkgdir}/usr/share/icons/hicolor/scalable/apps/rahasyakosh.svg"
+  install -Dm644 "usr/share/metainfo/io.github.enhariharan.Rahasyakosh.metainfo.xml" \
+    "${pkgdir}/usr/share/metainfo/io.github.enhariharan.Rahasyakosh.metainfo.xml"
+
+  # CLI
+  install -Dm755 "rk-${pkgver}" "${pkgdir}/usr/bin/rk"
+
+  # License
+  install -Dm644 "${startdir}/../../LICENSE" \
+    "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE" 2>/dev/null || true
+}

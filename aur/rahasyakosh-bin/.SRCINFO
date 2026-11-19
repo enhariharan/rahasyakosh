@@ -1,0 +1,22 @@
+pkgbase = rahasyakosh-bin
+	pkgdesc = Local-first, end-to-end-encrypted password manager (desktop + CLI)
+	pkgver = 0.1.0.alpha5
+	pkgrel = 1
+	url = https://github.com/enhariharan/rahasyakosh
+	arch = x86_64
+	license = MIT
+	depends = webkit2gtk-4.1
+	depends = gtk3
+	depends = xdotool
+	depends = libsoup3
+	optdepends = libayatana-appindicator: system tray icon support
+	provides = rahasyakosh
+	conflicts = rahasyakosh
+	conflicts = rahasyakosh-git
+	noextract = rahasyakosh-0.1.0.alpha5.deb
+	source_x86_64 = rahasyakosh-0.1.0.alpha5.deb::https://github.com/enhariharan/rahasyakosh/releases/download/v0.1.0-alpha.5/rahasyakosh_0.1.0-alpha.5-1_amd64.deb
+	source_x86_64 = rk-0.1.0.alpha5::https://github.com/enhariharan/rahasyakosh/releases/download/v0.1.0-alpha.5/rk
+	sha256sums_x86_64 = d8592d8261c9871122c47d92580c7c5f9aa7a3b7e94ff397ea10eb273918810b
+	sha256sums_x86_64 = b20a42a4d9901a3d1b965374338584beefa19baa199d528fa9ca7aabfa71f67f
+
+pkgname = rahasyakosh-bin

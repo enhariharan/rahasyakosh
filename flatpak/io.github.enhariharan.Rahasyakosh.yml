@@ -1,0 +1,63 @@
+app-id: io.github.enhariharan.Rahasyakosh
+runtime: org.gnome.Platform
+runtime-version: '47'
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: rahasyakosh
+
+finish-args:
+  # Display
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --device=dri
+  # Dioxus Desktop binds a local WebSocket between the Rust process and the
+  # WebKit webview; without network access the app panics on startup.
+  - --share=network
+  # Vault and settings — kept in the user's home directory, not the sandbox
+  - --filesystem=home/.local/share/rahasyakosh:create
+  - --filesystem=home/.config/rahasyakosh:create
+  - --filesystem=home/.local/state/rahasyakosh:create
+  # AT-SPI / Orca screen-reader support
+  - --talk-name=org.a11y.Bus
+  # Clipboard
+  - --talk-name=org.gnome.Mutter.DisplayConfig
+  # WebKit proxy resolution — without this WebKit stays blank white inside a
+  # sandbox that lacks the network plug (GLib tries the portal, portal refuses)
+  - --env=GIO_USE_PROXY_RESOLVER=dummy
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  env:
+    CARGO_HOME: /run/build/rahasyakosh/cargo
+
+modules:
+  - name: rahasyakosh
+    buildsystem: simple
+    build-commands:
+      # Build desktop binary
+      - cargo --offline fetch --manifest-path apps/desktop/Cargo.toml
+      - cargo --offline build --release --manifest-path apps/desktop/Cargo.toml
+      # Install binaries
+      - install -Dm755 apps/desktop/target/release/rahasyakosh-desktop
+          /app/bin/rahasyakosh-desktop
+      - install -Dm755 apps/desktop/packaging/rahasyakosh-launcher
+          /app/bin/rahasyakosh
+      # Desktop integration
+      - install -Dm644 apps/desktop/packaging/rahasyakosh-system.desktop
+          /app/share/applications/io.github.enhariharan.Rahasyakosh.desktop
+      - install -Dm644 apps/desktop/packaging/rahasyakosh-chest.svg
+          /app/share/icons/hicolor/scalable/apps/io.github.enhariharan.Rahasyakosh.svg
+      - install -Dm644 apps/desktop/packaging/io.github.enhariharan.Rahasyakosh.metainfo.xml
+          /app/share/metainfo/io.github.enhariharan.Rahasyakosh.metainfo.xml
+    sources:
+      - type: git
+        url: https://github.com/enhariharan/rahasyakosh
+        tag: v0.1.0-alpha.5
+        commit: 3a5896e3f3c956c1b226e7ce0ab3a01bd3b1ad87
+      # generated-sources.json is produced by flatpak-cargo-generator.py from Cargo.lock.
+      # Regenerate with:
+      #   python3 flatpak-cargo-generator.py apps/desktop/Cargo.lock -o generated-sources.json
+      # See: https://github.com/flatpak/flatpak-builder-tools/tree/master/cargo
+      - generated-sources.json
