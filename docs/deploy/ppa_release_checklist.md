@@ -71,10 +71,9 @@ When a new Ubuntu series is released:
 
 Ubuntu's in-between releases (for example 25.10) are supported for nine months;
 the long-term ones (xx.04 in even years) for five years. Once a series reaches
-its end of life, Launchpad marks it `Obsolete` and refuses uploads to it, and
-because the upload loop stops at the first failure, the series after it in the
-list are skipped too. Before each release tag, list the series Launchpad still
-accepts:
+its end of life, Launchpad marks it `Obsolete` and no longer accepts uploads
+for it, so keeping it in the list only produces a failed upload on every
+release. Before each release tag, list the series Launchpad still supports:
 ```bash
 curl -s https://api.launchpad.net/devel/ubuntu/series | python3 -c "import sys,json; \
   [print(e['name'], e['version'], e['status']) for e in json.load(sys.stdin)['entries'] \
@@ -94,7 +93,9 @@ everything older, which Launchpad still lists because of extended support.
 | Workflow YAML parse error | `<<HEREDOC` treated as YAML merge key | Use `printf` instead (already fixed) |
 | `gpg: signing failed` | Passphrase wrong or key not imported | Check `PPA_GPG_PASSPHRASE` secret; re-import key |
 | `dput` rejected: duplicate version | Same version already in PPA for that series | Bump Debian revision (`1~noble1` → `2~noble1`) |
-| `550 Requested action not taken: internal server error` from `dput`, or an upload rejected by e-mail | The series is end-of-life (`Obsolete` on Launchpad) | Remove it from `ppa.yml`; see "Removing an end-of-life Ubuntu series" |
+| `550 Requested action not taken: internal server error` from `dput` | Launchpad's FTP upload server failing, intermittently; it hit the 2nd or 3rd upload in a row for alpha.7 and alpha.8 (see Launchpad bug 2043679 for an earlier outage) | The workflow retries each series 3 times (pausing 1 and 2 min) and carries on with the others. A series that still fails is listed at the end of the job. It cannot be re-uploaded for the same version (see the next row); the next release tag uploads it. If it keeps happening, switch `dput` to SFTP (needs an SSH key on Launchpad and as a GitHub secret) |
+| Re-running a failed PPA job, or a hand upload, is rejected: `.orig.tar.gz` "already exists ... different contents" | Every run rebuilds the binary, so the orig tarball differs from the one Launchpad already holds for that version | Don't re-run for a version that reached Launchpad for any series; fix and tag the next version instead |
+| Upload rejected for one series by e-mail | Series is end-of-life (`Obsolete` on Launchpad) | Remove it from `ppa.yml`; see "Removing an end-of-life Ubuntu series" |
 | `unmet build dependencies: build-essential:native` | Runner image lacks `build-essential` | Install it in the "System libraries" step (already fixed) |
 | PPA shows build but `apt` returns 404 | Launchpad publishing queue lag | Wait 20–30 min; check `Pending` → `Published` via API |
 | Build fails on Launchpad | Missing runtime lib in Build-Depends | Add lib to `debian/control` Build-Depends, or override `dh_shlibdeps` |
