@@ -90,14 +90,10 @@ jobs:
             cp -r "${GITHUB_WORKSPACE}/apps/desktop/debian" \
               rahasyakosh-"${DEB_VERSION}"/
 
-            # Write a series-specific changelog
-            cat > rahasyakosh-"${DEB_VERSION}"/debian/changelog <<CHANGELOG
-rahasyakosh (${DEB_VERSION}-${DEB_REV}) ${SERIES}; urgency=low
-
-  * Release ${GITHUB_REF_NAME}.
-
- -- Hariharan Narayanan <enhariharan@gmail.com>  ${DATE}
-CHANGELOG
+            # Write a series-specific changelog (printf avoids heredoc YAML conflict)
+            printf 'rahasyakosh (%s-%s) %s; urgency=low\n\n  * Release %s.\n\n -- Hariharan Narayanan <enhariharan@gmail.com>  %s\n' \
+              "${DEB_VERSION}" "${DEB_REV}" "${SERIES}" "${GITHUB_REF_NAME}" "${DATE}" \
+              > rahasyakosh-"${DEB_VERSION}"/debian/changelog
 
             cd rahasyakosh-"${DEB_VERSION}"
             dpkg-buildpackage -S -sa -k"${KEY_FP}"
