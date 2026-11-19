@@ -7,3 +7,6 @@ target/
 
 # Snap build output
 *.snap
+
+# Local Flatpak manifest for testing uncommitted changes (docs/deploy/flathub_checklist.md)
+flatpak/local.yml

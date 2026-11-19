@@ -5,6 +5,8 @@ Manifest: `flatpak/io.github.enhariharan.Rahasyakosh.yml`
 
 Flathub requires a source build (no pre-built binaries). The manifest uses
 the GNOME runtime (which bundles WebKitGTK) and the rust-stable SDK extension.
+It builds a tagged release from GitHub (`tag:` and `commit:` in the manifest),
+as Flathub will, so a local build tests that release, not your working copy.
 
 ---
 
@@ -16,7 +18,7 @@ sudo apt install flatpak-builder
 flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 flatpak install flathub org.gnome.Platform//47 org.gnome.Sdk//47
 flatpak install flathub org.freedesktop.Sdk.Extension.rust-stable//24.08
-pip3 install aiohttp toml  # for flatpak-cargo-generator.py
+pip3 install aiohttp tomlkit  # for flatpak-cargo-generator.py
 ```
 
 ### 2. Generate Cargo sources
@@ -51,6 +53,21 @@ systems it is a RAM disk (tmpfs), and the build stops with `The state dir
 `--delete-build-dirs` removes each module's build folder afterwards; the
 desktop app's build folder is over 2 GB.
 
+#### Test uncommitted changes
+The manifest fetches the tagged commit, so it never sees local edits. To build
+your working copy instead, copy the manifest to `flatpak/local.yml` (git
+ignores that name) and, in the `rahasyakosh` module only, replace the
+`type: git` source (its `url`, `tag` and `commit` lines) with:
+```yaml
+      - type: dir
+        path: ..
+        skip:
+          - target
+          - apps/desktop/target
+```
+Keep the copy in `flatpak/` so `path: ..` and `generated-sources.json` still
+resolve, then run step 3 with `flatpak/local.yml`. Never submit this copy.
+
 ### 4. Submit to Flathub
 1. Fork `https://github.com/flathub/flathub`
 2. Create branch `new-pr/io.github.enhariharan.Rahasyakosh`
@@ -64,23 +81,31 @@ desktop app's build folder is over 2 GB.
 
 ## Per-release update
 
-For each new release (e.g. `v0.1.0-alpha.6`):
+For each new release (e.g. `v0.1.0-alpha.10`), after the tag is pushed:
 
-1. Update the manifest tag and commit hash:
+1. Update the `rahasyakosh` module's tag and commit in the manifest. The commit
+   is the full hash the tag points at:
+   ```bash
+   git rev-parse 'v0.1.0-alpha.10^{commit}'
+   ```
    ```yaml
-   tag: v0.1.0-alpha.6
-   commit: <full git commit hash>
+   tag: v0.1.0-alpha.10
+   commit: <that full hash>
    ```
 
-2. Regenerate cargo sources (crates change between releases):
+2. Regenerate cargo sources if `apps/desktop/Cargo.lock` changed since the
+   previous release (this prints nothing when it hasn't):
    ```bash
+   git diff --stat v0.1.0-alpha.9 v0.1.0-alpha.10 -- apps/desktop/Cargo.lock
    python3 flatpak-cargo-generator.py \
      apps/desktop/Cargo.lock \
      -o flatpak/generated-sources.json
    ```
 
-3. Test locally (step 3 above), then push to your Flathub fork.
-   Flathub pulls from their own repo — open a PR to `flathub/flathub`.
+3. Test locally (step 3 above). Before the app is accepted, update the files in
+   your `flathub/flathub` pull request; once it is accepted, Flathub creates a
+   repository for the app (`flathub/io.github.enhariharan.Rahasyakosh`), and
+   later releases are pull requests there.
 
 ---
 
