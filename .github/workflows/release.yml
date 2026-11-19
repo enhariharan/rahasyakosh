@@ -54,27 +54,46 @@ jobs:
           cargo cyclonedx --manifest-path Cargo.toml --format json
           cargo cyclonedx --manifest-path apps/desktop/Cargo.toml --format json
 
+      - name: Derive Debian version from tag
+        run: |
+          # v0.1.0-alpha.9 → 0.1.0~alpha9, the same rule ppa.yml uses. The "~"
+          # makes apt rank a pre-release below the final 0.1.0 and below later
+          # PPA builds, so people who install this .deb still get upgrades.
+          # (Without it the package was 0.1.0-1, which apt ranks above every
+          # PPA alpha and even the PPA's final 0.1.0-1~noble1.)
+          DEB_VERSION=$(echo "${GITHUB_REF_NAME#v}" | \
+            sed 's/-alpha\./~alpha/;s/-beta\./~beta/;s/-rc\./~rc/')
+          echo "DEB_VERSION=${DEB_VERSION}" >> "$GITHUB_ENV"
+          echo "Debian version: ${DEB_VERSION}-1"
+
       - name: Build .deb
         working-directory: apps/desktop
-        run: cargo deb --no-build
-
-      - name: SHA-256 checksums
+        # The package inside carries the Debian version; the file is named after
+        # the tag (no "~", which is awkward in URLs), so each release has its own
+        # predictable download name, e.g. rahasyakosh_0.1.0-alpha.9_amd64.deb.
+        # The AUR PKGBUILD downloads it by that name.
         run: |
-          sha256sum \
-            target/release/rk \
-            apps/desktop/target/release/rahasyakosh-desktop \
-            > SHA256SUMS.txt
+          mkdir -p ../../dist
+          cargo deb --no-build --deb-version "${DEB_VERSION}-1" \
+            --output "../../dist/rahasyakosh_${GITHUB_REF_NAME#v}_amd64.deb"
+
+      - name: Collect release files and SHA-256 checksums
+        run: |
+          cp target/release/rk apps/desktop/target/release/rahasyakosh-desktop dist/
+          # Bare file names, so `sha256sum --check` works in the download folder.
+          cd dist
+          sha256sum rk rahasyakosh-desktop rahasyakosh_*_amd64.deb > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Attest rk
         uses: actions/attest-build-provenance@v2
         with:
-          subject-path: target/release/rk
+          subject-path: dist/rk
 
       - name: Attest rahasyakosh-desktop
         uses: actions/attest-build-provenance@v2
         with:
-          subject-path: apps/desktop/target/release/rahasyakosh-desktop
+          subject-path: dist/rahasyakosh-desktop
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -87,9 +106,9 @@ jobs:
 
             ## Verify downloads
 
-            Download `SHA256SUMS.txt` alongside the binary and run:
+            Download `SHA256SUMS.txt` into the same folder as the files you downloaded and run:
             ```
-            sha256sum --check SHA256SUMS.txt
+            sha256sum --check --ignore-missing SHA256SUMS.txt
             ```
 
             Build provenance is recorded via sigstore. Verify with the [GitHub CLI](https://cli.github.com/):
@@ -98,9 +117,9 @@ jobs:
             gh attestation verify rahasyakosh-desktop --repo enhariharan/rahasyakosh
             ```
           files: |
-            target/release/rk
-            apps/desktop/target/release/rahasyakosh-desktop
-            apps/desktop/target/debian/*.deb
-            SHA256SUMS.txt
+            dist/rk
+            dist/rahasyakosh-desktop
+            dist/rahasyakosh_*_amd64.deb
+            dist/SHA256SUMS.txt
             *.cdx.json
             apps/desktop/*.cdx.json
