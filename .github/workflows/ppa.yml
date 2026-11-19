@@ -83,27 +83,62 @@ jobs:
           #   curl -s https://api.launchpad.net/devel/ubuntu/series
           # jammy (22.04) is left out: its glibc 2.35 is older than the 2.39
           # this runner's build needs. See docs/deploy/ppa_release_checklist.md.
-          for SERIES in noble resolute stonking; do
-            echo "=== Building for ${SERIES} ==="
-            DEB_REV="1~${SERIES}1"
-            BUILD_DIR="/tmp/rk-ppa-${SERIES}"
-            rm -rf "${BUILD_DIR}" && mkdir "${BUILD_DIR}"
-            cp /tmp/rahasyakosh_"${DEB_VERSION}".orig.tar.gz "${BUILD_DIR}/"
+          SERIES_LIST="noble resolute stonking"
 
-            cd "${BUILD_DIR}"
-            tar -xzf rahasyakosh_"${DEB_VERSION}".orig.tar.gz
-            cp -r "${GITHUB_WORKSPACE}/apps/desktop/debian" \
-              rahasyakosh-"${DEB_VERSION}"/
+          # Build and upload one series. Returns non-zero instead of exiting,
+          # so one failed series does not stop the others. (bash -e is off
+          # inside a function called from `if`, hence the explicit `|| return`.)
+          upload_series() {
+            local SERIES="$1"
+            local DEB_REV="1~${SERIES}1"
+            local BUILD_DIR="/tmp/rk-ppa-${SERIES}"
+            local SRC_DIR="rahasyakosh-${DEB_VERSION}"
+            local CHANGES="rahasyakosh_${DEB_VERSION}-${DEB_REV}_source.changes"
+
+            rm -rf "${BUILD_DIR}" && mkdir "${BUILD_DIR}" || return 1
+            cp /tmp/rahasyakosh_"${DEB_VERSION}".orig.tar.gz "${BUILD_DIR}/" || return 1
+            cd "${BUILD_DIR}" || return 1
+            tar -xzf rahasyakosh_"${DEB_VERSION}".orig.tar.gz || return 1
+            cp -r "${GITHUB_WORKSPACE}/apps/desktop/debian" "${SRC_DIR}/" || return 1
 
             # Write a series-specific changelog (printf avoids heredoc YAML conflict)
             printf 'rahasyakosh (%s-%s) %s; urgency=low\n\n  * Release %s.\n\n -- Hariharan Narayanan <enhariharan@gmail.com>  %s\n' \
               "${DEB_VERSION}" "${DEB_REV}" "${SERIES}" "${GITHUB_REF_NAME}" "${DATE}" \
-              > rahasyakosh-"${DEB_VERSION}"/debian/changelog
+              > "${SRC_DIR}/debian/changelog" || return 1
 
-            cd rahasyakosh-"${DEB_VERSION}"
-            dpkg-buildpackage -S -sa -k"${KEY_FP}"
+            (cd "${SRC_DIR}" && dpkg-buildpackage -S -sa -k"${KEY_FP}") || return 1
 
-            cd "${BUILD_DIR}"
-            dput ppa:enhariharan/rahasyakosh \
-              rahasyakosh_"${DEB_VERSION}"-"${DEB_REV}"_source.changes
+            # Launchpad's FTP upload server sometimes answers "550 Requested
+            # action not taken: internal server error". Retry with a growing
+            # pause. A failed attempt may leave dput's .upload log behind,
+            # which would make dput refuse the next try, so remove it first.
+            local ATTEMPT
+            for ATTEMPT in 1 2 3; do
+              rm -f ./*.upload
+              if dput ppa:enhariharan/rahasyakosh "${CHANGES}"; then
+                return 0
+              fi
+              echo "::warning::${SERIES}: upload attempt ${ATTEMPT} of 3 failed"
+              if [ "${ATTEMPT}" -lt 3 ]; then sleep $((ATTEMPT * 60)); fi
+            done
+            return 1
+          }
+
+          FAILED=""
+          for SERIES in ${SERIES_LIST}; do
+            echo "=== Building and uploading for ${SERIES} ==="
+            if upload_series "${SERIES}"; then
+              echo "=== ${SERIES}: uploaded ==="
+            else
+              echo "::error::${SERIES}: not uploaded"
+              FAILED="${FAILED} ${SERIES}"
+            fi
+            # Space out the uploads: the failures seen so far hit the second
+            # or third upload made in quick succession.
+            sleep 30
           done
+
+          if [ -n "${FAILED}" ]; then
+            echo "::error::Not uploaded to the PPA:${FAILED}. A re-run cannot fix this for the same version (it rebuilds a different .orig.tar.gz, which Launchpad rejects); the next release tag will upload them."
+            exit 1
+          fi
