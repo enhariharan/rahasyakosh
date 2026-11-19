@@ -8,16 +8,39 @@ All notable changes to Rahasyakosh are written here, newest first. The format fo
 
 ## [Unreleased]
 
+## [0.1.0-alpha.5] — 2026-11-19
+
+### Added
+- **PPA for all supported Ubuntu series:** install with `sudo add-apt-repository ppa:enhariharan/rahasyakosh && sudo apt install rahasyakosh`. Covers noble (24.04 LTS), oracular (24.10), plucky (25.04), questing (25.10), and resolute (26.10).
+- **Automated PPA uploads:** a new `ppa.yml` workflow builds and uploads signed source packages to the PPA for all five Ubuntu series on every release tag.
+
 ### Fixed
+- **`rk profile use <username>` now affects the CLI:** subsequent `rk` commands (without `--profile` or `RK_PROFILE`) now operate on the last-used profile's vault, matching the desktop app's behaviour.
 - A `.1pux` file that is not a valid ZIP archive now gives a clear error ("not a valid .1pux archive") in the desktop app instead of silently falling through to the CSV parser.
-- An empty ZIP file given a `.1pux` extension now gives a clear "missing export.data" error in the desktop app instead of a confusing CSV-column error.
+- An empty ZIP file given a `.1pux` extension now gives a clear "missing export.data" error instead of a confusing CSV-column error.
+
+### How to verify
+Downloads are built and signed by GitHub Actions. To verify a binary:
+```
+# Check the SHA-256 checksum
+sha256sum --check SHA256SUMS.txt
+
+# Verify GitHub Actions build provenance (requires the gh CLI)
+gh attestation verify rk --repo enhariharan/rahasyakosh
+gh attestation verify rahasyakosh-desktop --repo enhariharan/rahasyakosh
+```
+
+### Known issues
+- macOS and Windows are not yet supported.
+- The app has not been independently audited. **Do not store real secrets until an audit is complete.**
+- Deleting a profile has no trash; it removes the vault file permanently.
 
 ## [0.1.0-alpha.4] — 2026-11-17
 
 ### Added
 - **KeePass `.kdbx` import (US-IMP-02):** import a KeePass 4 database directly from the desktop import screen or with `rk import file.kdbx`. The database password is prompted; `RK_KDBX_PASSWORD` can supply it non-interactively.
 - **1Password `.1pux` import (US-IMP-02):** import a 1Password unencrypted export from the desktop or with `rk import file.1pux`. Login and Password items, TOTP fields, vault names as tags, and URL/notes are all carried over.
-- **`rk profile use <username>`:** sets which profile the desktop app opens by default (does not affect the CLI — use `--profile` or `RK_PROFILE` for that).
+- **`rk profile use <username>`:** sets which profile the desktop app opens by default (CLI behaviour fixed in alpha.5).
 
 ### Fixed
 - `rk import` correctly detects KDBX magic bytes and `.1pux` ZIP headers regardless of the file name.
