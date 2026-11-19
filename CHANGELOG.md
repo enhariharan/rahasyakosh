@@ -8,6 +8,17 @@ All notable changes to Rahasyakosh are written here, newest first. The format fo
 
 ## [Unreleased]
 
+## [0.1.0-alpha.6] — 2026-11-19
+
+### Added
+- **Packaging for Arch and Flathub:** an AUR package (`aur/rahasyakosh-bin`) and a Flatpak manifest (`flatpak/`), with checklists in `docs/deploy/`. Neither is published yet.
+
+### Fixed
+- **PPA workflow:** a YAML parse error that stopped `ppa.yml` from running at all (the alpha.5 PPA runs failed at once).
+- **Desktop app on a Wayland desktop with no X server:** the app no longer quits at start-up with `cannot open display` / `readPIDFromPeer`. Dioxus moves WebKit's page renderer to X11 on Wayland desktops; the app now skips that move when no X server can be reached (the Flatpak on a Wayland desktop, which hides X11) and keeps the renderer on Wayland. Nothing changes where an X server is available (the .deb, PPA and snap on GNOME, which provides XWayland).
+- **Flatpak build:** builds on memory-constrained hosts (new `release-flatpak` profile), links `xdotool`, launches from the app menu (the launcher pointed at a path that only exists outside the sandbox), and shows its icon. The shared desktop file and metainfo keep their .deb/snap names; the Flatpak renames only its own copies.
+- **PPA uploads:** the `apps/desktop/debian/` packaging folder the PPA workflow copies on each release tag is now in the repository.
+
 ## [0.1.0-alpha.5] — 2026-11-19
 
 ### Added
