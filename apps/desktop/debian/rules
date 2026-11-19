@@ -1,0 +1,21 @@
+#!/usr/bin/make -f
+%:
+	dh $@
+
+override_dh_auto_build:
+	# Binary-only: pre-built binary comes from the orig tarball.
+
+override_dh_auto_install:
+	install -Dm755 rahasyakosh-desktop \
+	    debian/rahasyakosh/usr/bin/rahasyakosh-desktop
+	install -Dm755 rahasyakosh-launcher \
+	    debian/rahasyakosh/usr/bin/rahasyakosh
+	install -Dm644 rahasyakosh-system.desktop \
+	    debian/rahasyakosh/usr/share/applications/rahasyakosh.desktop
+	install -Dm644 rahasyakosh-chest.svg \
+	    debian/rahasyakosh/usr/share/icons/hicolor/scalable/apps/rahasyakosh.svg
+	install -Dm644 io.github.enhariharan.Rahasyakosh.metainfo.xml \
+	    debian/rahasyakosh/usr/share/metainfo/io.github.enhariharan.Rahasyakosh.metainfo.xml
+
+override_dh_shlibdeps:
+	# Runtime deps are listed manually in debian/control; skip auto-detection.
