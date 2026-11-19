@@ -1,0 +1,29 @@
+Source: rahasyakosh
+Section: utils
+Priority: optional
+Maintainer: Hariharan Narayanan <enhariharan@gmail.com>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.6.2
+Homepage: https://github.com/enhariharan/rahasyakosh
+Rules-Requires-Root: no
+
+Package: rahasyakosh
+Architecture: amd64
+Depends: ${misc:Depends},
+ libwebkit2gtk-4.1-0,
+ libgtk-3-0,
+ libxdo3,
+ libayatana-appindicator3-1,
+ libsoup-3.0-0
+Description: Local-first, end-to-end-encrypted password manager
+ Rahasyakosh keeps your logins and two-factor codes in an encrypted
+ vault on your own computer. No accounts, no telemetry, no network.
+ .
+ Each person sharing the computer can have a profile with their own
+ vault and master password. Passwords can be imported from browsers
+ and other password managers (Bitwarden, KeePassXC, 1Password).
+ .
+ Full screen-reader support via AT-SPI/Orca.
+ .
+ Early alpha. Not independently audited — do not store real secrets
+ until an audit is complete.

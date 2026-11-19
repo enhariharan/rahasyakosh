@@ -101,6 +101,7 @@ Dioxus WebSocket works, prefer it over full network access.
 |---|---|---|
 | Blank white screen | WebKit proxy resolver | Add `--env=GIO_USE_PROXY_RESOLVER=dummy` |
 | App panics on startup | Dioxus WebSocket blocked | Ensure `--share=network` or `--share=localhost` |
+| `WebKitWebProcess: cannot open display:` then `readPIDFromPeer: Unexpected short read` | Dioxus sets `GDK_BACKEND=x11` for WebKit's renderer process, but on a Wayland desktop Flatpak hides X11 (`fallback-x11`), so the renderer finds no display and quits | Already handled in code: `platform::renderer_via_x11()` turns the switch off when `DISPLAY` is unset. Don't set `GDK_BACKEND` in the manifest or launcher; Dioxus overrides it anyway, and forcing one backend breaks hosts that only have the other |
 | `cargo: command not found` | rust-stable extension not on PATH | Add `--build-option append-path` for the extension |
 | Build fails: missing crate | `generated-sources.json` out of date | Re-run `flatpak-cargo-generator.py` |
 | Flathub CI fails: metainfo error | AppStream validation failure | Run `appstream-util validate` on the `.metainfo.xml` |

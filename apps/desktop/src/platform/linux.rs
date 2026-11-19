@@ -42,6 +42,21 @@ pub const SCRIPT_AFTER_WINDOW_FOCUS: Option<&str> = Some(
      refocus(10)",
 );
 
+/// Let Dioxus move the renderer to X11 only when an X server is reachable (`DISPLAY` set). Otherwise keep the other
+/// half of its Wayland workaround ourselves: turn off WebKit's DMA-BUF renderer, the part that draws blank or broken
+/// pages on some graphics drivers (NVIDIA especially). A value the user set themselves is left alone.
+pub fn renderer_via_x11() -> bool {
+    if std::env::var_os("DISPLAY").is_some_and(|d| !d.is_empty()) {
+        return true;
+    }
+    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none()
+        && std::path::Path::new("/dev/dri").exists()
+    {
+        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    }
+    false
+}
+
 thread_local! {
     /// Keeps the connection and the subscription alive for as long as the program runs.
     static KEEP: RefCell<Option<(gio::DBusConnection, gio::SignalSubscriptionId)>> = const { RefCell::new(None) };

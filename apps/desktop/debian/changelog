@@ -1,0 +1,17 @@
+rahasyakosh (0.1.0~alpha4-3) resolute; urgency=low
+
+  * Build for Ubuntu 26.10 (resolute).
+
+ -- Hariharan Narayanan <enhariharan@gmail.com>  Wed, 19 Nov 2026 09:00:00 +0530
+
+rahasyakosh (0.1.0~alpha4-2) noble; urgency=low
+
+  * Override dh_shlibdeps: pre-built binary; runtime deps listed manually.
+
+ -- Hariharan Narayanan <enhariharan@gmail.com>  Tue, 18 Nov 2026 00:30:00 +0530
+
+rahasyakosh (0.1.0~alpha4-1) noble; urgency=low
+
+  * Initial PPA release.
+
+ -- Hariharan Narayanan <enhariharan@gmail.com>  Tue, 18 Nov 2026 00:00:00 +0530
