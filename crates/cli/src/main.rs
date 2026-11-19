@@ -770,7 +770,20 @@ fn run() -> Result<()> {
     }
     let path = match &cli.profile {
         Some(name) => profile_vault(&path, name)?,
-        None => path,
+        None => {
+            // If a profile list exists, honour the last-used profile set by `rk profile use`.
+            let dir = path.parent().unwrap_or_else(|| Path::new("."));
+            match rahasyakosh_app::profile_files::read_list(dir) {
+                Ok(Some(list)) => {
+                    if let Some(p) = list.start_profile() {
+                        rahasyakosh_app::profile_files::vault_file(dir, p).unwrap_or(path)
+                    } else {
+                        path
+                    }
+                }
+                _ => path,
+            }
+        }
     };
     let mut rng = rand::rng();
 
