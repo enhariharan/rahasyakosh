@@ -21,6 +21,11 @@ conflicts=('rahasyakosh' 'rahasyakosh-git')
 # _ghver is the GitHub release tag (without 'v'); derived from pkgver
 _ghver="${pkgver/\.alpha/-alpha.}"  # 0.1.0.alpha10 → 0.1.0-alpha.10
 
+# The license text, from the same tag. The .deb has only a Debian-format
+# copyright file, and the AUR clone has no LICENSE of its own.
+source=("LICENSE-${pkgver}::https://raw.githubusercontent.com/enhariharan/rahasyakosh/v${_ghver}/LICENSE")
+sha256sums=('70fb4f01e008534c4f3ef37da2593a1bfe8d9fc6584dd4988bc072c3c83703c3')
+
 source_x86_64=(
   # Release .deb files are named after the tag from v0.1.0-alpha.10 on; earlier
   # releases have no file by this name, so pkgver can't go below alpha10.
@@ -55,6 +60,6 @@ package() {
   install -Dm755 "rk-${pkgver}" "${pkgdir}/usr/bin/rk"
 
   # License
-  install -Dm644 "${startdir}/../../LICENSE" \
-    "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE" 2>/dev/null || true
+  install -Dm644 "LICENSE-${pkgver}" \
+    "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
 }

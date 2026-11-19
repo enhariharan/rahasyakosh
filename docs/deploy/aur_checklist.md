@@ -53,6 +53,9 @@ For each new release (e.g. `v0.1.0-alpha.10`):
    - `pkgver=0.1.0.alpha10`
    - `pkgrel=1`
    - `sha256sums_x86_64` with the new hashes
+   - `sha256sums` (the `LICENSE`, downloaded from the tag) only if `LICENSE`
+     changed; `git diff --stat v0.1.0-alpha.9 v0.1.0-alpha.10 -- LICENSE` prints
+     nothing when it hasn't, and `sha256sum LICENSE` gives the new hash
 
 3. Regenerate `.SRCINFO`:
    ```bash
