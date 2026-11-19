@@ -1,6 +1,6 @@
 # Maintainer: Hariharan Narayanan <enhariharan@gmail.com>
 pkgname=rahasyakosh-bin
-pkgver=0.1.0.alpha5
+pkgver=0.1.0.alpha10
 pkgrel=1
 pkgdesc="Local-first, end-to-end-encrypted password manager (desktop + CLI)"
 arch=('x86_64')
@@ -19,16 +19,16 @@ provides=('rahasyakosh')
 conflicts=('rahasyakosh' 'rahasyakosh-git')
 
 # _ghver is the GitHub release tag (without 'v'); derived from pkgver
-_ghver="${pkgver/\.alpha/-alpha.}"  # 0.1.0.alpha5 → 0.1.0-alpha.5
+_ghver="${pkgver/\.alpha/-alpha.}"  # 0.1.0.alpha10 → 0.1.0-alpha.10
 
 source_x86_64=(
   # Release .deb files are named after the tag from v0.1.0-alpha.10 on; earlier
-  # releases have no file by this name, so bump pkgver to alpha.10 or later.
+  # releases have no file by this name, so pkgver can't go below alpha10.
   "rahasyakosh-${pkgver}.deb::https://github.com/enhariharan/rahasyakosh/releases/download/v${_ghver}/rahasyakosh_${_ghver}_amd64.deb"
   "rk-${pkgver}::https://github.com/enhariharan/rahasyakosh/releases/download/v${_ghver}/rk"
 )
 sha256sums_x86_64=(
-  'd8592d8261c9871122c47d92580c7c5f9aa7a3b7e94ff397ea10eb273918810b'  # .deb
+  'e4a8f2ee3476910ccb30073d7c3c281a9e718932f41c3c990a6b885dd17ec50b'  # .deb
   'b20a42a4d9901a3d1b965374338584beefa19baa199d528fa9ca7aabfa71f67f'  # rk
 )
 noextract=("rahasyakosh-${pkgver}.deb")
