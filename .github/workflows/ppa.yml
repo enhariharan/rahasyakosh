@@ -78,7 +78,12 @@ jobs:
           KEY_FP="0CA81C7A013EC6CD508B6B823AA5402D46C7F229"
           DATE=$(date -R)
 
-          for SERIES in noble oracular plucky questing resolute; do
+          # Supported Ubuntu series only: Launchpad refuses uploads to
+          # end-of-life ("Obsolete") series. Check before each release with
+          #   curl -s https://api.launchpad.net/devel/ubuntu/series
+          # jammy (22.04) is left out: its glibc 2.35 is older than the 2.39
+          # this runner's build needs. See docs/deploy/ppa_release_checklist.md.
+          for SERIES in noble resolute stonking; do
             echo "=== Building for ${SERIES} ==="
             DEB_REV="1~${SERIES}1"
             BUILD_DIR="/tmp/rk-ppa-${SERIES}"

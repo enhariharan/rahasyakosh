@@ -14,7 +14,7 @@ before the first automated run.
 - [x] GPG key `0CA81C7A013EC6CD508B6B823AA5402D46C7F229` uploaded to `keyserver.ubuntu.com` and confirmed on Launchpad
 - [x] GitHub secrets `PPA_GPG_KEY` and `PPA_GPG_PASSPHRASE` added to the repository
 - [x] `apps/desktop/debian/` folder with `control`, `rules`, `changelog`, `source/format`
-- [x] `ppa.yml` workflow committed; covers noble, oracular, plucky, questing, resolute
+- [x] `ppa.yml` workflow committed; covers noble (24.04 LTS), resolute (26.04 LTS), stonking (26.10)
 
 ---
 
@@ -38,7 +38,7 @@ Or watch the build queue at:
 ### 3. Verify publishing
 Check each series is published (status should change from `Pending` to `Published`):
 ```bash
-for SERIES in noble oracular plucky questing resolute; do
+for SERIES in noble resolute stonking; do
   curl -s "https://api.launchpad.net/1.0/~enhariharan/+archive/ubuntu/rahasyakosh?\
 ws.op=getPublishedBinaries&distro_arch_series=\
 https://api.launchpad.net/1.0/ubuntu/${SERIES}/amd64" \
@@ -67,6 +67,24 @@ When a new Ubuntu series is released:
    effect on the next release tag
 3. Optionally back-fill the new series manually using the script in `docs/deploy/`
 
+## Removing an end-of-life Ubuntu series
+
+Ubuntu's in-between releases (for example 25.10) are supported for nine months;
+the long-term ones (xx.04 in even years) for five years. Once a series reaches
+its end of life, Launchpad marks it `Obsolete` and refuses uploads to it, and
+because the upload loop stops at the first failure, the series after it in the
+list are skipped too. Before each release tag, list the series Launchpad still
+accepts:
+```bash
+curl -s https://api.launchpad.net/devel/ubuntu/series | python3 -c "import sys,json; \
+  [print(e['name'], e['version'], e['status']) for e in json.load(sys.stdin)['entries'] \
+   if e['status'] in ('Supported', 'Current Stable Release')]"
+```
+and remove any series from the `for SERIES in ...` list in `ppa.yml` that is not
+in it. Leave out series whose glibc is older than the one the runner builds
+against (the binary would not start there): for now, jammy (22.04) and
+everything older, which Launchpad still lists because of extended support.
+
 ---
 
 ## Troubleshooting
@@ -76,5 +94,7 @@ When a new Ubuntu series is released:
 | Workflow YAML parse error | `<<HEREDOC` treated as YAML merge key | Use `printf` instead (already fixed) |
 | `gpg: signing failed` | Passphrase wrong or key not imported | Check `PPA_GPG_PASSPHRASE` secret; re-import key |
 | `dput` rejected: duplicate version | Same version already in PPA for that series | Bump Debian revision (`1~noble1` → `2~noble1`) |
+| `550 Requested action not taken: internal server error` from `dput`, or an upload rejected by e-mail | The series is end-of-life (`Obsolete` on Launchpad) | Remove it from `ppa.yml`; see "Removing an end-of-life Ubuntu series" |
+| `unmet build dependencies: build-essential:native` | Runner image lacks `build-essential` | Install it in the "System libraries" step (already fixed) |
 | PPA shows build but `apt` returns 404 | Launchpad publishing queue lag | Wait 20–30 min; check `Pending` → `Published` via API |
 | Build fails on Launchpad | Missing runtime lib in Build-Depends | Add lib to `debian/control` Build-Depends, or override `dh_shlibdeps` |
