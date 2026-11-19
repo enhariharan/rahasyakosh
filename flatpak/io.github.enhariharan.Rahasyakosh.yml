@@ -26,6 +26,10 @@ finish-args:
   # WebKit proxy resolution — without this WebKit stays blank white inside a
   # sandbox that lacks the network plug (GLib tries the portal, portal refuses)
   - --env=GIO_USE_PROXY_RESOLVER=dummy
+  # Do NOT set GDK_BACKEND here. --socket=fallback-x11 hides X11 when Wayland
+  # is available, so the app picks the backend itself at start-up
+  # (platform::renderer_via_x11 in apps/desktop/src/platform). Forcing one here
+  # breaks hosts that only have the other.
 
 build-options:
   append-path: /usr/lib/sdk/rust-stable/bin
@@ -46,27 +50,49 @@ modules:
 
   - name: rahasyakosh
     buildsystem: simple
+    build-options:
+      env:
+        PKG_CONFIG_PATH: /app/lib/pkgconfig
+        LIBRARY_PATH: /app/lib
     build-commands:
       # Build desktop binary
       - cargo --offline fetch --manifest-path apps/desktop/Cargo.toml
-      - cargo --offline build --release --manifest-path apps/desktop/Cargo.toml
+      # release-flatpak profile: lto=false + codegen-units=16 to avoid OOM on
+      # memory-constrained build hosts; see apps/desktop/Cargo.toml for the definition.
+      - cargo --offline build --profile release-flatpak --jobs 1 --manifest-path apps/desktop/Cargo.toml
       # Install binaries
-      - install -Dm755 apps/desktop/target/release/rahasyakosh-desktop
+      - install -Dm755 apps/desktop/target/release-flatpak/rahasyakosh-desktop
           /app/bin/rahasyakosh-desktop
       - install -Dm755 apps/desktop/packaging/rahasyakosh-launcher
           /app/bin/rahasyakosh
-      # Desktop integration
+      # Desktop integration. The desktop file and metainfo are shared with the
+      # .deb, PPA, snap and AUR packages, which call the launcher
+      # rahasyakosh.desktop and the icon rahasyakosh. Flatpak needs both named
+      # after the app ID, and an Exec that exists inside the sandbox (/usr/bin
+      # here is the runtime's, not ours), so only the installed copies change.
       - install -Dm644 apps/desktop/packaging/rahasyakosh-system.desktop
+          /app/share/applications/io.github.enhariharan.Rahasyakosh.desktop
+      - desktop-file-edit --set-icon=io.github.enhariharan.Rahasyakosh
+          --set-key=Exec --set-value=rahasyakosh
           /app/share/applications/io.github.enhariharan.Rahasyakosh.desktop
       - install -Dm644 apps/desktop/packaging/rahasyakosh-chest.svg
           /app/share/icons/hicolor/scalable/apps/io.github.enhariharan.Rahasyakosh.svg
       - install -Dm644 apps/desktop/packaging/io.github.enhariharan.Rahasyakosh.metainfo.xml
           /app/share/metainfo/io.github.enhariharan.Rahasyakosh.metainfo.xml
+      - sed -i 's|>rahasyakosh.desktop<|>io.github.enhariharan.Rahasyakosh.desktop<|'
+          /app/share/metainfo/io.github.enhariharan.Rahasyakosh.metainfo.xml
     sources:
-      - type: git
-        url: https://github.com/enhariharan/rahasyakosh
-        tag: v0.1.0-alpha.5
-        commit: 3a5896e877406076827066e1ce4c7c1c23fe9d91
+      - type: dir
+        path: ..
+        skip:
+          - "*.snap"
+          - "*.deb"
+          - "*.buildinfo"
+          - "*.changes"
+          - "*.tar.gz*"
+          - apps/debian
+          - target
+          - apps/desktop/target
       # generated-sources.json is produced by flatpak-cargo-generator.py from Cargo.lock.
       # Regenerate with:
       #   python3 flatpak-cargo-generator.py apps/desktop/Cargo.lock -o generated-sources.json
