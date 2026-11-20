@@ -81,7 +81,15 @@ resolve, then run step 3 with `flatpak/local.yml`. Never submit this copy.
 
 ## Per-release update
 
-For each new release (e.g. `v0.1.0-alpha.10`), after the tag is pushed:
+Before tagging, in the release-prep commit next to `CHANGELOG.md`, add a
+`<release>` entry at the top of `<releases>` in
+`apps/desktop/packaging/io.github.enhariharan.Rahasyakosh.metainfo.xml`, and
+check the file with `appstreamcli validate --no-net`. Write pre-release versions
+with `~` (`0.1.0~alpha11`, not `0.1.0-alpha.11`; the comment in the file says
+why). Flathub builds the tagged commit, so an entry added after the tag only
+reaches Flathub with the next release.
+
+Then, after the tag is pushed:
 
 1. Update the `rahasyakosh` module's tag and commit in the manifest. The commit
    is the full hash the tag points at:

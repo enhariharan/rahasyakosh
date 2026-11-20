@@ -8,6 +8,9 @@ All notable changes to Rahasyakosh are written here, newest first. The format fo
 
 ## [Unreleased]
 
+### Fixed
+- **Release list in software centres:** the AppStream metadata listed only the first alpha, as version `0.1.0` dated 2026-11-12, so app stores would show it as the newest release (`0.1.0` ranks above every `0.1.0` alpha). It now lists alpha.10 and alpha.1, with pre-release versions written `0.1.0~alpha10`, which rank in the right order.
+
 ## [0.1.0-alpha.10] — 2026-11-19
 
 ### Changed
