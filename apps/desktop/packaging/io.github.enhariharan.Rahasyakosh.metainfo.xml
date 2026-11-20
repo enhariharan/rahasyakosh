@@ -51,8 +51,25 @@
       <image type="source" width="1080" height="720">https://raw.githubusercontent.com/enhariharan/rahasyakosh/main/docs/book/src/images/desktop-form.png</image>
     </screenshot>
   </screenshots>
+  <!-- Newest first. Pre-release versions use "~" (0.1.0~alpha10), the same rule
+       as the Debian packages: AppStream ranks "~" below everything, so 0.1.0~alpha10
+       comes after 0.1.0~alpha9 and before the final 0.1.0. "0.1.0-alpha.10" would
+       rank above 0.1.0. Dates are the release dates in CHANGELOG.md. -->
   <releases>
-    <release version="0.1.0" date="2026-11-12" type="development">
+    <release version="0.1.0~alpha10" date="2026-11-19" type="development">
+      <url type="details">https://github.com/enhariharan/rahasyakosh/releases/tag/v0.1.0-alpha.10</url>
+      <description>
+        <p>Changes since the first alpha:</p>
+        <ul>
+          <li>Import from KeePass (.kdbx) and 1Password (.1pux) files</li>
+          <li>An About page, and shell completions for the rk command-line tool</li>
+          <li>The app starts on Wayland desktops that have no X server</li>
+          <li>The screen reader reads the password fields correctly, and passwords in the entry form can be shown and hidden</li>
+        </ul>
+        <p>Not independently audited — do not store real secrets.</p>
+      </description>
+    </release>
+    <release version="0.1.0~alpha1" date="2026-11-13" type="development">
       <description>
         <p>First public alpha. Includes profiles, import from Bitwarden / KeePassXC / 1Password, export, two-factor codes, and full screen-reader support. Not independently audited — do not store real secrets.</p>
       </description>
