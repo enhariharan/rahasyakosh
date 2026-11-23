@@ -24,6 +24,19 @@ jobs:
       - name: WASM build of core
         run: cargo build -p rahasyakosh-core -p rahasyakosh-store -p rahasyakosh-app -p rahasyakosh-clipboard -p rahasyakosh-strength -p rahasyakosh-transfer --target wasm32-unknown-unknown --release
 
+  golden-cross-platform:
+    # Proves the vault binary format is portable: same golden vault opens on all three OSes.
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test -p rahasyakosh-core golden
+      - run: cargo test -p rahasyakosh-store --features sqlite every_schema_fixture
+
   wasm-test:
     # Runs core's tests, including the golden vault in spec/vectors, inside a WebAssembly runtime.
     runs-on: ubuntu-latest
