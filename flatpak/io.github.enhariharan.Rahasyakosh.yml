@@ -13,7 +13,9 @@ finish-args:
   - --share=ipc
   - --device=dri
   # Dioxus Desktop binds a local WebSocket between the Rust process and the
-  # WebKit webview; without network access the app panics on startup.
+  # WebKit webview; without this the app panics on startup. Flatpak's --share=
+  # only accepts "network" or "ipc" — there is no loopback-only option — so
+  # full network access is unavoidable here.
   - --share=network
   # Vault and settings — kept in the user's home directory, not the sandbox
   - --filesystem=home/.local/share/rahasyakosh:create
@@ -21,8 +23,6 @@ finish-args:
   - --filesystem=home/.local/state/rahasyakosh:create
   # AT-SPI / Orca screen-reader support
   - --talk-name=org.a11y.Bus
-  # Clipboard
-  - --talk-name=org.gnome.Mutter.DisplayConfig
   # WebKit proxy resolution — without this WebKit stays blank white inside a
   # sandbox that lacks the network plug (GLib tries the portal, portal refuses)
   - --env=GIO_USE_PROXY_RESOLVER=dummy
@@ -37,8 +37,35 @@ build-options:
     CARGO_HOME: /run/build/rahasyakosh/cargo
 
 modules:
+  # Clipboard: the app spawns wl-copy / wl-paste (crates/clipboard) to write
+  # and clear the clipboard without keeping secrets in a long-lived process.
+  # Neither tool is in the GNOME runtime, so bundle wl-clipboard here.
+  - name: wl-clipboard
+    buildsystem: meson
+    # Fish completion dir is detected from the host system (/usr/share/fish),
+    # which is read-only inside the sandbox. Override it into /app so the
+    # install step succeeds; the cleanup section removes it afterwards.
+    config-opts:
+      - -Dfishcompletiondir=/app/share/fish/vendor_completions.d
+    cleanup:
+      - /share/bash-completion
+      - /share/fish
+      - /share/zsh
+      - /share/man
+    sources:
+      - type: git
+        url: https://github.com/bugaevc/wl-clipboard.git
+        tag: v2.2.1
+        commit: 3eb912c274042cd5deed6b478b39908a12f37498
+
   - name: xdotool
     buildsystem: simple
+    # Remove build-only files: the binary and libxdo.so are kept; the header,
+    # pkg-config file and man page are not needed at runtime.
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+      - /man
     build-commands:
       - make PREFIX=/app
       - make install PREFIX=/app

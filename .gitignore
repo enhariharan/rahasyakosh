@@ -10,3 +10,9 @@ target/
 
 # Local Flatpak manifest for testing uncommitted changes (docs/deploy/flathub_checklist.md)
 flatpak/local.yml
+
+# Claude Code project settings
+.claude/
+
+# flatpak-cargo-generator.py is downloaded when needed (docs/deploy/flathub_checklist.md)
+flatpak-cargo-generator.py

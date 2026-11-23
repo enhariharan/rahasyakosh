@@ -35,16 +35,29 @@ Commit `generated-sources.json` alongside the manifest.
 
 ### 3. Test the build locally
 Run these from the repository root.
+
+**Build only** (no finish-args, good for a quick compile check):
 ```bash
 flatpak-builder --force-clean --sandbox --delete-build-dirs \
   ~/.cache/rk-flatpak-build \
   flatpak/io.github.enhariharan.Rahasyakosh.yml
-
-flatpak-builder --run \
-  ~/.cache/rk-flatpak-build \
-  flatpak/io.github.enhariharan.Rahasyakosh.yml \
-  rahasyakosh
 ```
+
+**Full install + run** (finish-args applied — required for clipboard, Wayland, and
+any feature that depends on `--socket=` or `--share=`):
+```bash
+flatpak-builder --force-clean --install --user \
+  ~/.cache/rk-flatpak-build \
+  flatpak/io.github.enhariharan.Rahasyakosh.yml
+
+flatpak run io.github.enhariharan.Rahasyakosh
+```
+
+Do not use `flatpak-builder --run` for feature testing. It launches a minimal
+sandbox without applying finish-args, so `WAYLAND_DISPLAY` and `DISPLAY` are
+unset — the app starts but clipboard copy fails and any feature gated on a
+socket or DBus name behaves as if the permission were absent.
+
 The build folder (`~/.cache/rk-flatpak-build`) must be on the same filesystem as
 the folder you run the command from, because flatpak-builder keeps its cache in
 `.flatpak-builder/` there and links files across. Don't use `/tmp`: on many
@@ -130,9 +143,9 @@ The app needs these `finish-args` (already in the manifest):
 | `--talk-name=org.a11y.Bus` | AT-SPI / Orca screen reader |
 | `--env=GIO_USE_PROXY_RESOLVER=dummy` | Prevents blank white screen in WebKit inside Flatpak sandbox |
 
-Flathub reviewers may ask to tighten `--share=network` to `--share=localhost`
-(loopback only). Try `--share=localhost` first in local testing; if the
-Dioxus WebSocket works, prefer it over full network access.
+Flatpak's `--share=` flag only accepts `network` or `ipc` — there is no
+loopback-only option. `--share=network` is unavoidable for the Dioxus WebSocket
+and is the correct value to use here.
 
 ---
 
