@@ -8,6 +8,8 @@ Files live in `aur/rahasyakosh-bin/` in this repo.
 ## One-time setup
 
 - [ ] Create an account at `https://aur.archlinux.org/` (requires a valid email).
+  **Note (2026-11-28):** AUR registration is temporarily closed due to automated account spam.
+  Watch https://archlinux.org/news/ or the aur-general mailing list for the reopening announcement.
 - [ ] Add your SSH public key to your AUR profile under **My Account → SSH Public Key**.
 - [ ] Clone the (empty) AUR package repo:
   ```bash
