@@ -35,7 +35,7 @@ A password manager earns trust slowly. Do these first:
 - [x] Issue templates (bug, feature, accessibility) and a pull request template, in `.github/`.
 - [x] Set the same version in every `Cargo.toml` (`apps/desktop` has its own workspace) and in the book. Both workspaces are at `0.1.0`; the book has no version field.
 - [x] Keep `Cargo.lock` committed; build with `--locked`. Both are in place.
-- [x] Decide the name check: confirm "Rahasyakosh" is free as a project and package name (apt, snap, flathub, GitHub topics). Checked 2026-11-13: not in apt, not in Snap Store, only enhariharan/rahasyakosh on GitHub. Flathub requires manual search; nothing found in public index.
+- [x] Decide the name check: confirm "Rahasyakosh" is free as a project and package name (apt, snap, GitHub topics). Checked 2026-11-13: not in apt, not in Snap Store, only enhariharan/rahasyakosh on GitHub.
 
 ## 2. Reproducible, verifiable releases
 - [x] A GitHub Actions workflow that runs on a version tag: builds on `ubuntu-22.04` with `cargo build --release --locked`, produces a `.deb`, and uploads artifacts. Done 2026-11-07.
@@ -64,9 +64,7 @@ The desktop app needs WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`), GTK 3 and libsoup 3
    - **Sandbox decisions 2026-11-13:** each install method keeps its own vault. Inside the snap the vault, secret keys, high-water mark and settings live under `$SNAP_USER_COMMON` (`~/snap/rahasyakosh/common/`), not the per-revision `~/snap/rahasyakosh/<rev>/`, so `snap revert` cannot roll the vault back. The `.deb` keeps `~/.local/share/rahasyakosh/`. So no `personal-files` plug is needed, and the Snap Store needs no manual interface review. The tray uses `unity7` (there is no `ayatana-appindicator` interface in snapd). Still to test in the installed snap: the vault lands in `common/`, the clipboard clears, the tray icon appears, and Orca reads the window.
    - **First run in the sandbox 2026-11-13:** two fixes were needed before the window drew. (1) Dioxus Desktop sends UI updates to the WebKit view over a WebSocket on `127.0.0.1` (random port, secret key per connection). Without the `network-bind` plug the app panics with "Failed to bind local TCP listener for edit socket". (2) The window then stayed blank white: inside a snap, GLib asks the desktop portal for proxy settings, the portal turns away snaps that lack the `network` plug, and WebKit never opens the socket. Setting `GIO_USE_PROXY_RESOLVER=dummy` in the app's `environment` skips the proxy lookup. We did not add the `network` plug, so the app still cannot reach the internet. With both fixes the snap installs with `sudo snap install --dangerous`, opens correctly, and creates its files under `~/snap/rahasyakosh/common/`. Also checked in the installed snap: the clipboard clears after the timeout, the tray icon appears, and Orca reads the window. Next: upload to the Snap Store.
    - **Done 2026-11-14:** snap fully published on the Snap Store `edge` channel. `.github/workflows/snap.yml` auto-builds and publishes on every `v*.*.*` tag. Store listing published with icon (512px PNG + SVG), banner (720×240), 4 screenshots, full metadata (`title`, `license`, `website`, `source-code`, `issues`, `contact`, `donation`). Snap Store badge added to README. GitHub Sponsors + FUNDING.yml added. Smoke-test: `sudo snap install rahasyakosh --channel=edge` on a clean machine — done 2026-11-16.
-4. **Flatpak / Flathub** (works on Ubuntu too, popular with privacy-minded users)
-   - Needs a reproducible manifest, AppStream metadata and a review by the Flathub team. Same sandbox questions as for the snap.
-5. **Official Ubuntu/Debian archive**: long term. Needs a Debian packaging sponsor and all Rust dependencies packaged individually. Do not plan for it in the alpha stage.
+4. **Official Ubuntu/Debian archive**: long term. Needs a Debian packaging sponsor and all Rust dependencies packaged individually. Do not plan for it in the alpha stage.
 
 Avoid a plain `curl | sh` installer.
 
@@ -75,7 +73,7 @@ Avoid a plain `curl | sh` installer.
 - [x] `rahasyakosh.desktop`: passes `desktop-file-validate` (one hint: it suggests adding `Settings` or `System` as a second category; categories are `Utility;Security;`).
 - [x] Icons at several sizes: PNG 16/32/48/64/128/256/512px generated from SVG and added to `.deb` assets and `install-local.sh`. Done 2026-11-13 (512px added 2026-11-14).
 - [x] Screenshots (4): unlock, first-run welcome, item detail with TOTP, edit form — all 1080×720 in `docs/book/src/images/`, referenced in AppStream metainfo. Done 2026-11-13.
-- [x] Choose the reverse-DNS app ID once and keep it. Using `io.github.enhariharan.Rahasyakosh` throughout (AppStream metainfo, `.desktop` file, Flatpak if added later). Done 2026-11-07.
+- [x] Choose the reverse-DNS app ID once and keep it. Using `io.github.enhariharan.Rahasyakosh` throughout (AppStream metainfo, `.desktop` file). Done 2026-11-07.
 
 ## 5. Quality bar for each release
 - [x] CI green on the tagged commit (fmt, clippy `-D warnings`, tests, deny, audit, fuzz job recent). Green on commits `ad76505` and `20ca27c` (2026-11-13).
@@ -110,6 +108,6 @@ Avoid a plain `curl | sh` installer.
 1. Finish the unlock checklist and the profile rough edges.
 2. Add `CHANGELOG.md`, issue templates and the release workflow with checksums and signing.
 3. Ship **v0.1.0-alpha.1** as a `.deb` on GitHub Releases, clearly marked unaudited.
-4. Add AppStream metadata, then a snap (and/or Flatpak) once sandbox behaviour with Orca and the vault folder is tested.
+4. Add AppStream metadata, then a snap once sandbox behaviour with Orca and the vault folder is tested.
 5. Seek an independent review of the crypto, then drop the "do not store real secrets" warning only after that.
 6. Consider a PPA once there is regular demand for updates through `apt`.

@@ -13,9 +13,6 @@ All notable changes to Rahasyakosh are written here, newest first. The format fo
 
 ## [0.1.0-alpha.10] — 2026-11-19
 
-### Changed
-- **Flatpak manifest:** builds a tagged release fetched from GitHub instead of the local folder, as Flathub requires. The Flatpak is not on Flathub yet.
-
 ### Fixed
 - **Release .deb version and name:** the GitHub release `.deb` was always `rahasyakosh_0.1.0-1_amd64.deb`, with version `0.1.0-1` taken from `Cargo.toml`. apt ranks that above every PPA alpha and even the PPA's final 0.1.0, so anyone who installed it would never get PPA upgrades. The package version now comes from the tag (`0.1.0~alpha10-1`, the PPA's scheme) and the file is named after the tag (`rahasyakosh_0.1.0-alpha.10_amd64.deb`). If you installed the alpha.9 `.deb` from GitHub, remove it once (`sudo apt remove rahasyakosh`) before installing a newer one or using the PPA.
 - **Release checksums:** `SHA256SUMS.txt` listed build paths (`target/release/rk`), so `sha256sum --check` failed on the downloaded files, and it left out the `.deb`. It now lists bare file names, including the `.deb`; check with `sha256sum --check --ignore-missing SHA256SUMS.txt`.
@@ -39,12 +36,11 @@ All notable changes to Rahasyakosh are written here, newest first. The format fo
 ## [0.1.0-alpha.6] — 2026-11-19
 
 ### Added
-- **Packaging for Arch and Flathub:** an AUR package (`aur/rahasyakosh-bin`) and a Flatpak manifest (`flatpak/`), with checklists in `docs/deploy/`. Neither is published yet.
+- **Packaging for Arch:** an AUR package (`aur/rahasyakosh-bin`), with a checklist in `docs/deploy/`.
 
 ### Fixed
 - **PPA workflow:** a YAML parse error that stopped `ppa.yml` from running at all (the alpha.5 PPA runs failed at once).
-- **Desktop app on a Wayland desktop with no X server:** the app no longer quits at start-up with `cannot open display` / `readPIDFromPeer`. Dioxus moves WebKit's page renderer to X11 on Wayland desktops; the app now skips that move when no X server can be reached (the Flatpak on a Wayland desktop, which hides X11) and keeps the renderer on Wayland. Nothing changes where an X server is available (the .deb, PPA and snap on GNOME, which provides XWayland).
-- **Flatpak build:** builds on memory-constrained hosts (new `release-flatpak` profile), links `xdotool`, launches from the app menu (the launcher pointed at a path that only exists outside the sandbox), and shows its icon. The shared desktop file and metainfo keep their .deb/snap names; the Flatpak renames only its own copies.
+- **Desktop app on a Wayland desktop with no X server:** the app no longer quits at start-up with `cannot open display` / `readPIDFromPeer`. Dioxus moves WebKit's page renderer to X11 on Wayland desktops; the app now skips that move when no X server can be reached and keeps the renderer on Wayland. Nothing changes where an X server is available (the .deb, PPA and snap on GNOME, which provides XWayland).
 - **PPA uploads:** the `apps/desktop/debian/` packaging folder the PPA workflow copies on each release tag is now in the repository.
 
 ## [0.1.0-alpha.5] — 2026-11-19

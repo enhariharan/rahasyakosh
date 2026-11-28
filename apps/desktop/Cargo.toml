@@ -29,17 +29,6 @@ gio = "0.18.4"
 lto = "thin"
 strip = true
 
-# Memory-constrained build profile used by the Flatpak manifest (--profile release-flatpak).
-# LTO is disabled and codegen-units is increased so LLVM never needs to hold the whole
-# program in RAM at once; flatpak-builder hosts (and local desktops) run out of memory
-# with the default release settings.
-[profile.release-flatpak]
-inherits = "release"
-lto = false
-codegen-units = 16
-opt-level = 2
-strip = true
-
 [lib]
 name = "rahasyakosh_desktop"
 path = "src/lib.rs"
