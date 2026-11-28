@@ -57,6 +57,12 @@ rahasyakosh
 sudo apt remove rahasyakosh
 ```
 
+**Results — noble (24.04 LTS), v0.1.0~alpha10-1~noble1, 2026-11-28 (GNOME Boxes VM):**
+- Install: clean, no dependency errors
+- App launched; existing vault and profiles opened correctly
+- Vault permissions correct (`drwx------`, files `rw-------`)
+- `apt remove` cleaned the package; `~/.local/share/rahasyakosh/` untouched
+
 ---
 
 ## Adding a new Ubuntu series

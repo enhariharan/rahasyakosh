@@ -179,10 +179,11 @@ dput ppa:enhariharan/rahasyakosh ../rahasyakosh_*.changes
 ## 6. Verify the PPA install on a clean VM
 
 For each Ubuntu series:
-- [ ] `sudo add-apt-repository ppa:enhariharan/rahasyakosh && sudo apt update && sudo apt install rahasyakosh`
-- [ ] App launches, vault creates, clipboard clears, Orca reads the window.
-- [ ] `sudo apt remove rahasyakosh` leaves `~/.local/share/rahasyakosh/` untouched.
-- [ ] `sudo apt upgrade` picks up a subsequent release without manual steps.
+- [x] `sudo add-apt-repository ppa:enhariharan/rahasyakosh && sudo apt update && sudo apt install rahasyakosh` — noble (24.04 LTS), v0.1.0~alpha10-1~noble1, 2026-11-28
+- [x] App launches, vault creates, clipboard clears, Orca reads the window. — noble, 2026-11-28 (GNOME Boxes VM)
+- [x] `sudo apt remove rahasyakosh` leaves `~/.local/share/rahasyakosh/` untouched. — noble, 2026-11-28; vault.db, profiles.json and WAL files all present after removal
+- [ ] `sudo apt upgrade` picks up a subsequent release without manual steps. (verify on next alpha release)
+- [ ] resolute (26.04 LTS) and stonking (26.10) — pending VM availability
 
 ---
 

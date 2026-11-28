@@ -25,6 +25,13 @@ rk get github --copy     # Copied to clipboard, cleared after 20s
 sudo snap install rahasyakosh --channel=edge
 ```
 
+**PPA (Ubuntu 24.04 / 26.04 / 26.10 — gets updates via `apt`):**
+
+```
+sudo add-apt-repository ppa:enhariharan/rahasyakosh
+sudo apt install rahasyakosh
+```
+
 **Build from source:**
 
 ```

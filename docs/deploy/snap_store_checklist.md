@@ -53,10 +53,7 @@ The desktop app needs WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`), GTK 3 and libsoup 3
    - Declare runtime `Depends:` (webkit, gtk3, libxdo, libayatana-appindicator) and set `Section: utils`, a proper description and the licence.
    - The launcher that turns on the accessibility service (see `install-local.sh`) must ship in the package, since screen-reader support depends on it.
    - Test: `sudo apt install ./rahasyakosh_*.deb` on a clean VM, then remove it with `apt remove` and confirm the vault in `~/.local/share/rahasyakosh/` is untouched. **Done 2026-11-13 (v0.1.0-alpha.1, Ubuntu 24.04 Wayland VM).**
-2. **A PPA on Launchpad** so users get updates through `apt`
-   - Needs a Launchpad account, a signed GPG key, and a Debian source package (`debian/` folder). Launchpad builds offline, so vendor the Rust crates (`cargo vendor`) or build a binary-only package.
-   - Good for Ubuntu users, but more work to keep up.
-3. **Snap** (Snap Store, default on Ubuntu)
+2. **Snap** (Snap Store, default on Ubuntu)
    - `snapcraft.yaml` with the `gnome` extension; confinement `strict` is preferred. Check what a sandbox does to a password manager: access to the vault folder in the home directory, the clipboard, and the accessibility bus (Orca). Test with a screen reader inside the snap before publishing.
    - Register the name early in the Snap Store; ask for the right interfaces in the forum if needed.
    - **Progress 2026-11-13:** `snap/snapcraft.yaml` written (core24 base, gnome extension, strict confinement, `personal-files` plug for the vault folder, `desktop-legacy` for AT-SPI/Orca). Name `rahasyakosh` registered in the Snap Store. Build not yet complete: Multipass and LXD both time out waiting for networking on this host (Ubuntu 26.04, all QEMU bridge interfaces NO-CARRIER). Next step: diagnose bridge networking or find an alternative build environment (e.g. a Ubuntu 24.04 VM or CI runner).
@@ -110,4 +107,4 @@ Avoid a plain `curl | sh` installer.
 3. Ship **v0.1.0-alpha.1** as a `.deb` on GitHub Releases, clearly marked unaudited.
 4. Add AppStream metadata, then a snap once sandbox behaviour with Orca and the vault folder is tested.
 5. Seek an independent review of the crypto, then drop the "do not store real secrets" warning only after that.
-6. Consider a PPA once there is regular demand for updates through `apt`.
+6. PPA is live at `ppa:enhariharan/rahasyakosh` — see `docs/deploy/ppa_checklist.md`.
